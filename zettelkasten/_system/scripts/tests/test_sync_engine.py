@@ -234,6 +234,33 @@ class SyncEngineTests(unittest.TestCase):
         self.assertEqual((clone / "integrations" / "VERSION").read_text(encoding="utf-8").strip(),
                          "1.0.0")
 
+    def test_self_heal_removes_what_upstream_deleted_under_scripts(self):
+        """A restore that only COPIES leaves the clone permanently un-syncable.
+
+        `git checkout <ref> -- scripts/` writes what upstream has and says
+        nothing about what upstream dropped, so a retired migration and its
+        helpers stay in the tree. `scripts/` then differs from upstream
+        forever, the dirty guard refuses it on every run, and the clone that
+        the recovery path exists for is exactly the one it cannot rescue.
+        """
+        clone = _clone(self.tmp, self.up, version="0.69.0")
+        # Something the restore must change, so `scripts/` is dirty vs HEAD...
+        shutil.rmtree(clone / "scripts" / "lib")
+        # ...and something upstream no longer has, so it is not identical to
+        # upstream either — which is the deadlock.
+        (clone / "scripts" / "migrations").mkdir(parents=True, exist_ok=True)
+        (clone / "scripts" / "migrations" / "002-retired-upstream.sh").write_text(
+            "# a migration upstream deleted\n", encoding="utf-8")
+        _git(clone, "add", "-A")
+        _git(clone, "commit", "-q", "-m", "a clone carrying retired migrations")
+
+        healed = _run(clone, "--self-heal")
+        self.assertEqual(healed.returncode, 0, healed.stdout + healed.stderr)
+        self.assertFalse((clone / "scripts" / "migrations" / "002-retired-upstream.sh").exists(),
+                         "a path upstream deleted must not survive the restore")
+        self.assertEqual((clone / "integrations" / "VERSION").read_text(encoding="utf-8").strip(),
+                         "1.0.0", "the first --self-heal run must reach the upstream version")
+
     def test_a_path_dirty_but_identical_to_upstream_is_not_an_abort(self):
         """Otherwise the self-heal deadlocks against the script's own dirty check."""
         clone = _clone(self.tmp, self.up, version="0.69.0")

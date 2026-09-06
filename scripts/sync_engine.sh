@@ -88,6 +88,22 @@ if [ $SELF_HEAL -eq 1 ]; then
   echo "[sync] self-heal: fetching $REMOTE/$BRANCH and restoring scripts/ ..."
   git fetch "$REMOTE" "$BRANCH"
   git checkout "$REMOTE/$BRANCH" -- scripts/
+  # A checkout writes what upstream HAS and says nothing about what upstream
+  # dropped, so every retired migration and its helpers stay in the tree.
+  # `scripts/` then differs from upstream forever and the dirty guard below
+  # refuses it on every run — deadlocking the recovery on exactly the clone it
+  # exists for. `--diff-filter=A` is the paths present here and absent there
+  # (the ref is the diff's OLD side, the working tree its new one).
+  # `core.quotepath=false` so a non-ASCII name arrives as itself; `--ignore-unmatch`
+  # so an untracked leftover is not an error; never `git rm -f`, which would
+  # reach beyond what this loop names.
+  git -c core.quotepath=false diff --name-only --diff-filter=A "$REMOTE/$BRANCH" -- scripts/ |
+    while IFS= read -r _stale; do
+      [ -n "$_stale" ] || continue
+      git rm -q --cached --ignore-unmatch -- "$_stale" >/dev/null 2>&1 || true
+      rm -f -- "$_stale"
+      echo "[sync] self-heal: removed $_stale (upstream no longer ships it)"
+    done
   echo "[sync] self-heal: scripts/ restored — re-running the repaired script"
   exec bash "$REPO_ROOT/scripts/sync_engine.sh" --remote "$REMOTE" --branch "$BRANCH"
 fi

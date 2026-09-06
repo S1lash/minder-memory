@@ -327,6 +327,41 @@ class Migration031Tests(unittest.TestCase):
         # sibling: the removals are reported separately and are non-empty
         self.assertTrue(payload["links_removed"])
 
+    def test_plain_leftovers_of_a_windows_install_are_removed_and_backed_up(self):
+        """A Windows install writes real files where a symlink was intended.
+
+        The prune skipped anything that was not a symlink, so a clone installed
+        without symlink support kept `skills/ztn-process/`, `rules/ztn.md` and
+        their siblings — shadowing the current wiring with a stub of the old
+        one. A legacy NAME is ours whatever its file type; a foreign name never
+        is, whatever its file type.
+        """
+        (self.home / "skills" / "ztn-process").mkdir(parents=True)
+        with open(self.home / "skills" / "ztn-process" / "SKILL.md", "w",
+                  encoding="utf-8", newline="") as handle:
+            handle.write("a plain copy of the old skill\n")
+        (self.home / "rules").mkdir(parents=True, exist_ok=True)
+        with open(self.home / "rules" / "ztn.md", "w", encoding="utf-8", newline="") as handle:
+            handle.write("a plain copy of the old rule\n")
+        with open(self.home / "rules" / "my-own.md", "w", encoding="utf-8", newline="") as handle:
+            handle.write("mine, not the engine's\n")
+
+        res = self._go()
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertFalse((self.home / "skills" / "ztn-process").exists(),
+                         "a plain directory under a legacy skill name must be removed")
+        self.assertFalse((self.home / "rules" / "ztn.md").exists(),
+                         "a plain file under a legacy rule name must be removed")
+        self.assertTrue((self.home / "rules" / "my-own.md").is_file(),
+                        "a foreign plain file must never be touched")
+
+        backups = sorted(self.home.glob(".minder-memory-backup-*"))
+        self.assertTrue(backups, "nothing was removed into a backup")
+        saved = {p.relative_to(b).as_posix()
+                 for b in backups for p in b.rglob("*") if p.is_file()}
+        self.assertIn("rules/ztn.md", saved)
+        self.assertIn("skills/ztn-process/SKILL.md", saved)
+
     # -- Step C: install.sh ------------------------------------------------ #
 
     def test_install_is_run_with_claude_home_inherited(self):
@@ -385,6 +420,32 @@ class Migration031Tests(unittest.TestCase):
         res = self._go()
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertTrue(self._url("upstream").endswith("minder-memory.git"))
+
+    def test_only_the_engine_sync_remote_is_rewritten(self):
+        """A friend's OWN repository may carry the former name too.
+
+        Rewriting every remote whose URL ends in the old skeleton name
+        repointed their data `origin` at a fork of the engine — silently, and
+        only visible the next time they pushed. The engine renames the one
+        remote it syncs from and reports the rest as left alone.
+        """
+        remotes = self.tmp / "remotes"
+        (remotes / "engine").mkdir(parents=True)
+        (remotes / "mine").mkdir(parents=True)
+        engine_old = _make_bare_remote(remotes / "engine" / "minder-ztn.git")
+        _make_bare_remote(remotes / "engine" / "minder-memory.git")
+        own_old = _make_bare_remote(remotes / "mine" / "minder-ztn.git")
+        _make_bare_remote(remotes / "mine" / "minder-memory.git")
+        self._remote("origin", own_old)
+        self._remote("upstream", engine_old)
+
+        res = self._go()
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertTrue(self._url("upstream").endswith("minder-memory.git"),
+                        f"the sync remote is still {self._url('upstream')}")
+        self.assertEqual(self._url("origin"), own_old,
+                         "the owner's own remote must keep its name")
+        self.assertIn("your own remotes keep their names", res.stdout)
 
     def test_lookalike_last_segment_is_not_rewritten(self):
         """`minder-ztn-alice` is somebody's fork name, not our repository."""

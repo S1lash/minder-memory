@@ -13,18 +13,23 @@ that window, in five steps that are each idempotent:
   A. The legacy managed-block markers in `$CLAUDE_HOME/CLAUDE.md` become the
      current ones, in place, so the installer refreshes the block where the
      owner put it instead of appending a second one at the end.
-  B. Symlinks under `$CLAUDE_HOME/{rules,commands,skills,agents}` that point
-     INTO this repository and either dangle or carry a legacy name are removed.
-     A link that points anywhere else is never touched — it is only reported
-     when it dangles, because it is somebody else's.
+  B. Entries under `$CLAUDE_HOME/{rules,commands,skills,agents}` that are the
+     engine's are removed. A symlink is the engine's when it points INTO this
+     repository and either dangles or carries a legacy name; anything that is
+     not a symlink — the real files and directories an install without symlink
+     support leaves behind — is the engine's when its NAME is a legacy one,
+     and is moved into this run's backup directory rather than deleted. A link
+     pointing anywhere else is never touched, only reported when it dangles;
+     a foreign name is never touched at all.
   C. `integrations/claude-code/install.sh` runs. Its failure is the
      migration's failure: the migration is `structural`, so the update aborts
      and retries next time rather than recording a half-wired harness. A clone
      that carries no installer has no harness to re-wire and passes.
-  D. Any git remote whose URL names the skeleton by its old repository name is
-     pointed at the new one — but only after `git ls-remote` proves the new
-     URL answers. No network, no answer, or a fork that merely shares the old
-     name: the remote is left alone and the manual command is printed.
+  D. The ONE remote the engine syncs from is pointed at the new URL — but only
+     after `git ls-remote` proves that URL answers. No network, no answer, or
+     a fork that merely shares the old name: the remote is left alone and the
+     manual command is printed. Every other remote is the owner's own, however
+     it is named, and is reported as untouched rather than as a to-do.
   E. A digest tells the owner what changed and what they hold outside the
      repository: the routine prompts to reconcile, the environment variable
      names (the old ones still work), the connector name.
@@ -79,6 +84,23 @@ def claude_home() -> Path:
     return Path(os.environ.get("CLAUDE_HOME") or (Path.home() / ".claude"))
 
 
+_BACKUP_DIR: Path | None = None
+
+
+def backup_dir(home: Path) -> Path:
+    """The one directory this run moves anything it removes into.
+
+    One per run, not one per step: an owner recovering from a bad update wants
+    a single place to look, and a timestamp per step would scatter the pieces
+    of one change across several.
+    """
+    global _BACKUP_DIR
+    if _BACKUP_DIR is None:
+        _BACKUP_DIR = home / (BACKUP_PREFIX + datetime.now().strftime("%Y%m%d-%H%M%S"))
+    _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    return _BACKUP_DIR
+
+
 # -----------------------------------------------------------------------------
 # A — markers
 # -----------------------------------------------------------------------------
@@ -96,11 +118,10 @@ def rewrite_markers(home: Path, *, dry_run: bool) -> dict:
     result["action"] = "rewritten"
     if dry_run:
         return result
-    backup_dir = home / (BACKUP_PREFIX + datetime.now().strftime("%Y%m%d-%H%M%S"))
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(claude_md, backup_dir / "CLAUDE.md.before-031")
+    backup = backup_dir(home) / "CLAUDE.md.before-031"
+    shutil.copy2(claude_md, backup)
     write_text_utf8(claude_md, new_text)
-    result["backup"] = str(backup_dir / "CLAUDE.md.before-031")
+    result["backup"] = str(backup)
     return result
 
 
@@ -129,7 +150,18 @@ def _is_legacy_name(subdir: str, name: str) -> bool:
 
 
 def prune_links(home: Path, repo_root: Path, *, dry_run: bool) -> tuple[list[str], list[str]]:
-    """Remove our dangling / legacy links; report foreign dangling ones."""
+    """Remove our dangling / legacy entries; report foreign dangling links.
+
+    Ownership of a SYMLINK is decided by where it points; ownership of anything
+    else by its NAME. An install without symlink support — Windows without
+    developer mode — wrote real files and directories where the installer
+    intended links, so `skills/ztn-process/` and `rules/ztn.md` survive as
+    plain copies and shadow the current wiring with a stub of the old one. A
+    legacy name is the engine's whatever its file type; a name that is not the
+    engine's is never touched, whatever its file type. What is removed is moved
+    into this run's backup directory first, because a plain file — unlike a
+    link — holds content nothing else can restore.
+    """
     removed: list[str] = []
     reported: list[str] = []
     repo_root = repo_root.resolve()
@@ -139,6 +171,12 @@ def prune_links(home: Path, repo_root: Path, *, dry_run: bool) -> tuple[list[str
             continue
         for entry in sorted(d.iterdir()):
             if not entry.is_symlink():
+                if _is_legacy_name(subdir, entry.name):
+                    removed.append(str(entry))
+                    if not dry_run:
+                        dest = backup_dir(home) / subdir / entry.name
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.move(str(entry), str(dest))
                 continue
             dangling = not entry.exists()
             ours = _points_into(entry, repo_root)
@@ -286,14 +324,28 @@ def _git(repo_root: Path, *args: str, timeout: int | None = None) -> subprocess.
 
 
 def rewrite_remotes(repo_root: Path, *, dry_run: bool) -> list[dict]:
+    """Repoint the ONE remote the engine syncs from; leave every other alone.
+
+    An owner's own repository is theirs to name, and plenty of them carry the
+    former name too — their data repository, a fork, a mirror. Rewriting every
+    remote whose URL ends in the old skeleton name repointed a friend's data
+    `origin` at the engine's renamed skeleton, silently, discoverable only at
+    their next push. Which remote the engine syncs from is not a guess: it is
+    what the sync exported, else `upstream`, else the one whose URL names the
+    skeleton — `sync_remote_and_branch` is the one home of that answer.
+    """
     out: list[dict] = []
     listed = _git(repo_root, "remote")
     if listed.returncode != 0:
         return out
+    sync_remote, _branch = sync_remote_and_branch(repo_root)
     for name in listed.stdout.split():
         url = _git(repo_root, "remote", "get-url", name).stdout.strip()
         new_url = _renamed_url(url)
         if not new_url:
+            continue
+        if name != sync_remote:
+            out.append({"remote": name, "url": url, "new_url": new_url, "action": "not-ours"})
             continue
         entry = {"remote": name, "url": url, "new_url": new_url, "action": "kept"}
         try:
@@ -335,7 +387,14 @@ def digest(result: dict) -> str:
         for p in still:
             lines.append(f"  - {p} — still absent; run the update once more")
     lines.append(f"install.sh exit code: {result['install_rc']}")
+    not_ours = [r for r in result["remotes"] if r["action"] == "not-ours"]
+    if not_ours:
+        lines.append("your own remotes keep their names — untouched, nothing for you to do:")
+        for r in not_ours:
+            lines.append(f"  - {r['remote']}: {r['url']}")
     for r in result["remotes"]:
+        if r["action"] == "not-ours":
+            continue
         if r["action"] in ("rewritten", "would-rewrite"):
             lines.append(f"remote {r['remote']}: {r['url']} -> {r['new_url']} ({r['action']})")
         else:

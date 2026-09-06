@@ -2,6 +2,40 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.0.1 — The rename update, after watching someone take it
+
+Five things that only show up when a real clone goes through the rename.
+
+**The recovery no longer stalls at 0.69.0.** `--self-heal` restores `scripts/`
+from upstream — but a restore that only copies leaves behind every file
+upstream has since deleted, so `scripts/` differed from upstream forever and
+the next run refused the tree as dirty. On exactly the clone the recovery
+exists for. It now removes what upstream dropped as well as writing what it
+ships, and the first run gets through.
+
+**Only the remote the engine syncs from is repointed.** If your own repository
+is named after the old skeleton — plenty are — the update used to point it at
+the engine's, silently, and you would find out at your next push. Your remotes
+keep their names and are listed as untouched.
+
+**Leftovers from a Windows install are cleared.** An install without symlink
+support writes real files where links were meant, so a stub of the old wiring
+survived under `~/.claude` and shadowed the new one. Anything under an engine
+name is now moved into the update's backup directory whatever its file type;
+anything under a name that is not the engine's is never touched.
+
+**Your own repository and folder names are yours.** A name like
+`minder-ztn-<yours>` in your notes is your repository or folder, not the
+product, and renaming it produced a path that does not exist. Those are left
+whole and reported, so you can see why those lines still read the old way.
+
+**The update checks itself.** Before it tells you anything, it re-derives what
+the migrations should have done and proves it from your filesystem — version,
+managed block, rules, commands, skills, dashboard, routines, credential store —
+fixes what it can, and reports the one thing that needs you. And it says, up
+front, that the rename rewrites files you have open and not yet saved, with
+their previous text recoverable from git.
+
 ## 1.0.0 — The product is Minder Memory
 
 The second memory has its own name inside the Minder ecosystem: **Minder
@@ -23,9 +57,11 @@ session afterwards so the re-wired rules load.
 rename map over your whole clone — the registries and system files that were
 seeded once, the vault config and dashboard (your edits travel with it), your
 notes, records, hubs and the append-only state — so nothing in your base says
-the old name any more. Only `_sources/` is left as recorded: a transcript is
-evidence of what was said. The rename is deterministic, idempotent, and one
-`git` step away from undone.
+the old name any more. A note that quotes the former name as a name now reads
+the new one — the rename is of the product wherever the product is named, not
+of a token in engine files only — while `_sources/` keeps the wording exactly
+as recorded: a transcript is evidence of what was said. The rename is
+deterministic, idempotent, and one `git` step away from undone.
 
 **Names you hold outside the repository — these are renamed, not read twice.**
 The base-path variable is `MINDER_MEMORY_BASE` and the credential-store key is

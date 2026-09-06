@@ -49,7 +49,14 @@ no version / phase / rename-history narratives.
    `.maintain.lock`, `.lint.lock`, `.agent-lens.lock`, `.content.lock`,
    `.roles.lock`, `.resolve.lock`. Abort naming the one found.
 3. Working tree clean on engine paths (script-style requirement —
-   uncommitted engine edits would be lost).
+   uncommitted engine edits would be lost). Say the wider version out loud
+   before an update that crosses 1.0.0: migration 032 rewrites the product
+   name in **every file in the clone**, engine and owner data alike, including
+   notes the owner has open and has not committed. That is the contract and it
+   is reversible — git holds the previous text under the old name — but an
+   owner who is told afterwards reads it as data loss. Ask them to commit what
+   they are in the middle of; if they proceed anyway, carry the migration's own
+   count of what it rewrote unsaved into the digest at Step 8.
 4. `upstream` remote configured. If missing — offer to add it
    interactively:
    ```
@@ -394,6 +401,60 @@ the key and send the routine back otherwise unchanged. Report the checklist as
 a table of items with «closed» / «open — needs the owner: …», and do not call
 the update finished while an item is open without the owner having said so.
 
+### Step 7.3 — Post-update self-check
+
+Before the owner is told anything, prove from the filesystem that the update
+did what it should have. What an update gets wrong is usually an ABSENCE — a
+rule that stopped loading, a skill nothing resolves — and nothing in the tree
+announces an absence: every artefact still looks correct. A migration that
+succeeded at the wrong thing is recorded `applied` and never runs again, so the
+proof has to be gathered now, by the run that made the change.
+
+```bash
+python3 scripts/check_update.py            # add --json for the machine-readable report
+```
+
+The probes live in that script, not here, for two reasons: a probe described in
+a prompt drifts from the one that ran last time, and the literals a rename check
+needs cannot live in a file the rename rewrites. It checks the version against
+the remote, the managed block, the rule / command / agent links, the skill
+count, leftovers and foreign dangling links under the harness home, the residue
+grep of `docs/upgrade-1.0.0.md` row 7, conflict markers, the dashboard,
+`_sources/`, the roles list and credential store, and the migration ledger.
+Each probe answers `ok` / `fail` / `skip`; the exit code is 0 when nothing
+failed, 1 when something did, 2 when the check could not run at all.
+
+**Two things the script cannot reach**, because they are read through the
+scheduler tool rather than the filesystem — do them yourself, here:
+
+- Read each cloud routine back. The prompt body must name no command under the
+  former product namespace, and no environment KEY may still carry the former
+  product name or its `_ROLES_KEY` spelling. Never read, print or quote a
+  value — only key names.
+- Read each `role.md`. Anything in it that names the repository, a path, an
+  environment variable or an outside service by a former name is a nuance to
+  raise with the owner, not something to rewrite: a role's prose is theirs.
+
+**Judgement.**
+
+- A `fail` is yours to fix once and re-run the script — that is the whole point
+  of checking while the change is still in hand.
+- Two exceptions you do not act on: a remote that did not answer (nothing local
+  fixes an offline host), and a credential that lives outside the repository.
+- Never repoint a remote other than the one the engine syncs from.
+- A `skip` is not a pass. Say which question could not be asked, and why, if it
+  matters to the owner.
+- The former name surviving in the places the residue grep excludes is correct —
+  say nothing about them.
+- `git status` must show only what this update produced. If the rename migration
+  rewrote files the owner had not saved, name them; its own output carries the
+  count.
+
+**What the owner sees:** one line — «checked everything after the update — all
+wired» — plus what you fixed, plus the one thing that needs them, if any. No
+probe table, no command output. The evidence is for you; the conclusion is for
+them.
+
 ### Step 8 — Stage + propose commit
 
 `git add` all overwritten paths + the migration ledger
@@ -515,6 +576,34 @@ expands that one item (how it works / how to enable / a concrete
 example), pulling from the CHANGELOG entry, the relevant skill doc, and
 `docs/privacy.md` when the feature reads owner-data. Do not pre-dump the
 detail — default short, depth on request.
+
+**When the update crosses into 1.0.0** (`version_before` < `1.0.0`), the
+release is a rename, and a rename is the one update where the mechanism IS the
+news: every name the owner types changed at once. The beats below are what the
+digest carries, in this order, in the owner's language. Everything above still
+applies — short, plain, no hype — but none of these may be dropped, because
+each one is a thing the owner would otherwise discover by something failing.
+
+1. **The product has its own name now.** Same notes, same repository, same
+   folder — nothing of theirs moved.
+2. **Old → new, for the commands they actually use.** A two-column table built
+   from what is on disk — `ls ~/.claude/commands/minder/mem/` and the skill
+   list — not from memory. Listing a command that does not exist is worse than
+   listing none.
+3. **`ztn` / `зтн` / `ЗТН` still work when they speak to the assistant.** <!-- rebrand:keep -->
+   They are aliases in the hot rule and stay so permanently; only the slash
+   commands changed. (The line above keeps the former spellings on purpose —
+   naming the alias is the whole point of the beat.)
+4. **Their GitHub repository name is theirs and needs no change.** The redirect
+   from the former name is permanent; renaming would drag cloud routines, inbox
+   integrations and collectors with it. Offer to help only if they ask.
+5. **The credential key rename** — what it is, what stays broken until it is
+   done (every role that reaches an outside service), and that the assistant
+   does it in the cloud routines itself.
+6. **What changed in their scheduled routines, and what is still open** — from
+   Step 7.1's reconciliation, by name.
+7. **A loader-style routine prompt keeps working unchanged**, because the
+   prompt FILE names did not change — only what is inside them.
 
 The block below is an ILLUSTRATION of the stance, not a required
 layout — adapt freely per update:

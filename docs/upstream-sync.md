@@ -84,7 +84,12 @@ bash scripts/sync_engine.sh --self-heal  # the script equivalent
 ```
 
 Both restore `scripts/` from the remote before doing anything else, then
-proceed with the repaired copy.
+proceed with the repaired copy. Restoring means making `scripts/` match
+upstream in both directions: what upstream ships is written, and what
+upstream has since dropped — a retired migration, a helper that moved —
+is removed. A copy-only restore would leave those behind, `scripts/`
+would differ from upstream forever, and the next run would refuse the
+tree as dirty on exactly the clone the recovery exists for.
 
 ## The version floor
 

@@ -14,6 +14,11 @@ engine performs, deterministic, idempotent and reversible through git (ADR-029).
 
 Never touched:
 - `zettelkasten/_sources/**` — verbatim source material (doctrine §3.6).
+- `minder-ztn-<suffix>` — the skeleton name with somebody's own tail on it is
+  THEIR repository, folder, host or fork, and renaming it produces a path that
+  does not exist. Left whole and reported on the `own_name` axis, so the
+  digest can say why those lines still read the old way. The engine's own
+  retired project identifier `minder-ztn-platform` is the one exception.
 - `docs/CHANGELOG.md` and `zettelkasten/5_meta/DECISION_LOG.md` — release and
   decision history; each carries its own note of the rename.
 - Any `.git` directory, generated output, binaries, files that are not UTF-8.
@@ -85,6 +90,21 @@ PROTECTED_PATTERNS: tuple[str, ...] = (
     r"_sources/[^\s`'\")\]|>]*",           # a path into verbatim sources
 )
 
+# The owner's OWN name, not the engine's. `minder-ztn-<suffix>` is somebody's
+# repository, clone folder, deploy host or fork — the skeleton name with their
+# own tail on it. Renaming it produces a path that does not exist, in the one
+# place they would look to find their own files. The engine renames what it
+# owns and nothing else, so these spans survive the map whole and are reported
+# instead. The single exception is the engine's own retired project identifier
+# `minder-ztn-platform`, which has its own rule in the map and moves with the
+# product. Hyphen form only: the underscore spelling is how python identifiers
+# and config keys inside the engine are written, never how a repository is named.
+# The lookbehind is what separates a NAME from a slug: a repository or folder
+# name starts a token (`~/repos/minder-ztn-ivanov`, `- minder-ztn-mcp`), while
+# `20260519-reflection-minder-ztn-origin-story` is a note's own slug with the
+# product named inside it, and that one moves with the product.
+OWN_NAME_PATTERN = r"(?i)(?<![\w-])minder-ztn-(?!platform\b)[A-Za-z0-9][A-Za-z0-9_-]*"
+
 _SENTINEL = "@@PROTECT{}@@"
 
 # -----------------------------------------------------------------------------
@@ -126,11 +146,15 @@ TOKEN_MAP: tuple[tuple[str, str], ...] = (
     (r"\bsync-ztn\.sh\b", "sync-minder-memory.sh"),
     (r"\bsearchZtn\b", "searchMinderMemory"),
     (r"\bZTN/Minder\b", PRODUCT_NAME),
-    (r"\bminder-ztn\b", PRODUCT_SLUG),
+    # Inside a longer hyphen chain the product is being NAMED, not a repository:
+    # a note slug `…-reflection-minder-ztn-origin-story` moves with the product.
+    # A name that STARTS a token was protected before the map ever ran.
+    (r"(?<=-)minder-ztn(?=-)", PRODUCT_SLUG),
+    (r"\bminder-ztn\b(?!-)", PRODUCT_SLUG),
     # «the ZTN memory» named the same thing the product now is; never «Minder Memory memory».
     (r"\bztn-memory\b", PRODUCT_SLUG),
     (r"(?i)\bztn memory\b", PRODUCT_NAME),
-    (r"\bminder_ztn\b", "minder_memory"),
+    (r"\bminder_ztn\b(?!_)", "minder_memory"),
     (r"\bMINDER-ZTN\b", "MINDER-MEMORY"),
     (r"\bmy-ztn\b", "my-minder-memory"),
     (r"\burn:ztn:", "urn:minder-memory:"),
@@ -189,7 +213,7 @@ CODE_SUFFIXES = frozenset({
 })
 _CODE_SAFE_RULES = frozenset({
     r"\bMinder[ /\-]ZTN\b", r"(?i)\bмайндер[ \-]ZTN\b", r"(?i)\bмайндер[ \-]ЗТН\b", r"\bZTN/Minder\b",
-    r"\bminder-ztn\b", r"\bminder_ztn\b", r"\bminder_ztn_", r"\bztn-memory\b", r"(?i)\bztn memory\b",
+    r"(?<=-)minder-ztn(?=-)", r"\bminder-ztn\b(?!-)", r"\bminder_ztn\b(?!_)", r"\bminder_ztn_", r"\bztn-memory\b", r"(?i)\bztn memory\b",
     r"\bMINDER-ZTN\b", r"\bmy-ztn\b", r"\burn:ztn:",
     r"\bMINDER_ZTN_", r"\bZTN_BASE\b", r"\bZTN_([A-Z][A-Z0-9_]*)\b",
     r"/ztn:", r"\bztn:(?=[a-z])",
@@ -231,6 +255,7 @@ def is_code_path(rel: str, name: str, suffix: str) -> bool:
 _COMPILED_PROTECTED: tuple[re.Pattern[str], ...] = tuple(
     re.compile(pat) for pat in PROTECTED_PATTERNS
 )
+_OWN_NAME_RE = re.compile(OWN_NAME_PATTERN)
 # Anything that still smells of the old name after the map ran.
 _RESIDUE_RE = re.compile(r"ztn|ЗТН|зтн", re.IGNORECASE)
 
@@ -262,7 +287,7 @@ def _rebrand_span(text: str, *, code: bool = False) -> str:
         kept.append(m.group(0))
         return _SENTINEL.format(len(kept) - 1)
 
-    for pat in _COMPILED_PROTECTED:
+    for pat in (*_COMPILED_PROTECTED, _OWN_NAME_RE):
         text = pat.sub(_protect, text)
     for pat, repl in (_COMPILED_CODE_MAP if code else _COMPILED_MAP):
         text = pat.sub(repl, text)
@@ -375,6 +400,13 @@ class Report:
     skipped_dirty: list[str] = field(default_factory=list)
     conflicts: list[str] = field(default_factory=list)
     residue: dict[str, int] = field(default_factory=dict)
+    # `minder-ztn-<suffix>` occurrences left alone: the owner's own repository
+    # or folder, reported so the digest can say why they still read that way.
+    own_name: dict[str, int] = field(default_factory=dict)
+    # Files that were rewritten while carrying uncommitted work. Tracked ones
+    # have their previous text in git; untracked ones have it nowhere.
+    rewritten_dirty: list[str] = field(default_factory=list)
+    rewritten_unsaved: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:
         return json.dumps({
@@ -386,6 +418,9 @@ class Report:
             "skipped_dirty": self.skipped_dirty,
             "conflicts": self.conflicts,
             "residue": self.residue,
+            "own_name": self.own_name,
+            "rewritten_dirty": self.rewritten_dirty,
+            "rewritten_unsaved": self.rewritten_unsaved,
         }, ensure_ascii=False, sort_keys=True, indent=1)
 
 
@@ -448,12 +483,24 @@ def _rename(root: Path, old: str, new: str, *, use_git: bool) -> None:
 
 def _git_dirty(root: Path) -> set[str]:
     """Paths with uncommitted changes — somebody's work in flight."""
+    return _git_unsaved(root)[0]
+
+
+def _git_unsaved(root: Path) -> tuple[set[str], set[str]]:
+    """(everything uncommitted, the subset git has never seen).
+
+    The split matters when the rename runs over them anyway: a tracked file's
+    previous text is recoverable from git under its old name, an untracked
+    one's is recoverable from nowhere. Reporting both as one number would
+    promise a recovery that does not exist for half of them.
+    """
     try:
         out = subprocess.run(["git", "-C", str(root), "status", "--porcelain", "-z"],
                              capture_output=True, check=True).stdout
     except (OSError, subprocess.CalledProcessError):
-        return set()
+        return set(), set()
     dirty: set[str] = set()
+    untracked: set[str] = set()
     fields = out.decode("utf-8", "surrogateescape").split("\0")
     i = 0
     while i < len(fields):
@@ -463,13 +510,15 @@ def _git_dirty(root: Path) -> set[str]:
             continue
         status, path = entry[:2], entry[3:]
         dirty.add(path)
+        if status == "??":
+            untracked.add(path)
         # A rename or copy record is followed by a second NUL-terminated
         # field holding the ORIGINAL path; both sides are somebody's work.
         if "R" in status or "C" in status:
             if i < len(fields) and fields[i]:
                 dirty.add(fields[i])
             i += 1
-    return dirty
+    return dirty, untracked
 
 
 def run(root: Path, *, dry_run: bool,
@@ -477,7 +526,10 @@ def run(root: Path, *, dry_run: bool,
     root = root.resolve()
     report = Report(root=str(root), dry_run=dry_run)
     use_git = _git_tracked(root) is not None
-    dirty = _git_dirty(root) if skip_dirty else set()
+    # Read BEFORE anything is rewritten — afterwards every file is dirty and
+    # the question «what was already unsaved?» can no longer be asked.
+    unsaved, untracked = _git_unsaved(root)
+    dirty = unsaved if skip_dirty else set()
     for rel in _candidates(root):
         if any(rel == e.rstrip("/") or rel.startswith(e.rstrip("/") + "/") for e in exclude):
             continue
@@ -540,6 +592,12 @@ def run(root: Path, *, dry_run: bool,
             src.write_bytes(new_text.encode("utf-8"))
         if new_rel != rel:
             _rename(root, rel, new_rel, use_git=use_git)
+    # What the run rewrote while it was somebody's work in flight. The rename
+    # applies to a clone whole — that is the contract — but an owner who has
+    # unsaved notes open deserves to be told which ones moved under them.
+    changed = {c.path for c in report.changes}
+    report.rewritten_dirty = sorted(p for p in changed & unsaved if p not in untracked)
+    report.rewritten_unsaved = sorted(changed & untracked)
     # Residue: what still matches after the run (or would, in a dry run).
     for rel in _candidates(root):
         if any(rel == e.rstrip("/") or rel.startswith(e.rstrip("/") + "/") for e in exclude) or rel in dirty:
@@ -552,9 +610,16 @@ def run(root: Path, *, dry_run: bool,
         except (OSError, UnicodeDecodeError):
             continue
         probe = rebrand_text(text, code=is_code_path(rel, p.name, p.suffix.lower())) if dry_run else text
-        n = len(_RESIDUE_RE.findall(probe))
-        if n:
-            report.residue[rebrand_path(rel) if dry_run else rel] = n
+        key = rebrand_path(rel) if dry_run else rel
+        # An own-name span carries exactly one old-name match and is EXPLAINED:
+        # it is subtracted from the residue so that residue keeps meaning
+        # «still unaccounted for», and reported on its own axis instead.
+        own = len(_OWN_NAME_RE.findall(probe))
+        if own:
+            report.own_name[key] = own
+        n = len(_RESIDUE_RE.findall(probe)) - own
+        if n > 0:
+            report.residue[key] = n
     return report
 
 
@@ -579,6 +644,21 @@ def render_inventory(report: Report) -> str:
     if report.skipped_dirty:
         lines += ["", "## Left alone — uncommitted changes belong to somebody's session", ""]
         lines += [f"- `{rel}`" for rel in report.skipped_dirty]
+    if report.own_name:
+        lines += ["", "## Left alone — these name your own repository or folder", "",
+                  "| Path | Occurrences |", "|---|---|"]
+        for rel, n in sorted(report.own_name.items()):
+            lines.append(f"| `{rel}` | {n} |")
+    if report.rewritten_dirty or report.rewritten_unsaved:
+        lines += ["", "## Rewritten while unsaved", ""]
+        if report.rewritten_dirty:
+            lines.append(f"{len(report.rewritten_dirty)} unsaved files were renamed in place — "
+                         "their previous text is in git under the old name.")
+            lines += [f"- `{rel}`" for rel in report.rewritten_dirty]
+        if report.rewritten_unsaved:
+            lines.append(f"{len(report.rewritten_unsaved)} of them were never saved to git — "
+                         "nothing holds their previous text.")
+            lines += [f"- `{rel}`" for rel in report.rewritten_unsaved]
     if report.residue:
         lines += ["", "## Residue after the run (must each be an allowed one)", "",
                   "| Path | Matches |", "|---|---|"]
@@ -615,6 +695,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"rebrand: {verb} {len(report.changes)} file(s), "
               f"{sum(1 for c in report.changes if c.new_path)} renamed, "
               f"{len(report.residue)} file(s) with residue")
+        if report.own_name:
+            print(f"rebrand: {len(report.own_name)} file(s) still carry the former name because "
+                  "these name your own repository or folder and were left alone")
+        if report.rewritten_dirty:
+            print(f"rebrand: {len(report.rewritten_dirty)} unsaved files were renamed in place — "
+                  "their previous text is in git under the old name")
+        if report.rewritten_unsaved:
+            print(f"rebrand: {len(report.rewritten_unsaved)} of them were never saved to git — "
+                  "nothing holds their previous text")
     return 0
 
 

@@ -111,6 +111,33 @@ class Migration032Tests(unittest.TestCase):
         self.assertEqual((self.root / "zettelkasten/_sources/inbox/raw.md").read_text(encoding="utf-8"),
                          "raw ZTN transcript\n")
 
+    def test_unsaved_owner_files_are_rewritten_and_the_count_is_reported(self):
+        """The rename applies to the clone whole — including work in flight.
+
+        That is the contract, and it is fine: git holds the previous text. What
+        was missing is the SAYING of it. An owner who left a note open finds it
+        renamed under them and no line anywhere telling them where the old text
+        went, which reads as data loss.
+        """
+        self._clone()
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid"}
+        for args in (("init", "-q"), ("add", "-A"), ("commit", "-qm", "seed")):
+            subprocess.run(["git", "-C", str(self.root), *args], capture_output=True, env=env)
+        # One tracked note edited but not committed, one never saved at all.
+        _write(self.root, "zettelkasten/_system/SOUL.md",
+               "I use Minder ZTN and I am mid-edit.\n")
+        _write(self.root, "zettelkasten/_records/observations/2026-06-01-open.md",
+               "An unsaved ZTN note.\n")
+
+        res = _run(self.mig, env=env, cwd=self.root)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertEqual((self.root / "zettelkasten/_system/SOUL.md").read_text(encoding="utf-8"),
+                         "I use Minder Memory and I am mid-edit.\n")
+        self.assertIn("1 unsaved files were renamed in place — their previous text is in git "
+                      "under the old name", res.stdout)
+        self.assertIn("never saved to git", res.stdout)
+
     def test_second_run_is_a_no_op(self):
         self._clone()
         self.assertEqual(_run(self.mig, cwd=self.root).returncode, 0)

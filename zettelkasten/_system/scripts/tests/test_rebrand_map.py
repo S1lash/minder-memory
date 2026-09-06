@@ -58,7 +58,13 @@ def _md5(root: Path) -> dict[str, str]:
 class TokenMapTests(unittest.TestCase):
     CASES = {
         "Minder ZTN": "Minder Memory", "Minder/ZTN": "Minder Memory", "ZTN/Minder": "Minder Memory",
-        "minder-ztn": "minder-memory", "minder-ztn-somebody": "minder-memory-somebody",
+        "minder-ztn": "minder-memory",
+        # A suffix after the skeleton name is somebody's OWN repository or folder;
+        # renaming it in their notes would point at a path that does not exist.
+        "minder-ztn-somebody": "minder-ztn-somebody",
+        "~/repos/minder-ztn-ivanov/notes": "~/repos/minder-ztn-ivanov/notes",
+        # ...except the engine's own retired project identifier, which is ours.
+        "minder-ztn-platform": "minder-memory-platform",
         "/ztn:process": "/minder:mem:process", "ztn:role:add": "minder:mem:role:add",
         "name: ztn:process": "name: minder:mem:process",
         "ztn-process": "minder-mem-process", "ztn-role": "minder-mem-role", "ztn-roles-": "minder-mem-roles-",
@@ -71,7 +77,7 @@ class TokenMapTests(unittest.TestCase):
         "urn:ztn:manifest-schema:v2": "urn:minder-memory:manifest-schema:v2",
         "ztn_constitution": "minder_memory_constitution", "clear_ztn_env": "clear_minder_memory_env",
         "minder_ztn_session": "minder_memory_session",
-        "topic/ztn": "topic/minder-memory", "ztn-platform": "minder-memory-platform", "minder-ztn-platform": "minder-memory-platform", "s3://minder-minder-memory-platform/": "s3://minder-memory-platform/",
+        "topic/ztn": "topic/minder-memory", "ztn-platform": "minder-memory-platform", "s3://minder-minder-memory-platform/": "s3://minder-memory-platform/",
         "20260519-meeting-ivan-petrov-team-ztn-demo": "20260519-meeting-ivan-petrov-team-minder-memory-demo",
         "only-the-ztn-memory-leaves": "only-the-minder-memory-leaves", "the ZTN memory": "the Minder Memory",
         "ZTN": "Minder Memory", "ЗТН": "Minder Memory", "«ЗТНа»": "«Minder Memory»", "my-ztn": "my-minder-memory",
@@ -117,9 +123,25 @@ class TokenMapTests(unittest.TestCase):
         self.assertIn("ztn: ZtnConfig", out)
         self.assertIn("user.ztn.workdir", out)
         self.assertIn('"processor": "minder:mem:process"', out)
-        self.assertIn("Minder Memory base at minder-memory-somebody /minder:mem:process MINDER_MEMORY_ROLES_KEY memory_search", out)
+        self.assertIn("Minder Memory base at minder-ztn-somebody /minder:mem:process MINDER_MEMORY_ROLES_KEY memory_search", out)
         self.assertEqual(rb.rebrand_text("const ZTN = 1; x.ZTN; ZTN(); // ZTN base", code=True),
                          "const ZTN = 1; x.ZTN; ZTN(); // Minder Memory base")
+
+    def test_an_owners_own_name_is_reported_as_residue_not_renamed(self):
+        """Left alone AND named — silence would read as «nothing to see»."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write(root, "note.md",
+                   "My clone lives in ~/repos/minder-ztn-ivanov and I run /ztn:process.\n")
+            report = rb.run(root, dry_run=False)
+            self.assertEqual(
+                (root / "note.md").read_text(encoding="utf-8"),
+                "My clone lives in ~/repos/minder-ztn-ivanov and I run /minder:mem:process.\n")
+            payload = json.loads(report.to_json())
+            self.assertEqual(payload["own_name"], {"note.md": 1})
+            self.assertNotIn("note.md", payload["residue"],
+                             "an own-name hit is explained, not unexplained residue")
+            self.assertIn("name your own repository or folder", rb.render_inventory(report))
 
     def test_every_code_safe_rule_names_a_real_map_entry(self):
         sources = {pat for pat, _ in rb.TOKEN_MAP}
