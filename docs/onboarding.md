@@ -13,27 +13,27 @@ After this guide you'll have:
   content and roles ticks.
 
 Two shell commands by hand: clone, then `install.sh`. Everything else
-is Claude Code skills — `/ztn:bootstrap` first, then the daily flow.
+is Claude Code skills — `/minder:mem:bootstrap` first, then the daily flow.
 
-If you only have 5 minutes: do steps 1–2, then `/ztn:bootstrap`.
+If you only have 5 minutes: do steps 1–2, then `/minder:mem:bootstrap`.
 You'll have a working system. The rest is enrichment.
 
 ## 1. Clone
 
-Replace `<maintainer>/minder-ztn` with the URL of the repo you are reading
+Replace `<maintainer>/minder-memory` with the URL of the repo you are reading
 this in — the one whoever shared it with you pointed you at.
 
 ```bash
-gh repo create my-ztn --template <maintainer>/minder-ztn --private --clone
-cd my-ztn
+gh repo create my-minder-memory --template <maintainer>/minder-memory --private --clone
+cd my-minder-memory
 ```
 
 You'll need an `upstream` remote later to pull engine updates, but you
-don't have to add it now — `/ztn:update` (step 8) will offer to add it
+don't have to add it now — `/minder:mem:update` (step 8) will offer to add it
 interactively the first time you run it. Manual:
 
 ```bash
-git remote add upstream https://github.com/<maintainer>/minder-ztn.git
+git remote add upstream https://github.com/<maintainer>/minder-memory.git
 ```
 
 See `docs/upstream-sync.md` for the full engine-update flow.
@@ -44,7 +44,7 @@ See `docs/upstream-sync.md` for the full engine-update flow.
 > `2026-04-29T14:09:30Z`. The engine handles this for you: any
 > non-portable name dropped into `_sources/inbox/` is automatically
 > renamed to a Windows-safe form (`2026-04-29T14-09-30Z`) when
-> `/ztn:process` or `/ztn:save` runs, before any links to it are
+> `/minder:mem:process` or `/minder:mem:save` runs, before any links to it are
 > created. You don't need to rename anything by hand. If an export tool
 > refuses to unpack a colon-named folder on Windows, let your unzip tool
 > rename it however it wants — the engine normalises it on pickup.
@@ -61,8 +61,8 @@ Then add to `~/.claude/CLAUDE.md` if not already present:
 ## Constitution Capture — Global Hook
 - @~/.claude/rules/constitution-capture.md
 
-## Zettelkasten (ZTN) — Personal Knowledge Base
-- @~/.claude/rules/ztn.md
+## Zettelkasten (Minder Memory) — Personal Knowledge Base
+- @~/.claude/rules/minder-memory.md
 ```
 
 ## 3. (Optional but high-leverage) Drop your backlog and write a profile
@@ -77,14 +77,14 @@ universal starter set of sources defined in
   fallback transcript layout)
 - `voice-notes/` — generic voice-note transcripts (any recorder)
 - `claude-sessions/` — Claude Code session recaps captured via
-  `/ztn:recap`
+  `/minder:mem:recap`
 - `notes/` — plain Markdown notes you drop in by hand
 - `crafted/` — hand-written long-form documents (also where
-  `/ztn:recap --crafted` saves verbatim artifacts like toasts, letters,
+  `/minder:mem:recap --crafted` saves verbatim artifacts like toasts, letters,
   posts)
 
 If your input does not match any of the starter sources, run
-`/ztn:source-add` after install — it registers a new source-type
+`/minder:mem:source-add` after install — it registers a new source-type
 declaratively (one row in SOURCES.md + paired inbox/processed
 folders). No code changes required.
 
@@ -99,12 +99,12 @@ Both steps are optional. If you skip them, bootstrap will detect that
 and offer alternatives (interview-only path, or proceed with empty
 backlog).
 
-## 4. Run /ztn:bootstrap
+## 4. Run /minder:mem:bootstrap
 
 In a Claude Code session opened in this repo:
 
 ```
-/ztn:bootstrap
+/minder:mem:bootstrap
 ```
 
 The skill is the actual orchestrator from here. It will:
@@ -126,11 +126,11 @@ re-run anytime as your inputs evolve.
 
 ## 5. Review the clarifications queue
 
-After bootstrap (and after every `/ztn:process`, `/ztn:lint`, or
-`/ztn:maintain` run that surfaces items), run:
+After bootstrap (and after every `/minder:mem:process`, `/minder:mem:lint`, or
+`/minder:mem:maintain` run that surfaces items), run:
 
 ```
-/ztn:resolve-clarifications
+/minder:mem:resolve-clarifications
 ```
 
 The skill pre-syncs against `origin` (so a queue resolved on another
@@ -138,18 +138,18 @@ device doesn't waste your attention), clusters open items by theme,
 presents one round at a time with full meeting context + verbatim
 quotes inline, pre-forms hypotheses against your constitution, and
 applies confirmed resolutions in place. After your rounds it
-auto-refreshes derived views (`/ztn:regen-constitution` if you
-accepted principle candidates; `/ztn:maintain` if you touched
-registries / hubs) and reminds you to run `/ztn:save`. Designed for
+auto-refreshes derived views (`/minder:mem:regen-constitution` if you
+accepted principle candidates; `/minder:mem:maintain` if you touched
+registries / hubs) and reminds you to run `/minder:mem:save`. Designed for
 offline-style review — you do not need to recall meeting context from
 memory; the skill reminds you.
 
-## 6. Save your work — `/ztn:save`
+## 6. Save your work — `/minder:mem:save`
 
 When you are done for now, run:
 
 ```
-/ztn:save
+/minder:mem:save
 ```
 
 The skill stages your changes by category (records, knowledge,
@@ -157,27 +157,27 @@ registries, state), proposes a commit message, shows a summary, asks
 for confirmation, then commits and pushes to `origin`. No git plumbing
 required.
 
-## 7. Pull data on a second device — `/ztn:sync-data`
+## 7. Pull data on a second device — `/minder:mem:sync-data`
 
 If you work from more than one machine (laptop ↔ desktop ↔ phone via
 git push), run before any work session:
 
 ```
-/ztn:sync-data
+/minder:mem:sync-data
 ```
 
 This pulls the latest from your `origin` with rebase, refusing to
 auto-merge conflicting prose and handing off to you if anything is
-ambiguous. Recommended before `/ztn:process`, `/ztn:lint`, and
-`/ztn:maintain` on any non-canonical device.
+ambiguous. Recommended before `/minder:mem:process`, `/minder:mem:lint`, and
+`/minder:mem:maintain` on any non-canonical device.
 
-## 8. Pull engine updates — `/ztn:update`
+## 8. Pull engine updates — `/minder:mem:update`
 
-When the upstream skeleton (the public `minder-ztn` repo) ships new
+When the upstream skeleton (the public `minder-memory` repo) ships new
 engine code, prompts, or migrations, pull them:
 
 ```
-/ztn:update
+/minder:mem:update
 ```
 
 Different from `sync-data`: this targets the `upstream` remote (engine
@@ -191,20 +191,20 @@ Five ready-made scheduler prompts ship in
 `integrations/claude-code/scheduler-prompts/` (canonical cadence table +
 exact cron in `docs/scheduling.md`):
 
-- `process-scheduled.md` — pre-sync → `/ztn:process` → `/ztn:maintain` →
+- `process-scheduled.md` — pre-sync → `/minder:mem:process` → `/minder:mem:maintain` →
   `finalize-tick.sh scheduler/process`.
   Recommended cadence: 3× per day (e.g. cron `0 9,14,19 * * *`).
-- `agent-lens-nightly.md` — pre-sync → `/ztn:agent-lens --all-due` →
+- `agent-lens-nightly.md` — pre-sync → `/minder:mem:agent-lens --all-due` →
   `finalize-tick.sh scheduler/agent-lens`. Recommended cadence: 1× per
   night (e.g. cron `0 3 * * *`). The skill filters lenses by per-lens
   cadence — nightly tick ≠ nightly lens runs.
-- `lint-nightly.md` — pre-sync → `/ztn:lint` (which dispatches
-  `/ztn:resolve-clarifications --auto-mode` inline via Step 7.5)
+- `lint-nightly.md` — pre-sync → `/minder:mem:lint` (which dispatches
+  `/minder:mem:resolve-clarifications --auto-mode` inline via Step 7.5)
   → `finalize-tick.sh scheduler/lint`. Recommended cadence: ~2 h after
   agent-lens (e.g. cron `0 5 * * *`).
-- `content-tick.md` — pre-sync → `/ztn:content --maintain` →
+- `content-tick.md` — pre-sync → `/minder:mem:content --maintain` →
   finalize. Recommended cadence: weekly (e.g. cron `0 6 * * 2`, Tuesday).
-- `roles-nightly.md` — pre-sync → `/ztn:roles` → finalize. Recommended
+- `roles-nightly.md` — pre-sync → `/minder:mem:roles` → finalize. Recommended
   cadence: 1× per day (e.g. cron `0 7 * * *`). Only needed once you have
   roles; the tick is a no-op with none. The skill runs only the roles whose
   own cadence has elapsed.
@@ -212,7 +212,7 @@ exact cron in `docs/scheduling.md`):
 The daily ticks are offset from each other (lens production isolated from
 lint+resolve consumption; roles last, so what a role writes is processed the
 same morning) — see `docs/scheduling.md` for the offset rationale. To create
-new lenses use `/ztn:agent-lens-add`, and new roles `/ztn:role:add` — both
+new lenses use `/minder:mem:agent-lens-add`, and new roles `/minder:mem:role:add` — both
 owner-driven, neither scheduled.
 
 You do not paste these bodies into your scheduler. Each routine gets a
@@ -246,13 +246,13 @@ answer never pays for them. All three ship with filled examples.
 
 The assistant also *learns* your style over time through the `cognitive-model`
 lens, which is **on by default**. Every other Monday it reads your own
-reflections and proposes "you seem to want X" for you to approve via `/ztn:lint`
+reflections and proposes "you seem to want X" for you to approve via `/minder:mem:lint`
 — it only appends to your review buffer and never changes your constitution on
 its own. It fills your cognitive-model hub
 (`5_meta/mocs/hub-cognitive-model.md`). To populate it now instead of waiting for
-the next cycle, run `/ztn:agent-lens --lens cognitive-model`. To turn it off, set
+the next cycle, run `/minder:mem:agent-lens --lens cognitive-model`. To turn it off, set
 its row to `draft` in `_system/registries/AGENT_LENSES.md` (note: a later
-`/ztn:update` re-applies the platform default of `active`). See `docs/privacy.md`
+`/minder:mem:update` re-applies the platform default of `active`). See `docs/privacy.md`
 for exactly what it reads and produces.
 
 ### Required GitHub repo setting — auto-delete head branches
@@ -283,7 +283,7 @@ prompt for SSH passphrases or 2FA. Set up one of:
   to your GitHub account.
 - **Personal Access Token** with `repo` scope, configured as the
   remote URL:
-  `git remote set-url origin https://<TOKEN>@github.com/<you>/my-ztn.git`.
+  `git remote set-url origin https://<TOKEN>@github.com/<you>/my-minder-memory.git`.
 - **Platform-managed credentials** — Claude Code cloud `/schedule`
   inherits your authenticated GitHub session (no extra setup).
 
@@ -306,7 +306,7 @@ sleep». It reads your base as context, keeps its own notes between runs, and ca
 reach an outside service if you give it a credential.
 
 ```
-/ztn:role:add
+/minder:mem:role:add
 ```
 
 Describe what you want in plain language. The concierge does the rest: it asks
@@ -321,9 +321,9 @@ work is fixed with you in that conversation, not at 07:00 in silence.
 
 The rest of the family:
 
-- `/ztn:role:list` — what you have, what each watches, when it last ran.
-- `/ztn:role:ask` — ask a role what it knows; it answers from its own notes.
-- `/ztn:role:edit` — change what it does or when, or pause it.
+- `/minder:mem:role:list` — what you have, what each watches, when it last ran.
+- `/minder:mem:role:ask` — ask a role what it knows; it answers from its own notes.
+- `/minder:mem:role:edit` — change what it does or when, or pause it.
 
 Two things worth knowing up front. A role writes only where its definition says
 it may — everything else it touches is put back after the run and shown to you,
@@ -332,26 +332,26 @@ is reported instead, because putting it back would erase work the role did not
 write. The report says whose it was, yours or an earlier role's in the same run.
 And a role that reaches an outside service needs a credential: the concierge
 captures it into an encrypted store and generates the one key that opens it.
-That key goes into the environment config of your `ztn-roles` schedule, never
+That key goes into the environment config of your `minder-mem-roles` schedule, never
 into the repo, and a lost key means entering those credentials again —
 `docs/scheduling.md` has the setup, including the one Python package a base with
 credentials needs. `docs/privacy.md` says what the encrypted store trades away,
 and what the write check does and does not hold against.
 
-Roles run from the `ztn-roles` tick in §9. Without that schedule they exist but
+Roles run from the `minder-mem-roles` tick in §9. Without that schedule they exist but
 never fire.
 
 
 ## Reference
 
-- **`integrations/claude-code/skills/ztn-bootstrap/SKILL.md`** — the
+- **`integrations/claude-code/skills/minder-mem-bootstrap/SKILL.md`** — the
   canonical playbook the skill executes. Read this if you want to
   understand exactly what bootstrap does and why.
 - **`docs/upstream-sync.md`** — engine update flow, deeper details
-  (`/ztn:update` is the friendly wrapper).
+  (`/minder:mem:update` is the friendly wrapper).
 - **`docs/obsidian.md`** — opening the vault in Obsidian; what the
-  ZTN-shipped `.obsidian/` config does and what to avoid.
-- **`integrations/claude-code/skills/ztn-{save,sync-data,update}/SKILL.md`**
+  Minder Memory-shipped `.obsidian/` config does and what to avoid.
+- **`integrations/claude-code/skills/minder-mem-{save,sync-data,update}/SKILL.md`**
   — git-flow skills.
 - **`zettelkasten/_system/docs/SYSTEM_CONFIG.md`** — full system spec.
 - **`zettelkasten/5_skills/`** — engine reference cards for a hand-picked subset

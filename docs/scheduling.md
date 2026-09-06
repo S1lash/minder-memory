@@ -1,6 +1,6 @@
-# Scheduling — autonomous ZTN ticks
+# Scheduling — autonomous Minder Memory ticks
 
-ZTN is designed to run **multiple times a day, every day**, without you
+Minder Memory is designed to run **multiple times a day, every day**, without you
 in the loop for the routine path. This doc describes the canonical
 scheduling setup, the assumptions baked into it, and how to plug it in.
 
@@ -10,15 +10,15 @@ Five scheduled jobs.
 
 | Job | Cadence | Skill chain | Prompt source |
 |---|---|---|---|
-| `ztn-process` | ≥ 3× per day | `/ztn:sync-data` → `/ztn:process` → `/ztn:maintain --no-sync-check` → `finalize-tick.sh scheduler/process` | `integrations/claude-code/scheduler-prompts/process-scheduled.md` |
-| `ztn-agent-lens` | 1× nightly (03:00) | `/ztn:sync-data` → `/ztn:agent-lens --all-due` → `finalize-tick.sh scheduler/agent-lens` | `integrations/claude-code/scheduler-prompts/agent-lens-nightly.md` |
-| `ztn-lint` | 1× nightly (05:00) | `/ztn:sync-data` → `/ztn:lint` (Step 7.5 dispatches `/ztn:resolve-clarifications --auto-mode` inline) → `finalize-tick.sh scheduler/lint` | `integrations/claude-code/scheduler-prompts/lint-nightly.md` |
-| `ztn-content` | 1× weekly (Tue 06:00) | `/ztn:sync-data` → `/ztn:content --maintain` → `finalize-tick.sh scheduler/content` | `integrations/claude-code/scheduler-prompts/content-tick.md` |
-| `ztn-roles` | 1× daily (07:00) | `/ztn:sync-data` → `/ztn:roles` → `finalize-tick.sh scheduler/roles` | `integrations/claude-code/scheduler-prompts/roles-nightly.md` |
+| `minder-mem-process` | ≥ 3× per day | `/minder:mem:sync-data` → `/minder:mem:process` → `/minder:mem:maintain --no-sync-check` → `finalize-tick.sh scheduler/process` | `integrations/claude-code/scheduler-prompts/process-scheduled.md` |
+| `minder-mem-agent-lens` | 1× nightly (03:00) | `/minder:mem:sync-data` → `/minder:mem:agent-lens --all-due` → `finalize-tick.sh scheduler/agent-lens` | `integrations/claude-code/scheduler-prompts/agent-lens-nightly.md` |
+| `minder-mem-lint` | 1× nightly (05:00) | `/minder:mem:sync-data` → `/minder:mem:lint` (Step 7.5 dispatches `/minder:mem:resolve-clarifications --auto-mode` inline) → `finalize-tick.sh scheduler/lint` | `integrations/claude-code/scheduler-prompts/lint-nightly.md` |
+| `minder-mem-content` | 1× weekly (Tue 06:00) | `/minder:mem:sync-data` → `/minder:mem:content --maintain` → `finalize-tick.sh scheduler/content` | `integrations/claude-code/scheduler-prompts/content-tick.md` |
+| `minder-mem-roles` | 1× daily (07:00) | `/minder:mem:sync-data` → `/minder:mem:roles` → `finalize-tick.sh scheduler/roles` | `integrations/claude-code/scheduler-prompts/roles-nightly.md` |
 
 The content pipeline runs across two ticks a day apart: the `content-synthesis`
 lens (the classifier) is a registered agent-lens (`weekly mon`), so the existing
-`ztn-agent-lens` tick runs it on Mondays; the `ztn-content` maintainer drafts on
+`minder-mem-agent-lens` tick runs it on Mondays; the `minder-mem-content` maintainer drafts on
 Tuesdays. Producer (lens) and consumer (maintainer) stay in separate scheduler
 contexts on purpose — the maintainer must not be the same context that just
 produced the lens verdict.
@@ -36,7 +36,7 @@ The roles tick closes the overnight sequence at 07:00. Three reasons for that
 slot, in order of weight:
 
 1. **After lint, before process.** A role that leaves a note in
-   `_sources/inbox/roles/` needs `/ztn:process` to fold it in; landing two hours
+   `_sources/inbox/roles/` needs `/minder:mem:process` to fold it in; landing two hours
    before the 09:00 process tick means the note is knowledge the same morning
    rather than the next day. Running it before lint would instead have roles read
    a base lint has not yet cleaned.
@@ -52,14 +52,14 @@ slot, in order of weight:
 Like agent-lens, one fire ≠ one run per role: the tick runs only the roles whose
 own cadence has elapsed, sequentially, never two at once.
 
-There is no `ztn-maintain` schedule — maintain has no cadence of its own
-and runs as Step 4.5 of the process tick, once `/ztn:process` has
+There is no `minder-mem-maintain` schedule — maintain has no cadence of its own
+and runs as Step 4.5 of the process tick, once `/minder:mem:process` has
 returned and released its lock (the two are mutually exclusive, so the
-integrator cannot run inside the producer). There is no `ztn-resolve-clarifications` schedule —
+integrator cannot run inside the producer). There is no `minder-mem-resolve-clarifications` schedule —
 the owner reviews the queue manually; that is the human-in-loop hinge
-of the whole system. There is no `ztn-agent-lens-add` schedule — lens
+of the whole system. There is no `minder-mem-agent-lens-add` schedule — lens
 creation is owner-driven (wizard-style); see
-`integrations/claude-code/skills/ztn-agent-lens-add/SKILL.md`.
+`integrations/claude-code/skills/minder-mem-agent-lens-add/SKILL.md`.
 
 ## Single-commit guarantee
 
@@ -77,11 +77,11 @@ into it:
   into one commit. Refuses to rewrite history if owner has manual
   non-scheduled commits ahead of `origin/main` (no force-push, ever).
 
-`/ztn:save` is owner-interactive only. Scheduler prompts never invoke
+`/minder:mem:save` is owner-interactive only. Scheduler prompts never invoke
 it and never call `git commit` / `git push` / `git add` outside the
 helper scripts (with one narrow exception below for the MCP fallback).
 
-**One skill commits inside its own tick: `/ztn:roles`.** Its write guard
+**One skill commits inside its own tick: `/minder:mem:roles`.** Its write guard
 compares the repository before and after each role, so whatever a role leaves
 uncommitted is still dirty when the next one starts — and a path already dirty
 when a role starts is one the guard may not revert, because restoring it would
@@ -93,7 +93,7 @@ partial-tick leftover. The guarantee is unchanged: one commit reaches
 
 ## Skill discovery — the Step 0 preflight
 
-Every tick invokes `/ztn:*` skills as slash commands. The runtime discovers
+Every tick invokes `/minder:mem:*` skills as slash commands. The runtime discovers
 them from `.claude/skills/<name>/SKILL.md` in the clone. If that layout is
 broken, the tick dies at its first slash invocation — historically the most
 common scheduler failure.
@@ -101,11 +101,11 @@ common scheduler failure.
 The layout is cross-platform by construction: the skeleton ships
 `.claude/skills/<name>/SKILL.md` as **real files**, not symlinks. Git symlinks
 do not survive a Windows clone (`core.symlinks=false` materialises the symlink
-blob as a text file, so `.claude/skills/ztn-process` becomes a file and its
+blob as a text file, so `.claude/skills/minder-mem-process` becomes a file and its
 `SKILL.md` disappears). The owner repo keeps symlinks for the dev loop;
 `scripts/release_engine.py` dereferences them into real files on release, and
 `scripts/sync_engine.sh` replaces a broken local `.claude/skills/` with the
-real-file tree on `/ztn:update`.
+real-file tree on `/minder:mem:update`.
 
 As a fail-fast guard, **Step 0** of every tick runs
 `scripts/scheduler/ensure-skills.sh` (check-only) and, if any skill does not
@@ -116,7 +116,7 @@ make the slash commands load, and a cloud sandbox is ephemeral so it cannot
 persist either. Repair belongs to persistent local setups — `install.sh` runs
 `ensure-skills.sh --repair` there (symlink where supported, real-file copy as
 fallback). The durable fix for a broken clone is the real-file skeleton layout
-delivered via `/ztn:update`.
+delivered via `/minder:mem:update`.
 
 ## Delivery model — two modes with an MCP fallback
 
@@ -167,7 +167,7 @@ explicitly. Verify it is on before relying on cloud scheduling.
 For LOCAL mode the setting is not required (no PR involved), but
 enabling it does no harm.
 
-## Credentials for the roles tick — ZTN_ROLES_KEY
+## Credentials for the roles tick — MINDER_MEMORY_ROLES_KEY
 
 Skip this until you have a role that reaches an outside service — a task
 board, a mail API, anything authenticated. Roles that only read and write
@@ -176,9 +176,9 @@ your own notes need none of it.
 Such a role reads its credential from an encrypted store committed to your
 repo, `zettelkasten/_system/state/secrets.enc.json`. Every value in it is
 encrypted on its own, and none is readable without a single key:
-`ZTN_ROLES_KEY`, one 44-character value, one per base.
+`MINDER_MEMORY_ROLES_KEY`, one 44-character value, one per base.
 
-**The key goes in the environment config of your `ztn-roles` routine and
+**The key goes in the environment config of your `minder-mem-roles` routine and
 nowhere else.** Not in the prompt — that is text you paste and share around.
 Not in the repo — the engine writes it to no file, and nothing in the tick
 prints it.
@@ -191,7 +191,7 @@ prints it.
   Actions secret exposed through `env:`. Not in a shell profile you also
   use interactively.
 
-**You never invent the key yourself.** `/ztn:role:add` generates it the
+**You never invent the key yourself.** `/minder:mem:role:add` generates it the
 first time a role on this base needs a credential, shows it once, and says
 where it goes. Once, because the engine keeps no copy. **A lost key cannot
 be recovered** — everything encrypted with it is gone and you enter those
@@ -207,7 +207,7 @@ would silently orphan every credential already stored. The tick's output
 carries:
 
 ```
-error: ZTN_ROLES_KEY is not set: the credential store is encrypted and the key arrives from the environment. Set ZTN_ROLES_KEY in the scheduler routine's env config — never in the prompt body and never in git.
+error: MINDER_MEMORY_ROLES_KEY is not set: the credential store is encrypted and the key arrives from the environment. Set MINDER_MEMORY_ROLES_KEY in the scheduler routine's env config — never in the prompt body and never in git.
 ```
 
 **A base that has credentials also needs the `cryptography` package** in the
@@ -227,7 +227,7 @@ cannot act on. The tick therefore checks at startup and installs the one
 declared package itself, but only when a credential store exists and only
 when the import fails; a base without credentials never installs anything.
 Run the command above yourself only for the machine where you use
-`/ztn:role:add`, since role creation needs the package too.
+`/minder:mem:role:add`, since role creation needs the package too.
 
 If the install cannot happen, nothing crashes: the tick degrades exactly as
 above and names the package instead of the key.
@@ -245,7 +245,7 @@ Committing it is what makes an unattended outward role possible at all.
 These are not configurable. If you need a different model, the
 scheduler prompts are not for you yet.
 
-- **Process at least daily, usually multiple times.** ZTN's value
+- **Process at least daily, usually multiple times.** Minder Memory's value
   comes from cadence. Less than once a day means transcripts pile up
   and the macro picture lags reality.
 - **Lint at night, after the day's last process tick.** Lint reads the
@@ -254,7 +254,7 @@ scheduler prompts are not for you yet.
 - **Every scheduled run autocommits and pushes.** Without push,
   multi-device use breaks. Without autocommit, the working tree
   accumulates uncommitted scheduler output and the next manual
-  `/ztn:save` becomes ambiguous.
+  `/minder:mem:save` becomes ambiguous.
 - **Ambiguity goes to CLARIFICATIONS, not to you.** The whole
   CLARIFICATIONS mechanism exists for this exact case. A scheduled
   run that pauses on a question is broken — it just hangs the agent
@@ -262,7 +262,7 @@ scheduler prompts are not for you yet.
 - **Engine drift is never resolved by the scheduler.** `stage.sh` and
   `finalize-tick.sh` refuse engine paths. If you edited engine files
   locally, the scheduler will leave them dirty and surface a
-  CLARIFICATIONS note. Run `/ztn:update` (or revert) yourself.
+  CLARIFICATIONS note. Run `/minder:mem:update` (or revert) yourself.
 
 ## What the scheduler will NEVER do
 
@@ -270,8 +270,8 @@ scheduler prompts are not for you yet.
 |---|---|
 | `git push --force` (or `--force-with-lease`) | Data-loss risk. Push rejection means «sync next tick», not «overwrite remote». |
 | Stage engine paths | Engine is owned upstream. Local edits to engine paths are an owner concern; engine drift is logged to CLARIFICATIONS instead. |
-| `/ztn:resolve-clarifications` interactive | Resolution is the human-in-loop step by design. The auto-mode dispatch inside lint Step 7.5 is the exception. |
-| `/ztn:update` | Engine sync needs owner attention (VERSION delta, migrations, divergence resolution). |
+| `/minder:mem:resolve-clarifications` interactive | Resolution is the human-in-loop step by design. The auto-mode dispatch inside lint Step 7.5 is the exception. |
+| `/minder:mem:update` | Engine sync needs owner attention (VERSION delta, migrations, divergence resolution). |
 | Pause and ask the owner | No human in this loop. Anything that would be a question becomes a CLARIFICATIONS row. |
 | Retry push on failure | The script makes exactly one delivery attempt per tick. A failed delivery surfaces as `partial`; next tick processes fresh state from inbox. |
 | Skip commit on «small» changes | Every tick commits, even routine state-only churn. Predictability beats minimalism. |
@@ -297,9 +297,9 @@ own log and can intervene if needed.
 ## How skills reach the scheduler agent
 
 The scheduler agent is just a Claude Code session running your prompt
-body. For the slash invocations (`/ztn:sync-data`, `/ztn:process`,
-`/ztn:maintain`, `/ztn:agent-lens --all-due`, `/ztn:lint`,
-`/ztn:content --maintain`, `/ztn:roles`) to actually fire, ZTN skills
+body. For the slash invocations (`/minder:mem:sync-data`, `/minder:mem:process`,
+`/minder:mem:maintain`, `/minder:mem:agent-lens --all-due`, `/minder:mem:lint`,
+`/minder:mem:content --maintain`, `/minder:mem:roles`) to actually fire, Minder Memory skills
 must be visible in the session's skill registry.
 
 - **Cloud Routines / `/schedule`** — clone the repo fresh and look at
@@ -336,7 +336,7 @@ reach every tick on their own from then on.
 
 ```
 /schedule
-  name: ztn-process
+  name: minder-mem-process
   cron: 0 9,14,19 * * *
   prompt: Read integrations/claude-code/scheduler-prompts/process-scheduled.md
     in this repository and follow it exactly, from its first step to its last.
@@ -347,7 +347,7 @@ reach every tick on their own from then on.
 
 ```
 /schedule
-  name: ztn-agent-lens
+  name: minder-mem-agent-lens
   cron: 0 3 * * *
   prompt: Read integrations/claude-code/scheduler-prompts/agent-lens-nightly.md
     in this repository and follow it exactly, from its first step to its last.
@@ -358,7 +358,7 @@ reach every tick on their own from then on.
 
 ```
 /schedule
-  name: ztn-lint
+  name: minder-mem-lint
   cron: 0 5 * * *
   prompt: Read integrations/claude-code/scheduler-prompts/lint-nightly.md
     in this repository and follow it exactly, from its first step to its last.
@@ -369,7 +369,7 @@ reach every tick on their own from then on.
 
 ```
 /schedule
-  name: ztn-content
+  name: minder-mem-content
   cron: 0 6 * * 2
   prompt: Read integrations/claude-code/scheduler-prompts/content-tick.md
     in this repository and follow it exactly, from its first step to its last.
@@ -380,7 +380,7 @@ reach every tick on their own from then on.
 
 ```
 /schedule
-  name: ztn-roles
+  name: minder-mem-roles
   cron: 0 7 * * *
   prompt: Read integrations/claude-code/scheduler-prompts/roles-nightly.md
     in this repository and follow it exactly, from its first step to its last.
@@ -389,9 +389,9 @@ reach every tick on their own from then on.
     cannot be read, stop immediately, change nothing, and report `partial`.
 ```
 
-If any of your roles reaches an outside service, the `ztn-roles` routine
-also needs `ZTN_ROLES_KEY` in its environment config — see «Credentials for
-the roles tick — ZTN_ROLES_KEY» above.
+If any of your roles reaches an outside service, the `minder-mem-roles` routine
+also needs `MINDER_MEMORY_ROLES_KEY` in its environment config — see «Credentials for
+the roles tick — MINDER_MEMORY_ROLES_KEY» above.
 
 Each routine runs in a fresh agent against a fresh clone, so the file it reads
 is the current one — which is what makes the loader safe. The refusal clause is
@@ -402,10 +402,10 @@ The body stays fully self-contained. Nothing about the loader changes what a
 tick does; it changes only where the tick gets its instructions, so that an
 engine update reaches your schedules without you re-pasting anything.
 
-**Name your routines whatever you like.** `ztn-lint` above is a suggestion, not
-a handle the engine uses — you may well call yours `minder-ztn: lint (nightly)`
+**Name your routines whatever you like.** `minder-mem-lint` above is a suggestion, not
+a handle the engine uses — you may well call yours `minder-memory: lint (nightly)`
 or `ночная уборка`. Nothing reads these names. When a future engine update
-changes a prompt file, `/ztn:update` finds the affected routines by comparing
+changes a prompt file, `/minder:mem:update` finds the affected routines by comparing
 what each one's prompt actually says against the shipped files, then tells you
 which of YOUR routines are involved and offers to update them for you. A
 recommendation phrased as «re-paste the prompt» is one you cannot act on
@@ -417,7 +417,7 @@ work instead of handing it to you.
 cron + `claude --print`, launchd, GitHub Actions on a private fork:
 same prompt bodies. Ensure:
 
-- Filesystem access to the ZTN repo working tree.
+- Filesystem access to the Minder Memory repo working tree.
 - Configured git identity for autonomous push.
 - Authentication to `origin` (SSH key in the runner / token in env).
   Concrete setup options (passphrase-less SSH, PAT-baked remote URL,
@@ -425,9 +425,9 @@ same prompt bodies. Ensure:
 - A way to surface non-zero exit (logs, email, pager) — the prompt
   bodies exit non-zero on sync-blocked / partial.
 - For the roles job only, and only if one of your roles reaches an outside
-  service: `ZTN_ROLES_KEY` in that job's environment and the `cryptography`
+  service: `MINDER_MEMORY_ROLES_KEY` in that job's environment and the `cryptography`
   package installed for that runner's `python3` — see «Credentials for the
-  roles tick — ZTN_ROLES_KEY» above.
+  roles tick — MINDER_MEMORY_ROLES_KEY» above.
 
 Local cron starts on the `main` branch by default, so LOCAL mode in
 `finalize-tick.sh` applies — no PR ceremony, just direct push.
@@ -437,11 +437,11 @@ Local cron starts on the `main` branch by default, so LOCAL mode in
 The other half of the loop. Whatever happened overnight + during the
 day lands in CLARIFICATIONS by morning.
 
-1. `/ztn:resolve-clarifications` — pre-syncs against `origin`, walks
+1. `/minder:mem:resolve-clarifications` — pre-syncs against `origin`, walks
    you through the queue one theme at a time, refreshes derived views
-   (`/ztn:regen-constitution`, `/ztn:maintain`) when your resolutions
+   (`/minder:mem:regen-constitution`, `/minder:mem:maintain`) when your resolutions
    touched constitution / registries, and reminds you to save.
-2. `/ztn:save` (interactive, not `--auto`) — commit + push your
+2. `/minder:mem:save` (interactive, not `--auto`) — commit + push your
    resolutions when the skill prompts you.
 
 That's it. The scheduler covers ingestion + slop-catching; you cover
@@ -450,12 +450,12 @@ judgement + resolution.
 ## Why this shape (instead of N tiny jobs or one big one)
 
 - **One big nightly job.** Tried mentally: would mean transcripts
-  dropped at 10am don't surface until 03:00 the next day. ZTN is a
+  dropped at 10am don't surface until 03:00 the next day. Minder Memory is a
   thinking aid; latency >12h kills the feedback loop.
 - **Per-skill schedules (process, maintain, lint, resolve, agent-lens,
   agent-lens-add, content, roles, role-add).** Tried mentally: maintain has no
   independent cadence (it is a step of the process tick); resolve, agent-lens-add and
-  `/ztn:role:{add,edit,list,ask}` must not be autonomous (owner judgement /
+  `/minder:mem:role:{add,edit,list,ask}` must not be autonomous (owner judgement /
   concierge interview). The five scheduled jobs (process / agent-lens / lint /
   content / roles) cover the autonomous surface area; every other skill is
   either owner-gated or tails another tick, so it earns no standalone schedule.

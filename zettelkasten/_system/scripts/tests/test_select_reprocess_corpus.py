@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests._fixture import clear_ztn_env  # type: ignore
+from tests._fixture import clear_minder_memory_env  # type: ignore
 import _common as c  # type: ignore
 
 
@@ -63,7 +63,7 @@ def _seed(base: Path) -> dict[str, Path]:
 
 class SelectReprocessCorpusTests(unittest.TestCase):
     def setUp(self) -> None:
-        clear_ztn_env()
+        clear_minder_memory_env()
         self._tmp = tempfile.TemporaryDirectory()
         self.base = Path(self._tmp.name)
         self.files = _seed(self.base)

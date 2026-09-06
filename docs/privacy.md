@@ -1,7 +1,7 @@
 # Privacy & data ownership
 
 Where your data lives, what travels where, what stays local. Read this
-before deciding to put anything sensitive into ZTN.
+before deciding to put anything sensitive into Minder Memory.
 
 ## TL;DR
 
@@ -9,20 +9,20 @@ before deciding to put anything sensitive into ZTN.
   in your git repo. They live on your machine (the working tree),
   plus the local `.git/` history, plus wherever you push the repo —
   typically a private GitHub repo you control. The engine itself
-  never pushes; you do (via `/ztn:save` with your confirmation, or
+  never pushes; you do (via `/minder:mem:save` with your confirmation, or
   manually). Nothing else exfiltrates them — with one exception you
   create deliberately: a **role** you set up to reach an outside
   service will send it what its assignment says to send. See «Roles»
   below before you create one.
 - **Your transcripts** — local files in `_sources/inbox/` after you
   drop them in. **The source you used to record** (Plaud, voice memos,
-  etc.) had its own data path before the file got to your inbox; ZTN
+  etc.) had its own data path before the file got to your inbox; Minder Memory
   starts where the file lands.
 - **Claude Code agent calls** — text content is sent to Anthropic's
   API per their terms. This is how the engine "thinks". You consent
   per-skill-invocation; nothing fires without your action or a
   scheduler you set up.
-- **Git pushes** — only when you (or `/ztn:save`, with your
+- **Git pushes** — only when you (or `/minder:mem:save`, with your
   confirmation) push to a remote. The default remote is `origin` (a
   private repo you control). The engine never auto-pushes to
   `upstream` (the public skeleton).
@@ -34,9 +34,9 @@ quiescent — markdown files on disk, nothing else.
 
 | Layer | Location | Travels where |
 |---|---|---|
-| Voice recordings (raw audio) | Wherever your recorder stores them (Plaud cloud, iCloud, etc.) | Determined by your recorder, not by ZTN. |
-| Transcripts (text) | `_sources/inbox/<source>/` and after processing `_sources/processed/<source>/` | Local. Read by `/ztn:process`, sent to Anthropic API as part of the prompt during processing. |
-| Records | `_records/meetings/`, `_records/observations/` | Local. Sent to Anthropic API when skills read them (every `/ztn:*` call loads relevant records into context). |
+| Voice recordings (raw audio) | Wherever your recorder stores them (Plaud cloud, iCloud, etc.) | Determined by your recorder, not by Minder Memory. |
+| Transcripts (text) | `_sources/inbox/<source>/` and after processing `_sources/processed/<source>/` | Local. Read by `/minder:mem:process`, sent to Anthropic API as part of the prompt during processing. |
+| Records | `_records/meetings/`, `_records/observations/` | Local. Sent to Anthropic API when skills read them (every `/minder:mem:*` call loads relevant records into context). |
 | Knowledge notes | `0_constitution/`, `1_projects/`, `2_areas/`, `3_resources/`, `5_meta/mocs/` | Same — local, sent to Anthropic API when skills read them. |
 | Registries | `3_resources/people/PEOPLE.md`, `1_projects/PROJECTS.md`, `_system/registries/` (tags, sources, concepts, domains, audiences) | Same. |
 | Runtime state | `_system/state/` (logs, queues, candidate buffers, batches) | Same. |
@@ -46,10 +46,10 @@ quiescent — markdown files on disk, nothing else.
 
 ## What "Anthropic API" means in practice
 
-Every time you run `/ztn:process`, `/ztn:lint`, `/ztn:agent-lens`, or
+Every time you run `/minder:mem:process`, `/minder:mem:lint`, `/minder:mem:agent-lens`, or
 any other skill, Claude Code:
 
-1. Loads relevant ZTN files into the prompt context (records, system
+1. Loads relevant Minder Memory files into the prompt context (records, system
    state, constitution, transcripts being processed).
 2. Sends that prompt to Anthropic's API.
 3. Receives the model's response.
@@ -78,12 +78,12 @@ Python on your machine — no network calls.
 Your repo can have two remotes:
 
 - **`origin`** — your private repo (the default. Created by
-  `gh repo create my-ztn --private`).
-- **`upstream`** — the public minder-ztn skeleton (engine source).
+  `gh repo create my-minder-memory --private`).
+- **`upstream`** — the public minder-memory skeleton (engine source).
   Read-only direction: you pull engine updates *from* upstream, never
   push to it.
 
-`/ztn:save` and `/ztn:sync-data` push to `origin` only. They never
+`/minder:mem:save` and `/minder:mem:sync-data` push to `origin` only. They never
 touch `upstream`. If you have private records you don't want on a
 remote at all, simply don't push — the system works fully offline.
 
@@ -101,7 +101,7 @@ Every note's frontmatter carries a privacy trio:
 
 Today these are **advisory metadata**:
 
-- `/ztn:lint` audits for missing or inconsistent values.
+- `/minder:mem:lint` audits for missing or inconsistent values.
 - Graph and search presets (`docs/obsidian.md` / `integrations/obsidian/views.md`) include
   filters like "show only `is_sensitive: true`" for self-review.
 - Hub views can be filtered by audience.
@@ -114,18 +114,18 @@ What they do **not** do today:
 
 These are explicit design decisions to keep the slot in the schema
 without overstating what the engine guarantees. If you want
-encryption-at-rest for sensitive notes, use a tool outside ZTN
+encryption-at-rest for sensitive notes, use a tool outside Minder Memory
 (e.g. git-crypt, age, or filesystem-level encryption) — they
 compose cleanly with the markdown layout.
 
 ## Roles — the one path that can send your notes to a third party
 
-Every other part of ZTN talks to exactly two places: Anthropic's API and your
+Every other part of Minder Memory talks to exactly two places: Anthropic's API and your
 own git remote. A **role** can talk to a third — but only one you set up
 yourself, in the conversation where you created it. Worth knowing before you
 create one:
 
-- **You authorize the destination once, at creation.** `/ztn:role:add` captures
+- **You authorize the destination once, at creation.** `/minder:mem:role:add` captures
   the credential and proves the call works. After that the role runs unattended
   and does not ask again — that is the point of a standing job, and it is why
   the concierge makes you look at what the role will send.
@@ -173,7 +173,7 @@ create one:
 - **What nothing can undo: an outward call already made.** A sent email is sent.
   The diff check protects your repository, not the outside world; a role that
   reaches outward is trusted at the moment you grant it.
-- **To stop one:** `/ztn:role:edit` and pause it, or remove the `ztn-roles`
+- **To stop one:** `/minder:mem:role:edit` and pause it, or remove the `minder-mem-roles`
   schedule to stop all of them. Its accumulated state stays on disk either way.
 
 ## Multi-device
@@ -190,7 +190,7 @@ your data is wherever you push it:
 The engine doesn't care which transport you use; it only sees a git
 repo on disk.
 
-## What to do if you put something you regret into ZTN
+## What to do if you put something you regret into Minder Memory
 
 1. **Filesystem level:** delete the file, run `git rm` if committed.
    The git history still has it. Use `git filter-repo` or
@@ -200,13 +200,13 @@ repo on disk.
    policy (currently 30 days for abuse monitoring, no training use
    on commercial accounts). You cannot delete from their logs; you
    can only stop sending more.
-3. **In your records pipeline:** if `/ztn:process` already wrote a
+3. **In your records pipeline:** if `/minder:mem:process` already wrote a
    record citing the regrettable content, edit the record, run
-   `/ztn:save`. The engine never auto-rewrites your edits.
+   `/minder:mem:save`. The engine never auto-rewrites your edits.
 
 ## The cognitive-model lens — profiling from your reflections
 
-ZTN ships a `cognitive-model` lens that is **on by default**. Every other Monday
+Minder Memory ships a `cognitive-model` lens that is **on by default**. Every other Monday
 it reads your own reflections (solo voice-notes, journal-style observations) and
 proposes principles about how you think and want to be communicated with. It
 touches your most private content and writes inferences about you into your repo
@@ -221,19 +221,19 @@ active platform-wide.
   and proposed candidates in `_system/state/principle-candidates.jsonl` —
   inferences about you, in plain text, in your repo.
 - **Never promotes on its own.** A candidate becomes a constitution principle
-  only through `/ztn:lint` F.5 + your review. Highly-confident candidates may
+  only through `/minder:mem:lint` F.5 + your review. Highly-confident candidates may
   append to the review buffer without a click (tunable in
   `insights-config.yaml`); medium / low always wait for you. Set the class to
   `never_auto` to click every one.
 - **Travels with your repo.** Like all your data, these inference files sync to
-  `origin` on `/ztn:save` and are sent to the Claude API when a skill reads
+  `origin` on `/minder:mem:save` and are sent to the Claude API when a skill reads
   them. `is_sensitive` is advisory only (see above) — it does not redact. If a
   derived inference feels too personal to live in your git history, delete the
-  lens output + candidate line and run `/ztn:save`.
+  lens output + candidate line and run `/minder:mem:save`.
 - **Turn it off:** set the lens row to `status: draft` in
   `_system/registries/AGENT_LENSES.md`. It stops immediately; existing outputs
   stay until you delete them. Note the opt-out is not durable across updates — a
-  later `/ztn:update` re-applies the platform default of `active`, so re-set it
+  later `/minder:mem:update` re-applies the platform default of `active`, so re-set it
   after updating if you want it permanently off.
 
 The guard against this becoming a profiler that flatters you is the
@@ -253,7 +253,7 @@ it derives its patterns at scan time from your own `PEOPLE.md`,
 axiom/principle/rule's title and statement — so a coworker added to
 `PEOPLE.md` last week, or a new project in `PROJECTS.md`, is automatically
 covered the next time the linter runs. Known-public terms (the engine's
-own placeholder examples, product names like `Minder`/`ZTN`) are excluded
+own placeholder examples, product names like `Minder`/`Minder Memory`) are excluded
 so the linter never flags its own depersonalized documentation. This
 derivation is local-only — it reads your registries to build regex
 patterns and never sends that data anywhere; the scan itself only runs
@@ -307,7 +307,7 @@ These hold across all skills. If you observe a violation, that's a bug.
 ## Questions
 
 If you're considering putting something specifically sensitive into
-ZTN and want to think it through, the right question is **"would I be
+Minder Memory and want to think it through, the right question is **"would I be
 OK with this text appearing in a Claude API call?"** — that is the
 boundary that matters.
 

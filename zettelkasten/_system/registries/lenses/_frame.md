@@ -6,7 +6,7 @@ The frame is the contract every lens runs inside. Two stages, deliberately
 decoupled:
 
 - **Stage 1 — Thinker.** The primary LLM (Opus or equivalent) reads the
-  lens prompt and decides what to read in the ZTN base. It writes its
+  lens prompt and decides what to read in the Minder Memory base. It writes its
   observations in **free form** — no schema, no required sections, no
   enforced vocabulary, no enforced phrasing. The thinker is NOT told that
   it must cite sources, provide an alternative reading, or state
@@ -50,13 +50,13 @@ unchanged.
 **Input type modes** — controlled by `input_type` lens-frontmatter field.
 Three values:
 
-- `input_type: records` — primary-source input; lens reads the ZTN base
+- `input_type: records` — primary-source input; lens reads the Minder Memory base
   directly (records, knowledge, hubs, constitution, system). Stage 1
   uses the base-input frame body below.
 - `input_type: lens-outputs` — meta-lens reads other lenses' outputs as
   a status page. Hard constraint against body-citation (described in
   the lens-outputs frame body). Used by `global-navigator`.
-- `input_type: multi-source` — synthesis lens reads BOTH the ZTN base
+- `input_type: multi-source` — synthesis lens reads BOTH the Minder Memory base
   AND lens outputs, with permission to synthesize across them. Used by
   synthesis lenses like `weekly-insights`. Stage 1 uses the multi-source
   frame body below. Anchoring constraint applies: every claim about the
@@ -70,7 +70,7 @@ Three values:
 The runner concatenates: this frame body + lens folder content + a
 description of available paths. Below is the body that wraps every
 lens whose `input_type: records` (legacy enum value — semantically
-"primary-source-input": the lens reads the ZTN base directly, as
+"primary-source-input": the lens reads the Minder Memory base directly, as
 opposed to meta-lenses that read other lenses' outputs).
 
 The lens prompt itself scopes which layer is primary — `_records/`,
@@ -80,11 +80,11 @@ priority; that decision belongs to the lens.
 
 ```
 You are an outside observer of a single person's structured personal
-knowledge base (ZTN). You exist to make observations the owner may
+knowledge base (Minder Memory). You exist to make observations the owner may
 not make themselves — patterns, gaps, drifts, recurring loops, latent
 connections — based on what is in the base.
 
-Read access to the entire ZTN base is available at the path provided
+Read access to the entire Minder Memory base is available at the path provided
 to you by the runner (the repository's `zettelkasten/` directory).
 
 Folder tree and routing rules: `_system/registries/FOLDERS.md` —
@@ -192,9 +192,9 @@ Available inputs (read whatever subset the lens prompt scopes you to):
     _system/agent-lens/{lens-id}/{date}.md  — individual lens outputs
 
   Engine state layer:
-    _system/state/log_process.md            — `/ztn:process` runs
-    _system/state/log_lint.md               — `/ztn:lint` runs
-    _system/state/log_maintenance.md        — `/ztn:maintain` + bootstrap runs
+    _system/state/log_process.md            — `/minder:mem:process` runs
+    _system/state/log_lint.md               — `/minder:mem:lint` runs
+    _system/state/log_maintenance.md        — `/minder:mem:maintain` + bootstrap runs
     _system/state/BATCH_LOG.md              — process batch index (table)
     _system/state/PROCESSED.md              — processed-source ledger
     _system/state/CLARIFICATIONS.md         — open clarifications queue
@@ -216,7 +216,7 @@ which has none):
 
   You may reference second-order content (observations, principle
   candidates, people candidates, clarification items, batch entries,
-  knowledge-note titles produced by /ztn:process) by:
+  knowledge-note titles produced by /minder:mem:process) by:
     - identifier (lens-id, candidate hash, batch-id, clarification id)
     - timestamp / date / age in days
     - count / aggregate / status label / confidence label
@@ -245,7 +245,7 @@ which has none):
 
   Allowed:  "stalled-thread 2026-04-23 observation 1 — 'Office
             relocation decision' — 21 days old, no follow-up commit"
-  Allowed:  "/ztn:lint last ran 2026-04-26; F.3 + F.5 fired"
+  Allowed:  "/minder:mem:lint last ran 2026-04-26; F.3 + F.5 fired"
   Allowed:  "5 principle-candidates appended this week (0 personal,
             5 bootstrap-raw-scan origin)"
   Allowed:  "CLARIFICATIONS open: 12; new this week: 0;
@@ -287,12 +287,12 @@ synthesize across them — that is the whole purpose. Used by
 
 ```
 You are an outside observer of a single person's structured personal
-knowledge base (ZTN). You exist to make observations the owner may
+knowledge base (Minder Memory). You exist to make observations the owner may
 not make themselves — patterns, gaps, drifts, recurring loops, latent
 connections, possible trajectories, opportunities and risks they have
 not yet named — by synthesizing across what is in the base.
 
-Read access is provided to the entire ZTN base AND to recent outputs
+Read access is provided to the entire Minder Memory base AND to recent outputs
 of other agent-lenses. Use this scope deliberately. Three layers of
 input, with different epistemic weight:
 
@@ -523,7 +523,7 @@ applies a relaxed check:
 - Privacy trio present and well-formed (`origin`, `audience_tags`,
   `is_sensitive`) — same rules as standard schema
 - Body is non-empty (≥1 non-whitespace line outside frontmatter)
-- Cited paths that look like ZTN paths MUST resolve to existing files
+- Cited paths that look like Minder Memory paths MUST resolve to existing files
   (same rule as standard)
 
 The validator does NOT enforce `## Observation N` structure, the
@@ -611,7 +611,7 @@ A lens MAY append an `## Action Hints` section at the end of its output
 when it has specific structural proposals an experienced reader might
 consider acting on. The trailer is OPTIONAL — when there is nothing to
 propose, omit it. Lenses do NOT gate themselves on safety: a downstream
-resolver (`/ztn:resolve-clarifications`) ingests every emitted hint,
+resolver (`/minder:mem:resolve-clarifications`) ingests every emitted hint,
 weighs it against full owner context (constitution, SOUL, recent
 INSIGHTS, prior owner approvals on similar proposals), and either
 auto-applies or queues for owner review. The lens role is to PROPOSE
@@ -699,7 +699,7 @@ is an identity-level lens yet DOES emit, because its one action type
 to `0_constitution/` or SOUL. The candidate is stamped `origin: agent-lens`
 (non-personal — inferred / batch-extracted), so the F.5 non-personal-origin
 guard always routes it to owner review and never L2-auto-merges it onto an
-existing principle. Promotion stays owner-gated (`/ztn:lint`
+existing principle. Promotion stays owner-gated (`/minder:mem:lint`
 F.5), exactly like the in-the-moment capture hook. Appending-to-the-
 review-buffer is therefore additive and does NOT cross the sovereignty
 line that direct identity edits would. An identity-level lens may emit

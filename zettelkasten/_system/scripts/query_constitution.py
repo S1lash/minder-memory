@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Query visible constitution principles as JSON.
 
-Consumed by `/ztn:check-decision`, `/ztn:lint` Scan F, and any future
+Consumed by `/minder:mem:check-decision`, `/minder:mem:lint` Scan F, and any future
 skill that needs the filtered tree.
 
 Filter layers (all AND'd):

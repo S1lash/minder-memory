@@ -9,7 +9,7 @@
 ## How to use
 
 Items in `## Open Items` are LLM-generated questions raised by skills when their
-confidence is below threshold. Run `/ztn:resolve-clarifications` to review the
+confidence is below threshold. Run `/minder:mem:resolve-clarifications` to review the
 queue interactively — the skill clusters items by theme, presents one round at
 a time with full context + verbatim quotes inline, pre-forms hypotheses against
 the owner's constitution, applies confirmed resolutions, and archives closed items.

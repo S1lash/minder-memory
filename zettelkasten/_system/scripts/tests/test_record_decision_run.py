@@ -14,7 +14,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests._fixture import clear_ztn_env, make_fixture  # type: ignore
+from tests._fixture import clear_minder_memory_env, make_fixture  # type: ignore
 import record_decision_run as et  # type: ignore
 
 
@@ -52,7 +52,7 @@ def _common_run_args(jsonl: Path, run_id: str = VALID_RUN_ID) -> list[str]:
 class VerdictEnum(unittest.TestCase):
     """`no-basis` is a distinct verdict, and the enum is what enforces it.
 
-    Downstream skills route the two silences oppositely: `/ztn:resolve-
+    Downstream skills route the two silences oppositely: `/minder:mem:resolve-
     clarifications` promotes a `no-match` candidate to auto-apply and holds a
     `no-basis` one in the queue. If the enum ever loses `no-basis`, the skill
     that emits it fails closed here rather than silently degrading to the
@@ -129,7 +129,7 @@ class EmitTelemetryRunMode(unittest.TestCase):
                     "test situation about whether to do X".encode("utf-8")
                 ).hexdigest(),
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_optional_self_report_defaults_to_null(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -141,19 +141,19 @@ class EmitTelemetryRunMode(unittest.TestCase):
             self.assertIsNone(entry["pre_confidence"])
             self.assertIsNone(entry["expected_verdict"])
             self.assertIsNone(entry["from_pipeline"])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_mechanical_caller_class_via_from_pipeline(self):
         with tempfile.TemporaryDirectory() as tmp:
             fx = make_fixture(Path(tmp))
             jsonl = fx.system / "state" / "check-decision-runs.jsonl"
             et.main(_common_run_args(jsonl) + [
-                "--from-pipeline", "/ztn:process",
+                "--from-pipeline", "/minder:mem:process",
             ])
             entry = _read(jsonl)[0]
             self.assertEqual(entry["caller_class"], "mechanical")
-            self.assertEqual(entry["from_pipeline"], "/ztn:process")
-        clear_ztn_env()
+            self.assertEqual(entry["from_pipeline"], "/minder:mem:process")
+        clear_minder_memory_env()
 
     def test_unknown_pipeline_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -161,9 +161,9 @@ class EmitTelemetryRunMode(unittest.TestCase):
             jsonl = fx.system / "state" / "check-decision-runs.jsonl"
             with self.assertRaises(SystemExit):
                 et.main(_common_run_args(jsonl) + [
-                    "--from-pipeline", "/ztn:not-a-real-pipeline",
+                    "--from-pipeline", "/minder:mem:not-a-real-pipeline",
                 ])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_sensitive_omits_text_and_rationale_keeps_hash(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -180,7 +180,7 @@ class EmitTelemetryRunMode(unittest.TestCase):
                 entry["citations"],
                 [{"id": "axiom-identity-001", "relation": "aligned"}],
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_malformed_run_id_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -195,7 +195,7 @@ class EmitTelemetryRunMode(unittest.TestCase):
                     "--situation", "x",
                     "--no-commit",
                 ])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_failed_status_run_accepts_missing_verdict(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -216,7 +216,7 @@ class EmitTelemetryRunMode(unittest.TestCase):
             self.assertIsNone(entry["verdict"])
             self.assertEqual(entry["citations"], [])
             self.assertIsNone(entry["tree_size"])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_situation_text_truncated_to_cap(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -236,7 +236,7 @@ class EmitTelemetryRunMode(unittest.TestCase):
                 entry["situation_hash"],
                 hashlib.sha256(long_situation.encode("utf-8")).hexdigest(),
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class EmitTelemetryFollowupMode(unittest.TestCase):
@@ -264,7 +264,7 @@ class EmitTelemetryFollowupMode(unittest.TestCase):
             self.assertEqual(f["post_confidence"], "high")
             self.assertTrue(f["verdict_resolved"])
             self.assertFalse(f["human_needed_after"])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_orphan_followup_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -282,7 +282,7 @@ class EmitTelemetryFollowupMode(unittest.TestCase):
                     "--verdict-resolved", "true",
                     "--no-commit",
                 ])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_followup_rejected_when_substrate_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -299,7 +299,7 @@ class EmitTelemetryFollowupMode(unittest.TestCase):
                     "--verdict-resolved", "true",
                     "--no-commit",
                 ])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_followup_inherits_caller_class_for_commit_decision(self):
         # Followup-line commit decision is based on the original run's
@@ -309,11 +309,11 @@ class EmitTelemetryFollowupMode(unittest.TestCase):
             fx = make_fixture(Path(tmp))
             jsonl = fx.system / "state" / "check-decision-runs.jsonl"
             et.main(_common_run_args(jsonl) + [
-                "--from-pipeline", "/ztn:process",
+                "--from-pipeline", "/minder:mem:process",
             ])
             cc = et._lookup_run_caller_class(jsonl, VALID_RUN_ID)
             self.assertEqual(cc, "mechanical")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class EmitTelemetryAppendOnly(unittest.TestCase):

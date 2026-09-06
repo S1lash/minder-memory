@@ -7,7 +7,7 @@ modified: 2026-05-04
 
 # Batch Format
 
-> Контракт формата batch-отчётов ZTN engine. Two artefacts per batch
+> Контракт формата batch-отчётов Minder Memory engine. Two artefacts per batch
 > live side by side under `_system/state/batches/`:
 >
 > - **`{batch_id}-{skill}.json`** — machine-parseable manifest. **The
@@ -51,7 +51,7 @@ modified: 2026-05-04
 
 ## File Locations
 
-- **Index:** `_system/state/BATCH_LOG.md` — append-only markdown table, one row per `/ztn:process` batch
+- **Index:** `_system/state/BATCH_LOG.md` — append-only markdown table, one row per `/minder:mem:process` batch
 - **Reports:** `_system/state/batches/{batch-id}-{skill}.md` — one file per batch, full structured report
 - **Manifests:** `_system/state/batches/{batch-id}-{skill}.json` — machine contract; schema in `_system/docs/manifest-schema/v{N}.json`
 
@@ -73,7 +73,7 @@ YYYYMMDD-HHmmss
 
 ## BATCH_LOG.md Schema
 
-Одна строка markdown-таблицы на каждый `/ztn:process` batch.
+Одна строка markdown-таблицы на каждый `/minder:mem:process` batch.
 Append-only, не перезаписывается.
 
 | Column | Type | Description |
@@ -98,7 +98,7 @@ Append-only, не перезаписывается.
 ---
 batch_id: YYYYMMDD-HHmmss
 timestamp: YYYY-MM-DDTHH:MM:SSZ
-processor: ztn:process v{version}
+processor: minder:mem:process v{version}
 format_version: 2.0
 sources: N
 records: N
@@ -129,7 +129,7 @@ sensitive_entities: N       # count of entities with is_sensitive=true
 7. `## Threads` → `### Opened` + `### Resolved`
 8. `## Hubs Updated`
 9. `## CLARIFICATIONS Raised`
-10. `## People Candidates Appended` (added 2026-04-24) — per entry: `{candidate_id} | {name_as_transcribed} | {note-id} | {role_hint or —}`. Count MUST equal `people_candidates_appended` in frontmatter. Use `(none)` if empty. Rationale: bare-name mentions routed to `_system/state/people-candidates.jsonl` instead of CLARIFICATIONS — see `/ztn:process` Step 3.8 + `/ztn:lint` Scan C.5.
+10. `## People Candidates Appended` (added 2026-04-24) — per entry: `{candidate_id} | {name_as_transcribed} | {note-id} | {role_hint or —}`. Count MUST equal `people_candidates_appended` in frontmatter. Use `(none)` if empty. Rationale: bare-name mentions routed to `_system/state/people-candidates.jsonl` instead of CLARIFICATIONS — see `/minder:mem:process` Step 3.8 + `/minder:mem:lint` Scan C.5.
 11. `## Concepts Upserted` — per entry: `{name} | {type} | {subtype or —} | {related_concepts comma-list or —}`. Count MUST equal `concepts_upserted` in frontmatter. Use `(none)` if empty. Mirrors the JSON manifest's `concepts.upserts[]`. Names conform to `_system/registries/CONCEPT_NAMING.md` (snake_case ASCII, English-only, no type prefix in name).
 12. `## Sensitive Entities` — per entry: `{path or id} | {kind: record|note|hub|task|...} | audience_tags: {[...] or "[]"}`. Count MUST equal `sensitive_entities` in frontmatter. Use `(none)` if empty. Lists every entity emitted in this batch with `is_sensitive: true` so downstream sync can apply extra-friction handling without re-scanning frontmatter.
 
@@ -143,7 +143,7 @@ sensitive_entities: N       # count of entities with is_sensitive=true
 ---
 batch_id: 20260416-103000
 timestamp: 2026-04-16T10:30:00Z
-processor: ztn:process
+processor: minder:mem:process
 format_version: 2.0
 sources: 1
 records: 1
@@ -213,11 +213,11 @@ Every entity surfaced in the markdown summary mirrors the manifest's
 
 | Field | Type | Default | Source of values |
 |---|---|---|---|
-| `origin` | enum | `personal` | `personal` / `work` / `external` (plus `bootstrap-*`/`sync-*` synthetic origins). Inferred per `/ztn:process` Step 3.4 Q16 from SOURCE TYPE + content signals. |
+| `origin` | enum | `personal` | `personal` / `work` / `external` (plus `bootstrap-*`/`sync-*` synthetic origins). Inferred per `/minder:mem:process` Step 3.4 Q16 from SOURCE TYPE + content signals. |
 | `audience_tags` | `text[]` | `[]` | Whitelist in `_system/registries/AUDIENCES.md` (canonical 5 + Extensions). Empty = owner-only. |
 | `is_sensitive` | bool | `false` | Set `true` on NDA, salary, health, financial detail, intimate disclosure. Friction-modifier, NOT audience narrower. |
 
-The trio is **slot-only** at this layer: ZTN emits values, downstream
+The trio is **slot-only** at this layer: Minder Memory emits values, downstream
 consumers (Minder backend, sync targets, custom forks) apply policy.
 Defaults are chosen so that absence of inference fails closed
 (private, not leaked).
@@ -229,14 +229,14 @@ Concept fields per entity:
 | `concepts:` | frontmatter on records and knowledge notes | Canonical concept-name list ("what things does this entity touch"); list of strings per CONCEPT_NAMING. |
 | `concept_hints[]` | per-record / per-note section in JSON manifest | Mirror of frontmatter `concepts:` for downstream consumption. Same values; "hint" name preserves the upstream-tentative semantics. |
 | `member_concepts[]` | per-hub section in JSON manifest | Union of concepts from hub's member knowledge notes. Aggregated at manifest emission time; not stored in hub frontmatter. |
-| `applies_in_concepts[]` | per-principle section in JSON manifest | Concepts a principle applies to. Sourced from constitution principle frontmatter (`/ztn:regen-constitution` reads). |
+| `applies_in_concepts[]` | per-principle section in JSON manifest | Concepts a principle applies to. Sourced from constitution principle frontmatter (`/minder:mem:regen-constitution` reads). |
 | `concepts.upserts[]` | top-level JSON manifest section | Registry-level deduplicated concept emission for the batch. Each entry: `{name, type, subtype?, related_concepts[]?, previous_slugs[]?}`. Where the same concept appeared in N entities, ONE upsert entry is emitted with consolidated metadata. |
 
-**Concept scope.** `/ztn:process` emits non-person, non-project concepts.
+**Concept scope.** `/minder:mem:process` emits non-person, non-project concepts.
 People are tracked via `tier1_objects.people` and `people:` frontmatter;
 projects via `tier1_objects.projects` and `projects:` frontmatter. The
 `type` enum in `CONCEPT_NAMING.md` includes `person` and `project` for
-downstream graph completeness, but ZTN-side emission deliberately
+downstream graph completeness, but Minder Memory-side emission deliberately
 excludes them to avoid dual-emit ambiguity. Downstream consumers infer
 person↔concept and project↔concept edges from co-occurrence in the
 manifest.
@@ -247,11 +247,11 @@ manifest.
 every entry in `previous_slugs`) MUST conform to
 `_system/registries/CONCEPT_NAMING.md` — snake_case `[a-z0-9_]`, ≤64
 chars, no type prefix in the name, English-only. The "no type prefix"
-rule is enforced **upstream at extraction** (`/ztn:process`), not by a
+rule is enforced **upstream at extraction** (`/minder:mem:process`), not by a
 mechanical strip — the normaliser keeps names verbatim because a blind
 strip cannot tell a redundant label from a compound (`decision_making`)
 and would corrupt identity. Non-English source terms MUST be translated
-upstream (in `/ztn:process` Step 3.4 Q15) BEFORE emission. Mechanical
+upstream (in `/minder:mem:process` Step 3.4 Q15) BEFORE emission. Mechanical
 non-conformance (case / separators / diacritics / over-length, and
 non-ASCII or bare-type-word drops) is silently autofixed or dropped by
 the autonomous-resolution helpers in `_system/scripts/_common.py` — at
@@ -267,7 +267,7 @@ of the canonical five (`family`, `friends`, `work`,
 **silently dropped** by the autonomous pipeline (the engine never coins
 new extensions); the entity falls back to its remaining accept-set
 audiences, or to `[]` if all entries dropped. Lint Scan A.7 applies the
-same drop-or-normalise rule against ZTN-internal manifest files as a
+same drop-or-normalise rule against Minder Memory-internal manifest files as a
 post-write safety net.
 
 **Autonomous resolution — no CLARIFICATIONs for the concept layer.**
@@ -287,7 +287,7 @@ under `concept-*-autofix` / `audience-tag-*-autofix` fix-ids in
 `log_lint.md` for traceability.
 
 **Owner-curated registries (privacy trio NOT applicable).** The
-following files are owner-curated outside the `/ztn:process` pipeline
+following files are owner-curated outside the `/minder:mem:process` pipeline
 and intentionally do NOT carry the privacy trio (origin /
 audience_tags / is_sensitive). Lint Scan A.7 explicitly skips them:
 
@@ -316,7 +316,7 @@ The JSON manifest schema is **canonical** in
 Documentation, version evolution rules, consumer integration patterns,
 and the "what is NOT in the manifest" contract live in
 `_system/docs/manifest-schema/README.md` — that doc is consumer-agnostic
-and is the source of truth for any process consuming ZTN output.
+and is the source of truth for any process consuming Minder Memory output.
 
 This file no longer maintains a separate JSON sketch — the schema
 file is itself the spec. Keeping a parallel narrative led to drift
@@ -329,16 +329,16 @@ location.
 
 Формат потребляют:
 
-- **`/ztn:process`** (writer) — генерирует `batches/{id}-process.md` +
+- **`/minder:mem:process`** (writer) — генерирует `batches/{id}-process.md` +
   `batches/{id}-process.json` + добавляет строку в `BATCH_LOG.md`
-- **`/ztn:maintain`** (writer + reader) — читает последний batch для
+- **`/minder:mem:maintain`** (writer + reader) — читает последний batch для
   incremental обновлений (mention counts, thread detection,
   CURRENT_CONTEXT regen); пишет `batches/{id}-maintain.json`
-- **`/ztn:lint`** (writer + reader) — сканирует `BATCH_LOG.md` для
+- **`/minder:mem:lint`** (writer + reader) — сканирует `BATCH_LOG.md` для
   detect stale threads, Evidence Trail gaps, content pipeline candidates;
   пишет `batches/{id}-lint.json`; Scan G validates every recent JSON
   manifest against the active schema
-- **`/ztn:agent-lens`** (writer) — пишет
+- **`/minder:mem:agent-lens`** (writer) — пишет
   `batches/{id}-agent-lens.json` per universal manifest contract;
   audit trail остаётся в `_system/state/agent-lens-runs.jsonl`
 - **Downstream consumers** (open set — Minder backend, custom forks,

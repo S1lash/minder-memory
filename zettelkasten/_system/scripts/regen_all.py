@@ -20,8 +20,8 @@ aside from the timestamp line).
 
 Invocation:
     - Manually after editing `0_constitution/`
-    - As the first step of every ZTN pipeline that reads derived views
-      (`/ztn:process`, `/ztn:maintain`, `/ztn:lint`). This is the single
+    - As the first step of every Minder Memory pipeline that reads derived views
+      (`/minder:mem:process`, `/minder:mem:maintain`, `/minder:mem:lint`). This is the single
       consistent rule: every consumer regenerates before reading.
     - From scheduler tasks on the Claude platform
 

@@ -129,7 +129,7 @@ Hub отслеживает эволюцию:
   `_system/scripts/render_tags.py`, и новый тег появится там сам
 - Имя, которое не разрешается в `firstname-lastname`, в `people:` не идёт —
   оно уходит в `_system/state/people-candidates.jsonl` и агрегируется
-  еженедельным `/ztn:lint`
+  еженедельным `/minder:mem:lint`
 
 **Антипаттерн:** «Этот человек упомянут мимоходом, не буду добавлять» — ЗАПРЕЩЕНО
 (если упоминание преднамеренное, а не оговорка).
@@ -183,7 +183,7 @@ project would make the record lose its core meaning. The test:
 - **Never:** 3+ elements. The frontmatter `projects:` array is NEVER
   used as an «umbrella tag cloud».
 
-`/ztn:lint` Scan A.8 warns on any `projects.length > 2`
+`/minder:mem:lint` Scan A.8 warns on any `projects.length > 2`
 (`projects-array-overcount`), and on `projects.length == 2` without a
 `boundary` annotation in body (`projects-array-2-without-boundary-marker`).
 
@@ -218,9 +218,9 @@ section owns only what requires judgment at extraction time.
 
 ### Migration & enforcement
 
-- `/ztn:process` projects-extraction prompt enforces primary-only at write.
-- `/ztn:lint` Scan A.X catches drift in existing records.
-- `/ztn:process --reprocess-corpus` re-derives `projects:` arrays for the
+- `/minder:mem:process` projects-extraction prompt enforces primary-only at write.
+- `/minder:mem:lint` Scan A.X catches drift in existing records.
+- `/minder:mem:process --reprocess-corpus` re-derives `projects:` arrays for the
   corpus when the prompt strict-semantic changes (rare).
 
 > **See also:** `1_projects/PROJECTS.md` — the registry that lists which
@@ -252,7 +252,7 @@ LLM должен распознавать неявные решения: ког�
 ## Values Profile (калибровка)
 
 Принципы универсальны, но их ИНТЕНСИВНОСТЬ — персональна. Каждый
-инстанс ZTN определяет свой профиль в `_system/SOUL.md` (секция
+инстанс Minder Memory определяет свой профиль в `_system/SOUL.md` (секция
 `## Working Style` / `## Values`). Если профиль не задан — действуют
 дефолты ниже.
 

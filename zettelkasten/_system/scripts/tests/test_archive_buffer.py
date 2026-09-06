@@ -8,7 +8,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from tests._fixture import clear_ztn_env, make_fixture  # type: ignore
+from tests._fixture import clear_minder_memory_env, make_fixture  # type: ignore
 import archive_buffer as a  # type: ignore
 
 
@@ -42,7 +42,7 @@ class ArchiveBufferTests(unittest.TestCase):
             self.assertEqual(len(lines), 2)
             # Buffer cleared
             self.assertEqual(buf.read_text(encoding="utf-8"), "")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_empty_buffer_noop(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -56,7 +56,7 @@ class ArchiveBufferTests(unittest.TestCase):
             ])
             self.assertEqual(rc, 0)
             self.assertEqual(buf.read_text(encoding="utf-8"), "")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_archive_verify_mismatch_preserves_buffer(self):
         """Direct unit test on archive_and_clear: simulate verify mismatch
@@ -87,7 +87,7 @@ class ArchiveBufferTests(unittest.TestCase):
                 self.assertIn("s2", buf.read_text(encoding="utf-8"))
             finally:
                 ab._count_nonblank_lines = orig_count
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_verify_mismatch_exits_nonzero(self):
         """main() returns 2 on verify failure, buffer remains intact."""
@@ -112,7 +112,7 @@ class ArchiveBufferTests(unittest.TestCase):
                 self.assertIn("x", buf.read_text(encoding="utf-8"))
             finally:
                 ab.archive_and_clear = orig
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_iso_week_tag_format(self):
         self.assertRegex(a.iso_week_tag(date(2026, 4, 20)), r"^2026-W\d{2}$")
@@ -130,7 +130,7 @@ class ArchiveBufferTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             # Buffer still has the entry
             self.assertIn("s1", buf.read_text(encoding="utf-8"))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 if __name__ == "__main__":

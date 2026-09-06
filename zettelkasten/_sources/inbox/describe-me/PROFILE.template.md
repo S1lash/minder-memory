@@ -1,11 +1,11 @@
-# Describe me — profile for /ztn:bootstrap
+# Describe me — profile for /minder:mem:bootstrap
 
-> **What this is.** A guided profile of you. `/ztn:bootstrap` reads
+> **What this is.** A guided profile of you. `/minder:mem:bootstrap` reads
 > this file as the **primary source** for `_system/SOUL.md` (Identity,
 > Values, Working Style, Active Goals) on a fresh skeleton. Filling
 > this in well dramatically increases the quality of every downstream
-> skill — `/ztn:process` calibrates tone, `/ztn:lint` calibrates
-> standards, `/ztn:capture-candidate` calibrates principle detection
+> skill — `/minder:mem:process` calibrates tone, `/minder:mem:lint` calibrates
+> standards, `/minder:mem:capture-candidate` calibrates principle detection
 > against your real value system.
 >
 > **How to use.** Copy this file to `PROFILE.md` in the same folder
@@ -30,13 +30,13 @@
 >
 > **Privacy.** This file lives in your private repo. It only ever
 > reaches Claude through your local skills. It is NOT shared with the
-> upstream `minder-ztn` skeleton.
+> upstream `minder-memory` skeleton.
 >
 > **After bootstrap reads your profile, the consumed files move to
 > `_sources/processed/describe-me/`** — kept as reference for re-runs.
 > You can drop more self-description files into this folder over time
-> (career updates, value shifts, new context); `/ztn:process` picks
-> them up as regular content, and a re-run of `/ztn:bootstrap` re-reads
+> (career updates, value shifts, new context); `/minder:mem:process` picks
+> them up as regular content, and a re-run of `/minder:mem:bootstrap` re-reads
 > both sides.
 
 ---
@@ -147,7 +147,7 @@
   bridges fintech and ML, both contexts are usually relevant»}
 - {Tools / stack you default to}
 - {Things to check before suggesting new approaches — existing
-  knowledge in ZTN, current codebase patterns, etc.}
+  knowledge in Minder Memory, current codebase patterns, etc.}
 
 ### What to avoid
 
@@ -163,7 +163,7 @@
 
 ## People who matter (optional, helpful)
 
-> If you list 5-15 people you talk about often, `/ztn:bootstrap`
+> If you list 5-15 people you talk about often, `/minder:mem:bootstrap`
 > seeds them as Tier-2/3 candidates in PEOPLE.md (subject to your
 > review). Skip this section if it feels weird — the raw transcript
 > scan finds them anyway, this just removes ambiguity for the
@@ -199,7 +199,7 @@
 > Pre-seeds the constitution. If you have explicit personal rules
 > you've already articulated (5-15 is normal), drop them here. They
 > land in `_system/state/principle-candidates.jsonl` for you to
-> review-and-promote via `/ztn:lint` rather than auto-loading.
+> review-and-promote via `/minder:mem:lint` rather than auto-loading.
 >
 > Format each as: `[type | domain] short rule — why you hold it`.
 >

@@ -17,11 +17,11 @@ _sources/                             # ВСЕ сырые данные (внут
 │   └── {source-id}/                  # Whitelist active sources — _system/registries/SOURCES.md.
 │                                     # Layout (flat-md | dir-per-item | dir-with-summary)
 │                                     # и Skip Subdirs объявлены на row of source.
-│                                     # Добавить новый source: /ztn:source-add.
+│                                     # Добавить новый source: /minder:mem:source-add.
 └── processed/                        # Обработанные (зеркальная иерархия)
     └── {source-id}/{id}/...          # Mirrors inbox layout. Сюда двигают консумированные
-                                      # файлы оба консумера: /ztn:process (Step 2.4) и
-                                      # /ztn:bootstrap (describe-me профиль после Step 2).
+                                      # файлы оба консумера: /minder:mem:process (Step 2.4) и
+                                      # /minder:mem:bootstrap (describe-me профиль после Step 2).
 ```
 
 ---
@@ -39,7 +39,7 @@ zettelkasten/
 │   │   └── YYYYMMDD-observation-{topic}.md
 │   ├── biometric/                # Daily wearable snapshots (kind: biometric)
 │   │   └── {source}/             # per-device namespace (garmin, oura): independent records + baselines
-│   │       └── YYYY-MM-DD.md     # one file per calendar day per device; auto-emitted by /ztn:process
+│   │       └── YYYY-MM-DD.md     # one file per calendar day per device; auto-emitted by /minder:mem:process
 │   │                             # metric-day branch from _sources/inbox/{source}/<date>.md.
 │   │                             # Frontmatter: device: {source}, device_estimate: true.
 │   │                             # Privacy: is_sensitive: true, audience_tags: [], origin: personal.
@@ -82,9 +82,9 @@ zettelkasten/
 │   │   ├── HUB_INDEX.md          # индекс всех hub-заметок
 │   │   ├── INDEX.md              # surface catalog: knowledge + archive + constitution + hubs (faceted)
 │   │   ├── CURRENT_CONTEXT.md    # live state snapshot
-│   │   ├── CONTENT_MAP.md        # content pipeline interface — view over hubs (writer: /ztn:maintain)
-│   │   ├── biometric/            # недельные биометрические сводки (writer: /ztn:maintain)
-│   │   └── activity/             # недельные сводки computer-usage (writer: /ztn:maintain)
+│   │   ├── CONTENT_MAP.md        # content pipeline interface — view over hubs (writer: /minder:mem:maintain)
+│   │   ├── biometric/            # недельные биометрические сводки (writer: /minder:mem:maintain)
+│   │   └── activity/             # недельные сводки computer-usage (writer: /minder:mem:maintain)
 │   ├── state/                    # pipeline state (write-heavy)
 │   │   ├── BATCH_LOG.md          # index batch-операций
 │   │   ├── PROCESSED.md          # source → note маппинг
@@ -93,23 +93,23 @@ zettelkasten/
 │   │   ├── OPEN_THREADS.md       # незакрытые стратегические нити
 │   │   ├── principle-candidates.jsonl  # append-only candidate buffer
 │   │   ├── people-candidates.jsonl     # append-only буфер неразрешённых имён
-│   │   ├── check-decision-runs.jsonl   # append-only телеметрия /ztn:check-decision
+│   │   ├── check-decision-runs.jsonl   # append-only телеметрия /minder:mem:check-decision
 │   │   ├── lens-resolution-history.jsonl  # прецеденты owner-решений по lens-хинтам
 │   │   ├── insights-config.yaml  # owner-настройки авто-применения lens-хинтов
 │   │   ├── secrets.enc.json      # per-value зашифрованные креды ролей (ключ — вне репо)
-│   │   ├── log_process.md        # хронологический лог /ztn:process
-│   │   ├── log_maintenance.md    # append-only лог /ztn:maintain + /ztn:bootstrap
-│   │   ├── log_lint.md           # append-only лог /ztn:lint runs
-│   │   ├── log_agent_lens.md     # append-only лог /ztn:agent-lens runs
+│   │   ├── log_process.md        # хронологический лог /minder:mem:process
+│   │   ├── log_maintenance.md    # append-only лог /minder:mem:maintain + /minder:mem:bootstrap
+│   │   ├── log_lint.md           # append-only лог /minder:mem:lint runs
+│   │   ├── log_agent_lens.md     # append-only лог /minder:mem:agent-lens runs
 │   │   ├── agent-lens-runs.jsonl # машинный индекс agent-lens runs (one JSON per line)
 │   │   ├── agent-lens-rejected/  # raw Stage 2 outputs (validator rejected)
-│   │   ├── resolve-sessions/     # per-session логи /ztn:resolve-clarifications
+│   │   ├── resolve-sessions/     # per-session логи /minder:mem:resolve-clarifications
 │   │   ├── biometric/            # σ-baselines по устройствам
 │   │   ├── activity/             # σ-baselines по источникам computer-usage
 │   │   ├── batches/              # полные batch-отчёты
 │   │   │   ├── {batch_id}.md            # human-readable markdown report (per-batch)
 │   │   │   ├── {batch_id}.json          # machine-parseable JSON manifest (consumer contract)
-│   │   │   └── {batch_id}-maintain.json # /ztn:maintain manifest (per maintain integration batch)
+│   │   │   └── {batch_id}-maintain.json # /minder:mem:maintain manifest (per maintain integration batch)
 │   │   └── lint-context/         # Lint Context Store: daily/ (30d rolling) + monthly/ (forever)
 │   ├── agent-lens/               # agent-lens outputs (private, owner-only review)
 │   │   └── {lens-id}/{date}.md   # one snapshot per run per lens
@@ -117,7 +117,7 @@ zettelkasten/
 │   └── registries/               # реестры сущностей
 │       ├── TAGS.md               # перепись тегов (`tags:` axis; рендерится скриптом)
 │       ├── SOURCES.md            # реестр источников
-│       ├── CONCEPTS.md           # перепись концептов (рендерится /ztn:maintain)
+│       ├── CONCEPTS.md           # перепись концептов (рендерится /minder:mem:maintain)
 │       ├── CONCEPT_NAMING.md     # canonical concept-name format (`concepts:` axis)
 │       ├── CONCEPT_TYPES.md      # зеркало downstream-энума типов концепта
 │       ├── DOMAINS.md            # `domains:` whitelist (канонические 13 + extensions)

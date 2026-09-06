@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ensure project-level ZTN skills resolve at `.claude/skills/<name>/SKILL.md`.
+# Ensure project-level Minder Memory skills resolve at `.claude/skills/<name>/SKILL.md`.
 #
 # Skill discovery for Cloud Routines and project-CWD sessions depends on
 # `.claude/skills/<name>/SKILL.md` being a READABLE file in the clone. The
@@ -7,9 +7,9 @@
 # (native on macOS / Linux, convenient for the dev loop); the public skeleton
 # ships them as real files, because git symlinks do NOT survive a Windows
 # clone — with `core.symlinks=false` git materialises the symlink blob as a
-# text file containing the target path, so `.claude/skills/ztn-process` becomes
-# a FILE (not a directory) and `.claude/skills/ztn-process/SKILL.md` no longer
-# exists. The runtime then cannot load the skill and every `/ztn:*` slash
+# text file containing the target path, so `.claude/skills/minder-mem-process` becomes
+# a FILE (not a directory) and `.claude/skills/minder-mem-process/SKILL.md` no longer
+# exists. The runtime then cannot load the skill and every `/minder:mem:*` slash
 # invocation in a scheduler tick fails at the first step.
 #
 # The canonical set of skills is the directory listing under

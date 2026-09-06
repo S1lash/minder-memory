@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ZTN lint — `cognitive_axes` frontmatter integrity.
+"""Minder Memory lint — `cognitive_axes` frontmatter integrity.
 
 Validates the optional `cognitive_axes` field on constitution principles (the
 field that powers `5_meta/mocs/hub-cognitive-model.md`):
@@ -17,7 +17,7 @@ field that powers `5_meta/mocs/hub-cognitive-model.md`):
 
 The slug SoT and the principle scopes are both READ here; nothing is duplicated.
 Output: JSONL on stdout, one event per finding. Exit 0 always (informational —
-ztn-lint routes findings to CLARIFICATIONs for owner review; no autofix of the
+minder-mem-lint routes findings to CLARIFICATIONs for owner review; no autofix of the
 sacred constitution tree).
 
 Usage:
@@ -118,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
     configure_std_streams()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=None,
-                        help="repo root (default: resolved from ZTN_BASE / file location)")
+                        help="repo root (default: resolved from MINDER_MEMORY_BASE / file location)")
     args = parser.parse_args(argv)
     root = args.root or repo_root()
     scan(root)

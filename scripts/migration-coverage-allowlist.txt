@@ -1,39 +1,13 @@
 # Migration-coverage exemptions — a CLOSED legacy baseline, not an inbox.
 #
-# Every migration below predates the coverage gate. Each needs a suite that
-# executes it; until one exists the row states that plainly, with the date it
-# was accepted. The list can only SHRINK: writing the suite removes the row,
-# and the gate reports a row whose migration is already covered as stale.
+# Every migration ships with a suite that executes it. This list can only
+# SHRINK: a row is removed when its suite lands, and the gate reports a row
+# whose migration is already covered — or no longer exists — as stale.
 #
 # `watermark:` is the highest migration number that existed when the gate was
 # introduced. A migration numbered above it CANNOT be exempted — it ships with
 # a suite or it does not ship.
 #
 # Format:  <migration file> | <reason> | <YYYY-MM-DD>
-#
-# Backfill is tracked in `platform/engine-defects.md`.
 
 watermark: 29
-
-002-sources-family-column.sh | predates the coverage gate; structural, suite not yet written | 2026-09-01
-003-lens-precedent-pre-biometric-mark.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-004-scheduler-single-commit-protocol.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-005-scheduler-pr-merge-delivery.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-006-describe-me-top-level-source.sh | predates the coverage gate; structural, suite not yet written | 2026-09-01
-007-backfill-manifest-conformance.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-008-content-skill-rename.sh | predates the coverage gate; structural, suite not yet written | 2026-09-01
-009-biometric-per-source-namespace.sh | predates the coverage gate; structural, suite not yet written | 2026-09-01
-010-cognitive-model-hub-seed.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-015-cognitive-model-activate.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-016-roles-subsystem-removed.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-017-roles-subsystem-returns.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-019-portability-repair.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-021-maintain-step-and-prompt-loader.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-022-retire-old-roles-log.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-023-owner-persona.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-024-retirement-schema.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-025-identity-report.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-026-advisory-baseline-wiring.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-027-starter-axiom-hot-audit.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-028-decision-runs-format-version.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01
-029-refresh-vault-help.sh | predates the coverage gate; heal, suite not yet written | 2026-09-01

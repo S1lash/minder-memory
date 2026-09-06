@@ -1,38 +1,38 @@
-You are running the autonomous nightly tick of `/ztn:lint`. There is no
+You are running the autonomous nightly tick of `/minder:mem:lint`. There is no
 human in this loop. The contract below is load-bearing.
 
 ## Invocation contract (read first)
 
-The ZTN skills in this prompt — `/ztn:sync-data`, `/ztn:lint` — are
+The Minder Memory skills in this prompt — `/minder:mem:sync-data`, `/minder:mem:lint` — are
 invoked **as slash commands in this same conversation**. Skills are
 committed to the cloned repo at `.claude/skills/<name>/SKILL.md`, so the
 runtime loads them automatically — write the slash command literally as
 the next action and it executes. Step 0 verifies this layout resolved in
 the clone before any slash invocation.
 
-`/ztn:lint` Step 7.5 dispatches `/ztn:resolve-clarifications --auto-mode`
+`/minder:mem:lint` Step 7.5 dispatches `/minder:mem:resolve-clarifications --auto-mode`
 inline as part of its own pipeline; the resolve session in turn may
-escalate ambiguous candidates to `/ztn:check-decision`. Both fire inside
+escalate ambiguous candidates to `/minder:mem:check-decision`. Both fire inside
 the lint slash invocation as the skill's own architecture and ARE
-preserved — your job is to invoke `/ztn:lint` once and let it run.
+preserved — your job is to invoke `/minder:mem:lint` once and let it run.
 
 **Single-commit guarantee.** This tick produces **exactly one git commit
 + one git push**, both from `bash scripts/scheduler/finalize-tick.sh` at
-Step 5. No other path in this prompt commits or pushes. `/ztn:save` is
+Step 5. No other path in this prompt commits or pushes. `/minder:mem:save` is
 **forbidden** in scheduler ticks. Any intermediate `git commit`,
 `git push`, or `git add` outside the helper scripts listed below is a
 contract violation.
 
 **Hard prohibitions:**
 
-- Do NOT invoke `/ztn:save` in any form. Use `finalize-tick.sh` at Step 5.
+- Do NOT invoke `/minder:mem:save` in any form. Use `finalize-tick.sh` at Step 5.
 - Do NOT call `git commit`, `git push`, `git add` directly outside the
   listed helper scripts. **One explicit exception:** Step 5b (MCP
   delivery fallback, runs only when finalize-tick reports `gh CLI not
   found in PATH`) uses one direct `git push origin "HEAD:<sandbox>"`
   per its strict per-step instructions. No other direct git/gh calls
   are authorized.
-- Do NOT open any `integrations/claude-code/skills/ztn-*/SKILL.md` and
+- Do NOT open any `integrations/claude-code/skills/minder-mem-*/SKILL.md` and
   re-implement its steps with Bash / Read / Edit. Skills are loaded by
   the runtime — invoke via slash, never re-execute.
 - Do NOT use the Agent / Task tool as a substitute for slash invocation.
@@ -52,7 +52,7 @@ contract violation.
   synchronous; their return IS completion.
 - Do NOT narrate or summarise between steps.
 - If the working tree looks "dirty across many categories" after Step 4,
-  that is NORMAL output of `/ztn:lint` + inline resolve dispatch. Do NOT
+  that is NORMAL output of `/minder:mem:lint` + inline resolve dispatch. Do NOT
   try to "group by theme" or "save progress" — Step 5's `finalize-tick.sh`
   collapses every dirty owner path into one commit.
 
@@ -73,7 +73,7 @@ Then exit `partial` immediately.
 ## Steps
 
 0. `bash scripts/scheduler/ensure-skills.sh` — verify the project-level
-   ZTN skills resolve at `.claude/skills/<name>/SKILL.md` before any slash
+   Minder Memory skills resolve at `.claude/skills/<name>/SKILL.md` before any slash
    invocation. This is the #1 cause of a tick dying at its first step: a
    clone where git symlinks did not survive (e.g. a Windows commit with
    `core.symlinks=false` materialises them as text files). On non-zero
@@ -83,7 +83,7 @@ Then exit `partial` immediately.
    cannot persist. Run failure-handling with cause
    `"skills unresolvable in this clone — apply the CHANGELOG 0.41.0 recovery, then re-run"`
    and exit `partial`. The durable fix is real-file skills delivered via
-   the skeleton + `/ztn:update`, not an in-tick repair.
+   the skeleton + `/minder:mem:update`, not an in-tick repair.
 
 1. `bash scripts/scheduler/pin-main.sh` — get on fresh `origin/main`,
    capture the starting sandbox branch, and best-effort recover any
@@ -94,15 +94,15 @@ Then exit `partial` immediately.
    recent (<2h).
    Stale locks (>2h) are removed automatically.
 
-3. `/ztn:sync-data` — safe `git pull --rebase` with conflict-refuse
+3. `/minder:mem:sync-data` — safe `git pull --rebase` with conflict-refuse
    semantics.
    - Returns "blocked" / non-zero → run failure-handling with cause
      `"sync-data blocked, owner action needed"`, exit `sync-blocked`.
 
-4. `/ztn:lint` — exactly ONE invocation. Runs the full pipeline:
+4. `/minder:mem:lint` — exactly ONE invocation. Runs the full pipeline:
    migration check → context load → Scans A–H → worklist apply → context
    store generation → Step 7.5 resolve-clarifications --auto-mode dispatch
-   (which may cascade into /ztn:check-decision for ambiguous proposals).
+   (which may cascade into /minder:mem:check-decision for ambiguous proposals).
    - On skill error → run failure-handling, exit `partial`.
    - When the skill returns, the immediate next action is step 5.
 
@@ -183,12 +183,12 @@ Then exit `partial` immediately.
 
 ## Forbidden in this tick
 
-- `/ztn:process`, `/ztn:agent-lens`, `/ztn:content`, `/ztn:roles` — separate schedules
-- `/ztn:resolve-clarifications` invoked DIRECTLY — only via lint Step 7.5
+- `/minder:mem:process`, `/minder:mem:agent-lens`, `/minder:mem:content`, `/minder:mem:roles` — separate schedules
+- `/minder:mem:resolve-clarifications` invoked DIRECTLY — only via lint Step 7.5
   dispatch (the lint skill handles it inline)
-- `/ztn:save` in any form (owner-interactive only — scheduler uses
+- `/minder:mem:save` in any form (owner-interactive only — scheduler uses
   `finalize-tick.sh`)
-- `/ztn:update` — engine sync is owner-only
+- `/minder:mem:update` — engine sync is owner-only
 - direct `git commit`, `git push`, `git add` outside helper scripts
 - `git push --force` of any kind
 - creating a feature branch, worktree, or PR

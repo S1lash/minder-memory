@@ -36,20 +36,20 @@ id: log-lint
 # Lint Log
 
 <!-- Entries append BELOW this line, newest first -->
-## 2026-07-28T01:09:09Z | lint | by: ztn:lint | batch: lint-20260728-001
+## 2026-07-28T01:09:09Z | lint | by: minder:mem:lint | batch: lint-20260728-001
 
 ### Scans Executed
 - clean
 
-## 2026-07-27T01:07:47Z | lint | by: ztn:lint | batch: —
+## 2026-07-27T01:07:47Z | lint | by: minder:mem:lint | batch: —
 
-## 2026-07-26T01:11:29Z | lint | by: ztn:lint | batch: —
+## 2026-07-26T01:11:29Z | lint | by: minder:mem:lint | batch: —
 
-## 2026-05-22T01:10:26Z | lint | by: ztn:lint | batch: —
+## 2026-05-22T01:10:26Z | lint | by: minder:mem:lint | batch: —
 
-## 2026-06-05T01:21:13Z | lint | by: ztn:lint | batch: —
+## 2026-06-05T01:21:13Z | lint | by: minder:mem:lint | batch: —
 
-## 2026-06-08T01:05:00Z | lint | by: ztn:lint | batch: —
+## 2026-06-08T01:05:00Z | lint | by: minder:mem:lint | batch: —
 
 ### Step 7.5 — resolve-clarifications dispatch
 auto-resolve: applied 1, queued 1, vetoed 0.
@@ -87,7 +87,7 @@ class HeaderShapeTests(unittest.TestCase):
     """All four shapes are real and in use; none of them is a contract."""
 
     CASES = [
-        ("## 2026-07-28T01:09:09Z | lint | by: ztn:lint", "2026-07-28T01:09:09Z"),
+        ("## 2026-07-28T01:09:09Z | lint | by: minder:mem:lint", "2026-07-28T01:09:09Z"),
         ("## 2026-08-08 — Processing: activitywatch metric-day", "2026-08-08T00:00:00Z"),
         ("## 2026-05-01 11:38:00Z — agent-lens run", "2026-05-01T11:38:00Z"),
         ("## 2026-08-06T23:10 — maintain", "2026-08-06T23:10:00Z"),

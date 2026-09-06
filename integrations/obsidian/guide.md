@@ -1,6 +1,6 @@
-# Obsidian guide for ZTN
+# Obsidian guide for Minder Memory
 
-Working in your ZTN vault from Obsidian. Hotkeys, navigation patterns,
+Working in your Minder Memory vault from Obsidian. Hotkeys, navigation patterns,
 recipes for daily / weekly flows, the philosophy of what's where.
 
 ## Mental model
@@ -9,7 +9,7 @@ Three layers, all visible from Obsidian:
 
 | Layer | Where | Role |
 |---|---|---|
-| **Records** | `_records/meetings/`, `_records/observations/` | Raw capture from transcripts. Append-only. Edited by `/ztn:process`. |
+| **Records** | `_records/meetings/`, `_records/observations/` | Raw capture from transcripts. Append-only. Edited by `/minder:mem:process`. |
 | **Knowledge** | `0_constitution/`, `1_projects/`, `2_areas/`, `3_resources/`, `4_archive/` | PARA hierarchy + constitution. Curated. Where insights distill from records. |
 | **Hubs** | `5_meta/mocs/` | Maps of Content. Cross-cutting views — patterns spanning domains. |
 
@@ -21,7 +21,7 @@ auto-generated views (`CURRENT_CONTEXT.md`, `INDEX.md`, `HUB_INDEX.md`).
 
 Two layers of filtering work together:
 
-- **CSS snippet `ztn-hide-engine-paths`** — hides engine internals
+- **CSS snippet `minder-memory-hide-engine-paths`** — hides engine internals
   (`_system/state/`, `_system/scripts/`, `_system/docs/`,
   `_sources/processed/`, `*.template.md`, `integrations/`,
   `__pycache__/`) from the file tree. Toggle off in Settings →
@@ -84,7 +84,7 @@ shipped in `graph.json`.
 
 ### Apply a preset
 
-1. Open `minder-ztn.md` → scroll to **🌐 Graph presets**.
+1. Open `minder-memory.md` → scroll to **🌐 Graph presets**.
 2. Click the chevron on a callout to expand. The query is in a code
    block — hover and click 📋 (top-right) to copy.
 3. `Cmd+Shift+G` to open graph view.
@@ -104,7 +104,7 @@ it:
 If Obsidian wiped your color groups while you tweaked filters (it
 sometimes auto-saves the graph state and drops the colorGroups array
 in the process), use the **🔄 Reset graph view to defaults** button at
-the bottom of `minder-ztn.md` (section ⚙️ Maintenance). One click
+the bottom of `minder-memory.md` (section ⚙️ Maintenance). One click
 restores the engine snapshot of `graph.json` and auto-backs up your
 current state. CLI alternative for power users:
 `bash integrations/obsidian/seed.sh --reset-graph`.
@@ -128,7 +128,7 @@ The graph is your "second consciousness made visible". Default settings:
 - **Arrows show direction** — record → person, principle → record.
 - **Hide unresolved** — phantom nodes (broken `[[wikilinks]]`) are
   hidden by default. Enable temporarily to find broken links.
-- **Forces tuned for ZTN scale** — `repelStrength: 18`,
+- **Forces tuned for Minder Memory scale** — `repelStrength: 18`,
   `linkDistance: 280`. Clusters spread out instead of collapsing.
 
 For specific lenses (people web, decision lineage, project landscape,
@@ -154,7 +154,7 @@ direct neighbours, 2-3 widens to second-order connections.
 
 ## Visual cues — note types at a glance
 
-CSS snippet `ztn-note-types` colours the left border of each note's
+CSS snippet `minder-memory-note-types` colours the left border of each note's
 editor and adds an emoji to its tab:
 
 - 👤 **Person** — orange border
@@ -171,8 +171,8 @@ Toggle in Settings → Appearance → CSS snippets.
 
 ## Frontmatter — read but don't bulk-edit
 
-ZTN frontmatter is consumed by skills (`/ztn:process`, `/ztn:lint`,
-`/ztn:maintain`). The Properties panel in Obsidian's right pane is
+Minder Memory frontmatter is consumed by skills (`/minder:mem:process`, `/minder:mem:lint`,
+`/minder:mem:maintain`). The Properties panel in Obsidian's right pane is
 fine for browsing — but **don't bulk-edit frontmatter through it** on
 files in:
 
@@ -203,7 +203,7 @@ Suggested cadence inside Obsidian:
 2. **During work — capture:**
    - Use Plaud / voice input externally; transcripts arrive in
      `_sources/inbox/` (hidden from your view)
-   - Run `/ztn:process` from Claude Code when batch is ready
+   - Run `/minder:mem:process` from Claude Code when batch is ready
 3. **Evening — review:**
    - Open Local Graph on any record from today (`Cmd+Shift+L`)
    - See who you talked to, what got captured
@@ -214,7 +214,7 @@ Suggested cadence inside Obsidian:
 1. Open the **Project landscape** graph preset
 2. For each project, open its local graph — see records of the week,
    people involved, principles cited
-3. Run `/ztn:lint` from Claude Code (auto-runs nightly anyway) to
+3. Run `/minder:mem:lint` from Claude Code (auto-runs nightly anyway) to
    surface dangling threads
 4. Use the **Hub network** preset to spot hubs that grew stale
 
@@ -243,7 +243,7 @@ Install via Settings → Community plugins → Browse:
 - **Tasks** by Clare Macrae — global task view across the vault.
 - **Front Matter Title** by snezhig (S. Mokienko) — shows
   `title:` from frontmatter instead of the file ID. Critical for
-  ZTN where IDs are snake_case (`ivan-petrov.md`) but titles are
+  Minder Memory where IDs are snake_case (`ivan-petrov.md`) but titles are
   human (`Иван Петров`).
 
 Once installed, the plugin auto-loads — `community-plugins.json` lists
@@ -252,7 +252,7 @@ its features OFF by default. After install:
 
 1. Settings → Front Matter Title → **Features**
 2. Toggle ON: Explorer, Graph, Tab, Header, Quick Switcher, Suggester
-3. (Default key is `title`, which matches ZTN frontmatter convention —
+3. (Default key is `title`, which matches Minder Memory frontmatter convention —
    no template config needed.)
 
 Dataview and Tasks plugins have no equivalent setup — they auto-work
@@ -261,11 +261,11 @@ once installed.
 ## Things to avoid
 
 - **Don't toggle `useMarkdownLinks` to true.** Settings → Files & Links
-  → "Use [[Wikilinks]]" must stay enabled. ZTN skills emit and parse
-  wikilinks; switching breaks round-trip with `/ztn:process`.
+  → "Use [[Wikilinks]]" must stay enabled. Minder Memory skills emit and parse
+  wikilinks; switching breaks round-trip with `/minder:mem:process`.
 - **Don't enable Obsidian Sync.** Conflicts with the git-based
-  pipeline and the cross-skill lock matrix. Use git via `/ztn:save`
-  and `/ztn:sync-data`.
+  pipeline and the cross-skill lock matrix. Use git via `/minder:mem:save`
+  and `/minder:mem:sync-data`.
 - **Don't bulk-edit frontmatter via Properties UI** in engine-managed
   files (see frontmatter section above).
 

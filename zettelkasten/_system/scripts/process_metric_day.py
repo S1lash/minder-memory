@@ -1,4 +1,4 @@
-"""Orchestrator for the /ztn:process metric-day branch.
+"""Orchestrator for the /minder:mem:process metric-day branch.
 
 Pure deterministic Python (no LLM). One source file → one per-day record
 under `_records/<family>/<source_id>/<date>.md` plus updated rolling
@@ -40,6 +40,7 @@ from typing import Any, Iterable, Optional
 import yaml
 
 import biometric_baselines as baselines_mod
+from emit_batch_manifest import PROCESSOR_NAMESPACE
 from biometric_baselines import Deviation, flag_deviations
 from biometric_streaks import advance as streaks_advance, StreakEvent
 import metric_day_profiles as profiles
@@ -577,7 +578,7 @@ def run(
         "origin": "personal",
         "audience_tags": [],
         "is_sensitive": profile.is_sensitive,
-        # ZTN-specific extras (allowed via section_extras pattern)
+        # Minder Memory-specific extras (allowed via section_extras pattern)
         "section_extras": {
             "date": date,
             "source_hash": src_hash,
@@ -764,7 +765,7 @@ def write_batch_manifest(
             "batch_id": batch_id,
             "timestamp": timestamp,
             "format_version": "2.0",
-            "processor": "ztn:process",
+            "processor": PROCESSOR_NAMESPACE + "process",
             "sources_processed": sources_processed_entries,
             "records": {"created": created_entries, "updated": updated_entries},
             "knowledge_notes": {"created": [], "updated": []},
@@ -870,7 +871,7 @@ def recompute_baselines_forward(
       1. Truncate `baselines.json` and `streaks.json` of all entries
          with date >= from_date (for baselines: drop values; for
          streaks: trim active/history bound by date).
-      2. Truncate `last_weekly_run.txt` so /ztn:maintain re-enters
+      2. Truncate `last_weekly_run.txt` so /minder:mem:maintain re-enters
          backfill mode for affected weeks.
       3. Re-process every existing biometric record from `from_date`
          forward, in date order, re-running baseline.update +
@@ -941,7 +942,7 @@ def recompute_baselines_forward(
     records_replayed = 0
     replay_results: list[ProcessResult] = []
     sources_dir = paths.processed_dir
-    staging = Path(tempfile.mkdtemp(prefix=f"ztn-recompute-{source_id}-"))
+    staging = Path(tempfile.mkdtemp(prefix=f"minder-memory-recompute-{source_id}-"))
     try:
         for src in sorted(sources_dir.glob("*.md")):
             if src.stem < from_date:

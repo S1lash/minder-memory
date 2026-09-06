@@ -20,7 +20,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 
-from tests._fixture import clear_ztn_env  # type: ignore
+from tests._fixture import clear_minder_memory_env  # type: ignore
 import lint_concept_audit as la  # type: ignore
 
 
@@ -83,7 +83,7 @@ class ConceptAutofixTests(unittest.TestCase):
             text = f.read_text(encoding="utf-8")
             self.assertIn("office_move", text)
             self.assertNotIn("Office-Move", text)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_non_ascii_dropped(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -101,7 +101,7 @@ class ConceptAutofixTests(unittest.TestCase):
             text = f.read_text(encoding="utf-8")
             self.assertNotIn("тема", text)
             self.assertIn("delegation_pattern", text)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class AudienceAutofixTests(unittest.TestCase):
@@ -118,7 +118,7 @@ class AudienceAutofixTests(unittest.TestCase):
             )
             events = _run(root, mode="fix")
             self.assertEqual(events, [])  # nothing to fix
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_unknown_tag_dropped(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -137,7 +137,7 @@ class AudienceAutofixTests(unittest.TestCase):
             text = f.read_text(encoding="utf-8")
             self.assertNotIn("team-platform", text)
             self.assertIn("- work", text)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_extension_accepted(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -151,7 +151,7 @@ class AudienceAutofixTests(unittest.TestCase):
             )
             events = _run(root, mode="fix")
             self.assertEqual(events, [])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_case_normalised_to_canonical(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -169,7 +169,7 @@ class AudienceAutofixTests(unittest.TestCase):
             text = f.read_text(encoding="utf-8")
             self.assertIn("- family", text)
             self.assertNotIn("Family", text)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class PrivacyTrioBackfillTests(unittest.TestCase):
@@ -189,7 +189,7 @@ class PrivacyTrioBackfillTests(unittest.TestCase):
             self.assertIn("origin: personal", text)
             self.assertIn("audience_tags: []", text)
             self.assertIn("is_sensitive: false", text)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_origin_derived_from_meetings_path(self):
         """Meeting record gets origin=work from path heuristic, not personal default."""
@@ -204,7 +204,7 @@ class PrivacyTrioBackfillTests(unittest.TestCase):
             _run(root, mode="fix")
             text = f.read_text(encoding="utf-8")
             self.assertIn("origin: work", text)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_origin_derived_from_areas_work_path(self):
         """Note in 2_areas/work/ gets origin=work."""
@@ -220,7 +220,7 @@ class PrivacyTrioBackfillTests(unittest.TestCase):
             _run(root, mode="fix")
             text = f.read_text(encoding="utf-8")
             self.assertIn("origin: work", text)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_origin_personal_default_outside_work_paths(self):
         """Solo-capture paths and unmatched folders fall back to personal."""
@@ -235,7 +235,7 @@ class PrivacyTrioBackfillTests(unittest.TestCase):
             _run(root, mode="fix")
             text = f.read_text(encoding="utf-8")
             self.assertIn("origin: personal", text)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_origin_coerced(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -250,7 +250,7 @@ class PrivacyTrioBackfillTests(unittest.TestCase):
             events = _run(root, mode="fix")
             ids = {e["fix_id"] for e in events}
             self.assertIn("origin-coerce-autofix", ids)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_is_sensitive_string_coerced(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -265,7 +265,7 @@ class PrivacyTrioBackfillTests(unittest.TestCase):
             events = _run(root, mode="fix")
             ids = {e["fix_id"] for e in events}
             self.assertIn("is-sensitive-coerce-autofix", ids)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class ScopeExclusionTests(unittest.TestCase):
@@ -282,7 +282,7 @@ class ScopeExclusionTests(unittest.TestCase):
             events = _run(root, mode="fix")
             self.assertEqual(events, [])
             self.assertEqual(soul.read_text(encoding="utf-8"), original)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_template_not_touched(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -297,7 +297,7 @@ class ScopeExclusionTests(unittest.TestCase):
             events = _run(root, mode="fix")
             self.assertEqual(events, [])
             self.assertEqual(tpl.read_text(encoding="utf-8"), original)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_constitution_not_touched(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -312,7 +312,7 @@ class ScopeExclusionTests(unittest.TestCase):
             original = principle.read_text(encoding="utf-8")
             _run(root, mode="fix")
             self.assertEqual(principle.read_text(encoding="utf-8"), original)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class IdempotenceTests(unittest.TestCase):
@@ -328,7 +328,7 @@ class IdempotenceTests(unittest.TestCase):
             )
             self.assertEqual(_run(root, mode="scan"), [])
             self.assertEqual(_run(root, mode="fix"), [])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_fix_then_rerun_no_events(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -345,7 +345,7 @@ class IdempotenceTests(unittest.TestCase):
             self.assertGreater(len(first), 0)
             second = _run(root, mode="fix")
             self.assertEqual(second, [])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class ScanModeNoWriteTests(unittest.TestCase):
@@ -363,7 +363,7 @@ class ScanModeNoWriteTests(unittest.TestCase):
             events = _run(root, mode="scan")
             self.assertGreater(len(events), 0)
             self.assertEqual(f.read_text(encoding="utf-8"), original)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 def _write_domains(root: Path, extensions: list[str] | None = None) -> None:
@@ -399,7 +399,7 @@ class DomainAutofixTests(unittest.TestCase):
             events = _run(root, mode="scan")
             domain_events = [e for e in events if "domain" in e.get("fix_id", "")]
             self.assertEqual(domain_events, [])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_unknown_value_dropped(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -465,7 +465,7 @@ class DomainAutofixTests(unittest.TestCase):
             content = (root / "1_projects" / "n.md").read_text(encoding="utf-8")
             self.assertIn("- work\n", content)
             self.assertIn("- learning\n", content)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_case_normalised(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -537,7 +537,7 @@ class DomainAutofixTests(unittest.TestCase):
             self.assertEqual(
                 [e for e in second if "domain" in e.get("fix_id", "")], []
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_dedupes_after_normalisation(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -676,7 +676,7 @@ class ApplyAliasesIntegrationTests(unittest.TestCase):
             # api_v2 and api2 collapsed into single api_v2_design
             self.assertEqual(content.count("- api_v2_design\n"), 1)
             self.assertNotIn("api_v2\n", content.replace("api_v2_design", "X"))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_idempotent_after_rewrite(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -699,7 +699,7 @@ class ApplyAliasesIntegrationTests(unittest.TestCase):
             self.assertEqual(
                 [e for e in second if e["fix_id"] == "concept-alias-rewrite-autofix"], []
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 if __name__ == "__main__":

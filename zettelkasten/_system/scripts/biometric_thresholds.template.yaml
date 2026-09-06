@@ -1,7 +1,7 @@
 # Biometric thresholds — engine spec + universal defaults.
 #
 # Layered at runtime by Tier I + Tier II workers in this order:
-#   1. this template — engine-shipped baseline (synced via /ztn:update)
+#   1. this template — engine-shipped baseline (synced via /minder:mem:update)
 #   2. biometric_thresholds.yaml — live working file (one-time seed
 #      from this template at install; not synced upstream-to-downstream)
 #   3. biometric_thresholds.local.yaml — owner-only override (created
@@ -38,7 +38,7 @@ deviation_thresholds:
 baseline_windows:
   default:           28        # days — most metrics
   chronic_load:      42        # ACWR / training_load_chronic
-  refresh_cadence:   daily     # baselines recompute daily on /ztn:process
+  refresh_cadence:   daily     # baselines recompute daily on /minder:mem:process
 
 # Categorical (event-based) flags. Triggered on transitions, not σ.
 categorical_events:

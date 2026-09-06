@@ -2,8 +2,8 @@
 
 Active in every Claude Code session, every repo. When you observe one of
 the narrow triggers below during any conversation with the owner — invoke
-`/ztn:capture-candidate`. Do not ask permission. The buffer is
-append-only; the owner resolves candidates in batch via `/ztn:lint` F.3.
+`/minder:mem:capture-candidate`. Do not ask permission. The buffer is
+append-only; the owner resolves candidates in batch via `/minder:mem:lint` F.3.
 
 ## Capture (narrow triggers — exactly four)
 
@@ -52,8 +52,8 @@ principle behind it. The owner decides on review whether it is real or noise.
   presentation carve-out above does for how they want to be told things. The
   universal floor is in `advisory-baseline`; what belongs in the buffer is
   where THIS owner departs from it.
-- Facts about people — those go through `/ztn:process` → PEOPLE.md.
-- The entire session content — that is `/ztn-recap`.
+- Facts about people — those go through `/minder:mem:process` → PEOPLE.md.
+- The entire session content — that is `/minder:mem:recap`.
 
 **Better to miss 30% of real candidates than ingest 300% noise.** The
 constitution buffer stays signal-heavy by design. A missed candidate
@@ -63,7 +63,7 @@ the review queue.
 ## How to invoke
 
 ```
-/ztn:capture-candidate
+/minder:mem:capture-candidate
   situation: "<1-2 sentences of what was happening>"
   observation: "<verbatim quote from owner if any, else empty>"
   hypothesis: "<one-line hypothesis; null if (a) explicit>"
@@ -85,13 +85,13 @@ while working inside a work repo where identity-shaping deserves more
 deliberate review). Work-origin candidates never qualify for L2
 auto-merge in lint F.5 — they always require the owner's manual review.
 
-## Relationship to `/ztn-recap`
+## Relationship to `/minder:mem:recap`
 
 Different concerns, no overlap:
 
-- `/ztn-recap` — captures a *session* as knowledge for later processing
-  into ZTN notes. End-of-session action.
-- `/ztn:capture-candidate` — captures *one observation* that looks like
+- `/minder:mem:recap` — captures a *session* as knowledge for later processing
+  into Minder Memory notes. End-of-session action.
+- `/minder:mem:capture-candidate` — captures *one observation* that looks like
   a principle. In-the-moment action, triggered by the four rules above.
 
 Both can fire in the same session. They write to different targets and

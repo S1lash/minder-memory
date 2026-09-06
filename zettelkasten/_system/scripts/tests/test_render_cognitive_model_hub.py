@@ -1,6 +1,6 @@
 """Tests for render_cognitive_model_hub.py.
 
-Isolated via ZTN_BASE → a tempdir holding a minimal ZTN tree (axis-SoT prompt,
+Isolated via MINDER_MEMORY_BASE → a tempdir holding a minimal Minder Memory tree (axis-SoT prompt,
 schema-valid principles, candidate buffer, hub-with-markers). No LLM, no network.
 """
 
@@ -33,9 +33,9 @@ def _axis_block_text() -> str:
 
 
 def _reload_module(base: Path):
-    """Import (or re-import) the helper with ZTN_BASE pointed at `base`.
+    """Import (or re-import) the helper with MINDER_MEMORY_BASE pointed at `base`.
 
-    repo_root() reads ZTN_BASE at call time, but registries_dir()/state_dir()
+    repo_root() reads MINDER_MEMORY_BASE at call time, but registries_dir()/state_dir()
     are computed inside main() per call — so a plain import is enough; we set
     the env in the fixture.
     """
@@ -64,7 +64,7 @@ status: {status}
 
 @pytest.fixture
 def base(tmp_path, monkeypatch):
-    monkeypatch.setenv("ZTN_BASE", str(tmp_path))
+    monkeypatch.setenv("MINDER_MEMORY_BASE", str(tmp_path))
     # Axis SoT prompt
     prompt = tmp_path / "_system/registries/lenses/cognitive-model/prompt.md"
     prompt.parent.mkdir(parents=True, exist_ok=True)

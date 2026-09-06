@@ -7,7 +7,7 @@ part (classifying orphans into Action / Waiting / Delegate). Walking notes and
 diffing task-ids is cheap and unbounded; only the orphans it surfaces need LLM
 classification. This is the safety net that makes the aggregation silent-drop
 recoverable and self-checking: the failure mode is a full "scan ALL notes" that
-the autonomous ``/ztn:process`` tick quietly downgrades to a per-batch append at
+the autonomous ``/minder:mem:process`` tick quietly downgrades to a per-batch append at
 scale, so tasks accumulate un-aggregated (a full-scan regen once recovered 452).
 
 Task identity for the aggregate-presence check is the ``^task-id`` string. The
@@ -16,7 +16,7 @@ notes (one logical task, many notes), so an id present anywhere in TASKS.md is
 aggregated. Keying by (note, id) would false-flag every derived copy as orphan.
 
 Read-only by design: the reconciler never writes. Orphans are always re-derivable
-from the notes, so there is nothing to materialise — ``/ztn:process
+from the notes, so there is nothing to materialise — ``/minder:mem:process
 --reconcile-tasks`` (the classifier) and the weekly lint scan both call ``--report``
 and act on the live result. Keeping it read-only also keeps engine migrations off
 owner-data (they detect + nudge, never mutate TASKS.md).

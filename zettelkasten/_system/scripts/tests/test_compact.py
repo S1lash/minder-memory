@@ -7,7 +7,7 @@ import unittest
 from datetime import date, timedelta
 from pathlib import Path
 
-from tests._fixture import clear_ztn_env, make_fixture  # type: ignore
+from tests._fixture import clear_minder_memory_env, make_fixture  # type: ignore
 import compact_evidence_trail as cmp_module  # type: ignore
 
 
@@ -64,7 +64,7 @@ class CompactTests(unittest.TestCase):
             self.assertIn(recent_date, text)
             # Only one [compacted] line emitted
             self.assertEqual(text.count("[compacted]"), 1)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_refuses_cutoff_inside_protected_window(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -80,7 +80,7 @@ class CompactTests(unittest.TestCase):
                     "--cutoff", recent_cutoff,
                     "--summary", "should never run",
                 ])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_noop_when_no_old_entries(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -101,7 +101,7 @@ class CompactTests(unittest.TestCase):
             ])
             self.assertEqual(rc, 0)
             self.assertEqual(before, note.read_text(encoding="utf-8"))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_already_compacted_entries_are_skipped(self):
         """Compacting a summary is nonsense — skip anything tagged [compacted]."""
@@ -130,7 +130,7 @@ class CompactTests(unittest.TestCase):
             # Raw entries gone
             self.assertNotIn("raw entry 1", text)
             self.assertNotIn("raw entry 2", text)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_frontmatter_bytes_preserved(self):
         """Frontmatter block must come out byte-identical after compaction —
@@ -145,7 +145,7 @@ domain: identity
 statement: Test
 priority_tier: 1
 scope: shared
-applies_to: [claude-code, ztn]
+applies_to: [claude-code, minder-memory]
 binding: hard
 status: active
 created: 2020-01-01
@@ -180,7 +180,7 @@ test
             result_fm = result.split("---", 2)[1]
             self.assertEqual(orig_fm, result_fm,
                              "frontmatter bytes must be identical after compact")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_frontmatter_with_triple_dash_in_value_survives(self):
         """Regression: earlier naive split-on-'---' would mangle this."""
@@ -230,7 +230,7 @@ test
             import _common as c  # type: ignore
             p = c.parse_file(note)
             self.assertEqual(p.id, "axiom-identity-001")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 if __name__ == "__main__":

@@ -80,7 +80,7 @@ import roles_guard
 import roles_log
 import roles_secrets
 
-SNAPSHOT_DIR_PREFIX = "ztn-roles-"
+SNAPSHOT_DIR_PREFIX = "minder-mem-roles-"
 SNAPSHOT_DIR_KEY_LENGTH = 8
 TICK_BASELINE_NAME = "tick.json"
 ROLE_SNAPSHOT_NAME = "role-{role_id}.json"
@@ -401,7 +401,7 @@ def _secret_findings(cfg, values, secrets_path: Path) -> list:
 
 
 def cmd_base(args) -> int:
-    """Print the repository's one ZTN base, so no caller derives it itself.
+    """Print the repository's one Minder Memory base, so no caller derives it itself.
 
     Every role skill's prelude calls this. Their shell loop only locates a copy
     of this CLI — which directory is the base is decided here, once, and zero
@@ -518,14 +518,14 @@ def cmd_validate(args) -> int:
 # --------------------------------------------------------------------------
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="ZTN roles runner")
+    parser = argparse.ArgumentParser(description="Minder Memory roles runner")
     verbs = parser.add_subparsers(dest="verb", required=True)
 
     def add(name, handler, *, base=True, repo=True, role=False, now=False):
         sub = verbs.add_parser(name)
         if base:
             sub.add_argument("--base", type=Path, required=True,
-                             help="ZTN base directory")
+                             help="Minder Memory base directory")
         if repo:
             sub.add_argument("--repo", type=Path, required=True, help="repository root")
         if role:

@@ -3,7 +3,7 @@
 Your data stays yours. Engine updates flow upstream → your repo.
 Two entry points:
 
-- **`/ztn:update`** — interactive Claude skill (recommended default).
+- **`/minder:mem:update`** — interactive Claude skill (recommended default).
   Detects local engine customisations, asks per-file before overwriting,
   applies migrations in order, surfaces follow-ups (re-run install.sh,
   regen constitution view, run tests).
@@ -14,10 +14,10 @@ Two entry points:
 ## One-time setup
 
 ```bash
-git remote add upstream https://github.com/<maintainer>/minder-ztn.git
+git remote add upstream https://github.com/<maintainer>/minder-memory.git
 ```
 
-Replace `<maintainer>/minder-ztn` with the actual upstream URL — the
+Replace `<maintainer>/minder-memory` with the actual upstream URL — the
 repo you cloned the template from.
 
 ## Routine sync (skill — recommended)
@@ -25,12 +25,12 @@ repo you cloned the template from.
 In a Claude Code session:
 
 ```
-/ztn:update
+/minder:mem:update
 ```
 
 The skill walks you through VERSION delta, pending migrations,
 divergence detection (per-file ask if you customised an engine path
-locally), and proposes a commit. It does not push — run `/ztn:save`
+locally), and proposes a commit. It does not push — run `/minder:mem:save`
 afterwards.
 
 ## Routine sync (script — CI / power users)
@@ -79,19 +79,36 @@ reports that **none** of the engine paths were found upstream, that is
 what happened — recover with either:
 
 ```bash
-/ztn:update                              # the skill repairs scripts/ first, always
+/minder:mem:update                              # the skill repairs scripts/ first, always
 bash scripts/sync_engine.sh --self-heal  # the script equivalent
 ```
 
 Both restore `scripts/` from the remote before doing anything else, then
 proceed with the repaired copy.
 
+## The version floor
+
+The migration chain starts at `031`; a clone below `0.69.0` cannot jump
+straight to the current engine, and the sync refuses rather than applying
+migrations that assume a shape the clone never reached. The path is two
+steps, and the refusal prints them:
+
+```bash
+bash scripts/sync_engine.sh --self-heal --branch release/0.69.0   # to the floor release
+git add -A && git commit -m "engine 0.69.0"                       # what /minder:mem:update does for you
+bash scripts/sync_engine.sh                                       # then to the current one
+```
+
+`--self-heal` on the first step matters: it puts that release's own update
+machinery in `scripts/` before running it. Without it `scripts/` holds the
+newer copy from the refused attempt, and the sync refuses the tree as dirty.
+
 ## After a sync
 
 - Re-install the Claude Code symlinks (some skills may have been
   renamed): `bash integrations/claude-code/install.sh`. This step also
   invokes `integrations/obsidian/seed.sh` to seed `<vault>/.obsidian/`
-  and `<vault>/minder-ztn.md` if missing — engine improvements to the
+  and `<vault>/minder-memory.md` if missing — engine improvements to the
   Obsidian config never overwrite your live `.obsidian/` (run
   `seed.sh --force` if you want engine defaults back, with auto-backup).
 - Run the test suite: `pytest zettelkasten/_system/scripts/tests/`.

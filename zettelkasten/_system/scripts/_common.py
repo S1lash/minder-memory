@@ -90,7 +90,7 @@ ALLOWED_DOMAINS: frozenset[str] = frozenset({
 # Mirror of Minder's `ConceptDomain` enum
 # (`minder/.../domain/value/ConceptDomain.java`). Per-concept-mention scope
 # derived downstream from a note's `domains:` + `origin`. NOT used for
-# ZTN-side validation — kept here as a documentation reference so future
+# Minder Memory-side validation — kept here as a documentation reference so future
 # manifest/consumer work can spot drift between the two axes.
 MINDER_CONCEPT_DOMAIN: frozenset[str] = frozenset({
     "work", "personal", "mixed", "unknown",
@@ -100,7 +100,7 @@ ALLOWED_FRAMINGS = {"positive", "negative"}
 ALLOWED_BINDINGS = {"hard", "soft"}
 ALLOWED_SCOPES = {"shared", "personal", "sensitive"}
 ALLOWED_APPLIES_TO = {
-    "claude-code", "ztn", "chatgpt", "claude-desktop",
+    "claude-code", "minder-memory", "chatgpt", "claude-desktop",
     "life-advice", "work-code", "bootstrap", "minder",
 }
 ALLOWED_CONFIDENCES = {"proven", "working", "experimental"}
@@ -111,7 +111,7 @@ ALLOWED_STATUSES = {"active", "candidate", "archived", "placeholder"}
 # Concept-name normalisation per `_system/registries/CONCEPT_NAMING.md`
 # -----------------------------------------------------------------------------
 #
-# Autonomous-pipeline policy: ZTN engine resolves concept-name format
+# Autonomous-pipeline policy: Minder Memory engine resolves concept-name format
 # issues with deterministic heuristics — never raises, never blocks owner,
 # never surfaces a CLARIFICATION. `normalize_concept_name(raw)` returns
 # either a valid snake_case ASCII identifier or `None` to signal "drop
@@ -135,7 +135,7 @@ _CONCEPT_RUN_US = re.compile(r"_+")
 # kept verbatim otherwise; the only semantic drop is a BARE reserved
 # type-word (rule 8, unambiguous — see RESERVED_TYPE_WORDS). Rule 5 ("no
 # type prefix in the name") is enforced upstream at extraction by the
-# `/ztn:process` prompt; a slipped weld is preserved (a cosmetic redundant
+# `/minder:mem:process` prompt; a slipped weld is preserved (a cosmetic redundant
 # prefix is safe and recoverable) rather than blindly amputated.
 
 # Frozen mirror of Minder's `ConceptType` enum (18 values).
@@ -173,7 +173,7 @@ CONCEPT_TYPE_DESCRIPTIONS: dict[str, str] = {
     "other": "Other concepts",
 }
 
-# `type` enum emitted by ZTN (lowercase, excludes person/project per
+# `type` enum emitted by Minder Memory (lowercase, excludes person/project per
 # §"Concept scope" in `_system/docs/batch-format.md`).
 # Subset of CONCEPT_TYPES_ALL — gate at emit boundary.
 EMITTED_CONCEPT_TYPES: frozenset[str] = CONCEPT_TYPES_ALL - frozenset({
@@ -309,7 +309,7 @@ def recompute_hub_trio(
 ) -> tuple[dict, list[dict]]:
     """Derive hub privacy trio from member-note trios.
 
-    Single source of truth for `/ztn:process` hub C/D, `/ztn:maintain`
+    Single source of truth for `/minder:mem:process` hub C/D, `/minder:mem:maintain`
     Step 4 hub linkage, and `lint_concept_audit.py` hub-pass logic.
 
     Derivation rules:
@@ -466,8 +466,8 @@ def normalize_audience_tag(raw: str | None) -> str | None:
 # named with pure-ISO timestamps (`2026-04-29T14:09:30Z`) whose colons make
 # the path uncreatable on Windows and break `git checkout` on any Windows
 # clone that pulls such a path. New inbox items are therefore normalised at
-# ingestion (`/ztn:process` pre-scan) and before commit (`/ztn:save`
-# pre-pass); `/ztn:lint` Scan A.10 is the backstop. Existing already-
+# ingestion (`/minder:mem:process` pre-scan) and before commit (`/minder:mem:save`
+# pre-pass); `/minder:mem:lint` Scan A.10 is the backstop. Existing already-
 # processed paths are grandfathered — references to them never rewrite.
 
 WINDOWS_RESERVED_BASENAMES: frozenset[str] = frozenset(
@@ -514,7 +514,7 @@ def is_portable_name(raw: str | None) -> bool:
 #
 # Slash-syntax handling. Real corpus contains values like `work/process`,
 # `personal/psychology` — owner's compact notation for "this entity belongs
-# to MULTIPLE domains: work AND process". The ZTN axis is flat (no hierarchy)
+# to MULTIPLE domains: work AND process". The Minder Memory axis is flat (no hierarchy)
 # but it IS multi-valued, so slash entries split into independent values.
 # Each part is normalised + filtered against the accept set independently.
 # Real-corpus consequence: `work/process` keeps `work` (canonical) and drops
@@ -1407,14 +1407,23 @@ ALL_SCOPES_VISIBLE: frozenset[str] = frozenset({"shared", "personal", "sensitive
 # Paths (resolved relative to repo root)
 # -----------------------------------------------------------------------------
 
+BASE_ENV = "MINDER_MEMORY_BASE"
+
+
+def base_from_env() -> Path | None:
+    """The base named by `MINDER_MEMORY_BASE`, or None when it is not set."""
+    value = os.environ.get(BASE_ENV, "").strip()
+    return Path(value).resolve() if value else None
+
+
 def repo_root() -> Path:
     """Return the zettelkasten repo root.
 
-    Env var `ZTN_BASE` overrides; otherwise derive from this file's location.
+    `MINDER_MEMORY_BASE` overrides; otherwise derive from this file's location.
     """
-    env = os.environ.get("ZTN_BASE")
-    if env:
-        return Path(env).resolve()
+    env = base_from_env()
+    if env is not None:
+        return env
     # scripts/_common.py → scripts → _system → zettelkasten
     return Path(__file__).resolve().parent.parent.parent
 
@@ -1596,7 +1605,7 @@ def append_frontmatter_list_value(
 ) -> bool | None:
     """Add one value to a frontmatter list, creating the key if absent.
 
-    The other write `/ztn:maintain` performs by the hundred — a thread
+    The other write `/minder:mem:maintain` performs by the hundred — a thread
     back-reference into a record's `threads:`. Hand-rolled, it is the same
     hazard as the trio write next door: a list built by string concatenation
     is a list that can be built wrong, and a note whose frontmatter stops
@@ -2047,10 +2056,10 @@ def find_soul_auto_zone(text: str) -> tuple[int, int] | None:
 
 
 # -----------------------------------------------------------------------------
-# Reprocess-corpus selection (deterministic substrate for /ztn:process §2.1)
+# Reprocess-corpus selection (deterministic substrate for /minder:mem:process §2.1)
 # -----------------------------------------------------------------------------
 
-# Roots walked by `/ztn:process --reprocess-corpus`. Keep aligned with the
+# Roots walked by `/minder:mem:process --reprocess-corpus`. Keep aligned with the
 # SKILL spec's `## Mode: --reprocess-corpus`: records cover transcript-grounded
 # logs, knowledge covers PARA layers (4_archive intentionally excluded — history
 # is not rewritten).
@@ -2063,7 +2072,7 @@ REPROCESS_CORPUS_LAYERS: frozenset[str] = frozenset({"record", "knowledge"})
 
 
 # -----------------------------------------------------------------------------
-# Action Hints — lens emission contract (consumed by /ztn:resolve-clarifications)
+# Action Hints — lens emission contract (consumed by /minder:mem:resolve-clarifications)
 # -----------------------------------------------------------------------------
 #
 # Lenses MAY append an `## Action Hints` trailer to their output file,
@@ -2071,7 +2080,7 @@ REPROCESS_CORPUS_LAYERS: frozenset[str] = frozenset({"record", "knowledge"})
 # resolver ingests these hints, judges with full owner context, and either
 # auto-applies (when precedent + constitution + safety align) or queues
 # for owner review. See `integrations/claude-code/skills/
-# ztn-resolve-clarifications/SKILL.md` for the consumer side.
+# minder-mem-resolve-clarifications/SKILL.md` for the consumer side.
 #
 # Whitelist enforcement happens at resolver Step 2, not at lens emission.
 # Lenses propose freely; non-whitelisted types are routed to clarifications
@@ -2253,7 +2262,7 @@ def select_reprocess_corpus_files(
     `base` is the zettelkasten root (typically `repo_root()`).
 
     Implementation notes: deterministic, no LLM. Matches §2.1 reprocess-
-    corpus branch of `/ztn:process` SKILL spec. Exposed so that the
+    corpus branch of `/minder:mem:process` SKILL spec. Exposed so that the
     orchestrator can shell out for a single source-of-truth file list
     instead of reimplementing the walk per invocation.
     """

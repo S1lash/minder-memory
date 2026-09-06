@@ -6,7 +6,7 @@ When the producer normaliser gains new coercions (e.g. bare-string
 `sources_processed[]` → structured `source_entry`, non-empty
 `tier1_objects.people: [...]` → `{upserts: [...]}`, privacy-trio
 defaults on entity-list entries), historical manifests written before
-the fix carry the broken shape. `/ztn:lint` Scan G surfaces them as
+the fix carry the broken shape. `/minder:mem:lint` Scan G surfaces them as
 `manifest-schema-violation` CLARIFICATIONs; this utility fixes them in
 place.
 
@@ -82,7 +82,7 @@ _SCHEMAS_CACHE: dict | None = None
 def schema_errors(data: dict, schemas_dir: Path | None = None) -> list[str]:
     """JSON-Schema errors for one manifest, as readable strings.
 
-    The SAME validator `/ztn:lint` Scan H runs, so "this manifest needs repair"
+    The SAME validator `/minder:mem:lint` Scan H runs, so "this manifest needs repair"
     and "Scan H will complain about this manifest" are the same question. Any
     other check here would let the two drift.
 
@@ -324,7 +324,7 @@ def quarantine(data: dict, *, reason: str, errors: list[str], ts: str) -> None:
 
     The marker lives in `section_extras` — the manifest's own forward-compat
     field — so the reason travels WITH the entity, per the Archive Contract.
-    `/ztn:lint` Scan H reads it and stops re-raising, which turns a permanent
+    `/minder:mem:lint` Scan H reads it and stops re-raising, which turns a permanent
     nag into a recorded, inspectable state.
 
     Nothing about the manifest's data is altered. A quarantined manifest stays

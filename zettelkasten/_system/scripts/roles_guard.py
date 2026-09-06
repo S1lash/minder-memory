@@ -326,7 +326,7 @@ def _hooks_digest(repo: Path) -> dict:
     The hooks PATH was already watched; the hooks themselves were not, and
     the tick runs `git commit` once per role. A `post-commit` planted by a
     role therefore executes inside the tick's own process — which is exactly
-    where `ZTN_ROLES_KEY` lives — with the guard reporting a clean surface.
+    where `MINDER_MEMORY_ROLES_KEY` lives — with the guard reporting a clean surface.
     Digesting the directory closes the gap without the guard ever writing
     inside `.git/`, which it is forbidden to do.
     """

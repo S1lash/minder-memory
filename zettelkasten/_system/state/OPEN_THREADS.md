@@ -10,7 +10,7 @@ modified: REPLACE_WITH_DATE
 > Different from TASKS.md: threads are systemic expectations / questions
 > ("waiting for X's strategic answer"); tasks are operational items.
 
-> Populated by `/ztn:bootstrap` (initial scan) and `/ztn:maintain` (incremental
+> Populated by `/minder:mem:bootstrap` (initial scan) and `/minder:mem:maintain` (incremental
 > update). Resolved threads move to the `## Resolved` section — owner moves them
 > manually; pipeline never auto-closes a thread.
 

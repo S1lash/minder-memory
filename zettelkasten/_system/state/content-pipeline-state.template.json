@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Content pipeline ledger — the only new persistent state of the content pipeline (NOT regenerable: it records what the engine already drafted, so incremental drafting and the long tail can coexist). Written by `/ztn:content --maintain`. Each entry in `drafts` references a SET of `theme_ids` — length 1 for a single-theme post, length N for a cross-theme post. 'Did this draft change' = ANY constituent theme strengthened since `last_surfaced` (the maintainer diffs current map ripeness vs `last_surfaced_ripeness` across all referenced themes). Separated from the regenerable CONTENT_MAP.md view by hard SoT requirement.",
+  "description": "Content pipeline ledger — the only new persistent state of the content pipeline (NOT regenerable: it records what the engine already drafted, so incremental drafting and the long tail can coexist). Written by `/minder:mem:content --maintain`. Each entry in `drafts` references a SET of `theme_ids` — length 1 for a single-theme post, length N for a cross-theme post. 'Did this draft change' = ANY constituent theme strengthened since `last_surfaced` (the maintainer diffs current map ripeness vs `last_surfaced_ripeness` across all referenced themes). Separated from the regenerable CONTENT_MAP.md view by hard SoT requirement.",
   "draft_entry_schema": {
     "draft_id": "string slug, e.g. project-alpha-x-team-management",
     "theme_ids": ["hub-id or theme slug", "... (1 = single-theme, N = cross-theme)"],

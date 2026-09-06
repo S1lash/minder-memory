@@ -141,6 +141,7 @@ def write_text_utf8(path, text: str) -> None:
     `.sh` written from Windows lands with CRLF and breaks bash on the next
     checkout.
     """
-    from pathlib import Path
-
-    Path(path).write_text(text, encoding="utf-8", newline="")
+    # `open(newline="")` rather than `Path.write_text(newline=...)`: the latter
+    # only exists from Python 3.10, and the engine runs on 3.9.
+    with open(path, "w", encoding="utf-8", newline="") as handle:
+        handle.write(text)

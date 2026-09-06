@@ -1,37 +1,37 @@
-You are running the autonomous nightly tick of `/ztn:agent-lens`. There
+You are running the autonomous nightly tick of `/minder:mem:agent-lens`. There
 is no human in this loop. The contract below is load-bearing.
 
 ## Invocation contract (read first)
 
-The ZTN skills in this prompt — `/ztn:sync-data`, `/ztn:agent-lens` —
+The Minder Memory skills in this prompt — `/minder:mem:sync-data`, `/minder:mem:agent-lens` —
 are invoked **as slash commands in this same conversation**. Skills are
 committed to the cloned repo at `.claude/skills/<name>/SKILL.md`, so the
 runtime loads them automatically — write the slash command literally as
 the next action and it executes. Step 0 verifies this layout resolved in
 the clone before any slash invocation.
 
-`/ztn:agent-lens --all-due` iterates all lenses whose cadence has elapsed
+`/minder:mem:agent-lens --all-due` iterates all lenses whose cadence has elapsed
 and runs each through its two-stage thinker→structurer pipeline as the
 skill's own architecture. Outputs land in `_system/agent-lens/{id}/{date}.md`
 plus the runs index `_system/state/agent-lens-runs.jsonl`.
 
 **Single-commit guarantee.** This tick produces **exactly one git commit
 + one git push**, both from `bash scripts/scheduler/finalize-tick.sh` at
-Step 5. No other path in this prompt commits or pushes. `/ztn:save` is
+Step 5. No other path in this prompt commits or pushes. `/minder:mem:save` is
 **forbidden** in scheduler ticks. Any intermediate `git commit`,
 `git push`, or `git add` outside the helper scripts listed below is a
 contract violation.
 
 **Hard prohibitions:**
 
-- Do NOT invoke `/ztn:save` in any form. Use `finalize-tick.sh` at Step 5.
+- Do NOT invoke `/minder:mem:save` in any form. Use `finalize-tick.sh` at Step 5.
 - Do NOT call `git commit`, `git push`, `git add` directly outside the
   listed helper scripts. **One explicit exception:** Step 5b (MCP
   delivery fallback, runs only when finalize-tick reports `gh CLI not
   found in PATH`) uses one direct `git push origin "HEAD:<sandbox>"`
   per its strict per-step instructions. No other direct git/gh calls
   are authorized.
-- Do NOT open `integrations/claude-code/skills/ztn-*/SKILL.md` and
+- Do NOT open `integrations/claude-code/skills/minder-mem-*/SKILL.md` and
   re-implement its steps with Bash / Read / Edit. Skills are loaded by
   the runtime — invoke via slash, never re-execute.
 - Do NOT use the Agent / Task tool as a substitute for slash invocation.
@@ -72,7 +72,7 @@ Then exit `partial` immediately.
 ## Steps
 
 0. `bash scripts/scheduler/ensure-skills.sh` — verify the project-level
-   ZTN skills resolve at `.claude/skills/<name>/SKILL.md` before any slash
+   Minder Memory skills resolve at `.claude/skills/<name>/SKILL.md` before any slash
    invocation. This is the #1 cause of a tick dying at its first step: a
    clone where git symlinks did not survive (e.g. a Windows commit with
    `core.symlinks=false` materialises them as text files). On non-zero
@@ -82,7 +82,7 @@ Then exit `partial` immediately.
    cannot persist. Run failure-handling with cause
    `"skills unresolvable in this clone — apply the CHANGELOG 0.41.0 recovery, then re-run"`
    and exit `partial`. The durable fix is real-file skills delivered via
-   the skeleton + `/ztn:update`, not an in-tick repair.
+   the skeleton + `/minder:mem:update`, not an in-tick repair.
 
 1. `bash scripts/scheduler/pin-main.sh` — get on fresh `origin/main`,
    capture the starting sandbox branch, and best-effort recover any
@@ -92,12 +92,12 @@ Then exit `partial` immediately.
    (process / maintain / lint / agent-lens / content / resolve / roles) is recent (<2h).
    Stale locks (>2h) are removed automatically.
 
-3. `/ztn:sync-data` — safe `git pull --rebase` with conflict-refuse
+3. `/minder:mem:sync-data` — safe `git pull --rebase` with conflict-refuse
    semantics.
    - Returns "blocked" / non-zero → run failure-handling with cause
      `"sync-data blocked, owner action needed"`, exit `sync-blocked`.
 
-4. `/ztn:agent-lens --all-due` — exactly ONE invocation. Iterates all
+4. `/minder:mem:agent-lens --all-due` — exactly ONE invocation. Iterates all
    due lenses sequentially, writes outputs + machine index. Lens-level
    failures degrade to clarifications and do not abort the whole run.
    - On skill-level error (registry unreadable, etc.) → run
@@ -181,12 +181,12 @@ Then exit `partial` immediately.
 
 ## Forbidden in this tick
 
-- `/ztn:process`, `/ztn:lint`, `/ztn:content`, `/ztn:roles` — separate schedules
-- `/ztn:resolve-clarifications` — owner-only interactive; auto-mode is
+- `/minder:mem:process`, `/minder:mem:lint`, `/minder:mem:content`, `/minder:mem:roles` — separate schedules
+- `/minder:mem:resolve-clarifications` — owner-only interactive; auto-mode is
   dispatched only by lint Step 7.5, never from agent-lens
-- `/ztn:save` in any form (owner-interactive only — scheduler uses
+- `/minder:mem:save` in any form (owner-interactive only — scheduler uses
   `finalize-tick.sh`)
-- `/ztn:update` — engine sync is owner-only
+- `/minder:mem:update` — engine sync is owner-only
 - direct `git commit`, `git push`, `git add` outside helper scripts
 - `git push --force` of any kind
 - creating a feature branch, worktree, or PR

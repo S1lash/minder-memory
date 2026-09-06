@@ -236,7 +236,7 @@ class BaselineGuardTests(unittest.TestCase):
                         ["git", "config", "user.name", "t"]):
                 subprocess.run(cmd, cwd=tmp, capture_output=True)
             bl = root / "_system" / "state" / ia.ORPHAN_BASELINE_NAME
-            # The repo root is the parent of the ZTN base, as in the real tree.
+            # The repo root is the parent of the Minder Memory base, as in the real tree.
             zk = root / "zettelkasten"
             zk.mkdir(exist_ok=True)
             (zk / "_system" / "state").mkdir(parents=True, exist_ok=True)
@@ -253,6 +253,33 @@ class BaselineGuardTests(unittest.TestCase):
             tracked.write_text("", encoding="utf-8")
             self.assertEqual(ia.baseline_additions(zk), [])
             del bl
+
+    def test_a_renamed_note_keeps_its_row(self):
+        """The row follows the file: the same orphan under a new name is not
+        a new orphan. Git's rename detection is the one source for the map."""
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _base(tmp)
+            if subprocess.run(["git", "init", "-q"], cwd=tmp,
+                              capture_output=True).returncode != 0:
+                self.skipTest("git unavailable")
+            for cmd in (["git", "config", "user.email", "t@t"],
+                        ["git", "config", "user.name", "t"]):
+                subprocess.run(cmd, cwd=tmp, capture_output=True)
+            zk = root / "zettelkasten"
+            (zk / "_system" / "state").mkdir(parents=True, exist_ok=True)
+            note = zk / "old-name.md"
+            note.write_text("---\nid: n\n---\n" + "body line\n" * 20, encoding="utf-8")
+            tracked = zk / "_system" / "state" / ia.ORPHAN_BASELINE_NAME
+            tracked.write_text("project/one | old-name.md\n", encoding="utf-8")
+            subprocess.run(["git", "add", "-A"], cwd=tmp, capture_output=True)
+            subprocess.run(["git", "commit", "-qm", "seed"], cwd=tmp, capture_output=True)
+            subprocess.run(["git", "mv", "old-name.md", "new-name.md"], cwd=zk, capture_output=True)
+            tracked.write_text("project/one | new-name.md\n", encoding="utf-8")
+            self.assertEqual(ia.baseline_additions(zk), [])
+            # a genuinely new row beside the carried one is still reported
+            tracked.write_text("project/one | new-name.md\nproject/sneaked | b.md\n", encoding="utf-8")
+            self.assertEqual(ia.baseline_additions(zk), ["project/sneaked | b.md"])
 
     def test_creating_the_baseline_is_not_an_addition(self):
         """The commit that first writes the file must not fail its own guard."""

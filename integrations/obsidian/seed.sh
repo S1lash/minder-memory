@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
-# minder-ztn — Obsidian vault seeder.
+# minder-memory — Obsidian vault seeder.
 #
-# Idempotently seeds Obsidian configuration for the ZTN vault. Run by
+# Idempotently seeds Obsidian configuration for the Minder Memory vault. Run by
 # integrations/claude-code/install.sh after Claude integration is wired,
 # but also safe to run standalone.
 #
 # Behaviour:
 #   - If <vault>/.obsidian/ does not exist, copies vault-config/ there.
-#   - If <vault>/minder-ztn.md does not exist, copies the dashboard
-#     template there. A legacy <vault>/HOME.md (pre-rename) is migrated
-#     to minder-ztn.md preserving any owner edits.
+#   - If <vault>/minder-memory.md does not exist, copies the dashboard
+#     template there. A dashboard under one of its earlier names —
+#     <vault>/minder-ztn.md or <vault>/HOME.md — is renamed to  # rebrand:keep
+#     minder-memory.md preserving any owner edits, and the vault-config
+#     entries that name the dashboard file (bookmarks, ignore filter,
+#     workspace) are pointed at the new name.
 #     Those two are the owner's once they exist: the seeder leaves them
 #     alone, and only --force overwrites them.
 #   - The four help docs under <vault>/5_meta/help/ are the exception,
@@ -28,7 +31,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-VAULT="${MINDER_ZTN_BASE:-$REPO_ROOT/zettelkasten}"
+VAULT="${MINDER_MEMORY_BASE:-$REPO_ROOT/zettelkasten}"
 
 FORCE=0
 RESET_GRAPH=0
@@ -73,11 +76,11 @@ log() { printf '[obsidian] %s\n' "$*"; }
 # and softening it for these files would restore the freeze.
 refresh_help() {
   # Validate the target BEFORE creating anything. `--refresh-help` runs from
-  # the updater, which inherits MINDER_ZTN_BASE from whatever environment it
+  # the updater, which inherits MINDER_MEMORY_BASE from whatever environment it
   # was launched in; an `mkdir -p` on an unvalidated path would happily build
   # and populate a directory tree somewhere unrelated.
   if [ ! -d "$VAULT/_system" ]; then
-    log "help: $VAULT is not a ZTN base (no _system/) — refusing to write there"
+    log "help: $VAULT is not a Minder Memory base (no _system/) — refusing to write there"
     return 1
   fi
   help_dst="$VAULT/5_meta/help"
@@ -109,7 +112,7 @@ $help_pairs
 HELP_PAIRS
 }
 
-# `--refresh-help` is the narrow entry point /ztn:update calls: the DERIVED
+# `--refresh-help` is the narrow entry point /minder:mem:update calls: the DERIVED
 # help docs and nothing else — no `.obsidian/`, no dashboard, no plugin check.
 if [ "$REFRESH_HELP_ONLY" -eq 1 ]; then
   refresh_help
@@ -147,16 +150,41 @@ fi
 
 OBS_DST="$VAULT/.obsidian"
 OBS_SRC="$SCRIPT_DIR/vault-config"
-DASHBOARD_DST="$VAULT/minder-ztn.md"
-DASHBOARD_SRC="$SCRIPT_DIR/minder-ztn.template.md"
-LEGACY_HOME="$VAULT/HOME.md"
+DASHBOARD_DST="$VAULT/minder-memory.md"
+DASHBOARD_SRC="$SCRIPT_DIR/minder-memory.template.md"
 
-# Migration: the dashboard was previously named HOME.md. If a legacy
-# HOME.md exists and minder-ztn.md does not, rename it preserving owner
-# edits.
-if [ -f "$LEGACY_HOME" ] && [ ! -f "$DASHBOARD_DST" ]; then
-  mv "$LEGACY_HOME" "$DASHBOARD_DST"
-  log "migrated HOME.md -> minder-ztn.md (preserved your edits)"
+# The dashboard's earlier names, newest first. A vault that still carries one
+# of them and not the current name gets the file renamed — the owner's edits
+# travel with it — and the vault-config entries that name the dashboard by
+# file name are pointed at the new one. Idempotent: once the current name
+# exists nothing here runs again.
+LEGACY_DASHBOARDS="minder-ztn.md HOME.md"  # rebrand:keep — former names, on purpose
+if [ ! -f "$DASHBOARD_DST" ]; then
+  for legacy_file in $LEGACY_DASHBOARDS; do
+    legacy="$VAULT/$legacy_file"
+    [ -f "$legacy" ] || continue
+    mv "$legacy" "$DASHBOARD_DST"
+    log "renamed $legacy_file -> minder-memory.md (preserved your edits)"
+    # What to rewrite in the vault config depends on the former name: the
+    # product slug is unambiguous anywhere it appears; `HOME` is not, so only
+    # the file reference moves.
+    case "$legacy_file" in
+      minder-ztn.md) sed_expr='s/minder-ztn/minder-memory/g' ;;  # rebrand:keep
+      HOME.md) sed_expr='s/HOME\.md/minder-memory.md/g' ;;
+      *) sed_expr='' ;;
+    esac
+    [ -n "$sed_expr" ] || break
+    for cfg in bookmarks.json app.json workspace.json; do
+      cfg_path="$VAULT/.obsidian/$cfg"
+      [ -f "$cfg_path" ] || continue
+      if grep -q "${legacy_file%.md}" "$cfg_path"; then
+        # `sed -i.bak` is the one form that works on both GNU and BSD sed.
+        sed -i.bak "$sed_expr" "$cfg_path" && rm -f "$cfg_path.bak"
+        log "pointed .obsidian/$cfg at minder-memory.md"
+      fi
+    done
+    break
+  done
 fi
 
 # --- .obsidian/ seed ---
@@ -181,7 +209,7 @@ else
 fi
 
 # --- Always-refresh: graph defaults snapshot ---
-# minder-ztn.md ships a "Reset graph" button that reads this file and
+# minder-memory.md ships a "Reset graph" button that reads this file and
 # copies it to .obsidian/graph.json. Refresh on every seed run (not
 # only on full reseed) so engine improvements to graph defaults reach
 # the in-vault button without requiring --force.
@@ -189,12 +217,12 @@ if [ -f "$OBS_SRC/graph.json" ] && [ -d "$OBS_DST" ]; then
   cp "$OBS_SRC/graph.json" "$OBS_DST/graph-defaults.json"
 fi
 
-# --- minder-ztn.md seed ---
+# --- minder-memory.md seed ---
 if [ -f "$DASHBOARD_DST" ] && [ "$FORCE" -ne 1 ]; then
-  log "skipped minder-ztn.md — already exists at $DASHBOARD_DST"
+  log "skipped minder-memory.md — already exists at $DASHBOARD_DST"
 else
   cp "$DASHBOARD_SRC" "$DASHBOARD_DST"
-  log "seeded minder-ztn.md at $DASHBOARD_DST"
+  log "seeded minder-memory.md at $DASHBOARD_DST"
 fi
 
 # --- Help docs into the vault (DERIVED — see refresh_help above) ---
@@ -206,7 +234,7 @@ refresh_help || log "help: refresh skipped"
 # --- Community plugins — detect missing and warn ---
 # Plugin IDs in community-plugins.json auto-enable when their main.js lands
 # under .obsidian/plugins/<id>/. Until then, the dashboard's [live] blocks
-# in minder-ztn.md render as code.
+# in minder-memory.md render as code.
 RECOMMENDED_PLUGINS=("dataview" "obsidian-tasks-plugin" "obsidian-front-matter-title-plugin")
 MISSING_PLUGINS=()
 for pid in "${RECOMMENDED_PLUGINS[@]}"; do
@@ -222,7 +250,7 @@ cat <<EOF
 Open the vault in Obsidian:
   Obsidian → Open folder as vault → $VAULT
 
-Start at minder-ztn.md (Cmd+O → "HOME").
+Start at minder-memory.md (Cmd+O → "minder-memory").
 EOF
 
 if [ ${#MISSING_PLUGINS[@]} -gt 0 ]; then
@@ -249,7 +277,7 @@ Install them in one pass:
 community-plugins.json already lists their IDs.)
 
 File explorer cleanup is handled by the shipped CSS snippet
-"ztn-hide-engine-paths" — already enabled by the seeder via
+"minder-memory-hide-engine-paths" — already enabled by the seeder via
 appearance.json. No plugin needed.
 
 Full guide: docs/obsidian.md
@@ -259,5 +287,5 @@ fi
 cat <<EOF
 
 Settings preserved on next sync; re-run with --force only if you want
-to reset .obsidian/ and minder-ztn.md to engine defaults.
+to reset .obsidian/ and minder-memory.md to engine defaults.
 EOF

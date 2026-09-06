@@ -1,21 +1,21 @@
 # Manifest schema fixtures
 
-Sanitized batch manifests, one per ZTN engine skill, that MUST validate
+Sanitized batch manifests, one per Minder Memory engine skill, that MUST validate
 against the version of `manifest-schema/v{N}.json` they are paired with.
 
 ## Files
 
-- `process.json` — `/ztn:process` emission. Sanitized from a real
+- `process.json` — `/minder:mem:process` emission. Sanitized from a real
   reprocess-corpus batch: people, project, and source IDs replaced with
   realistic placeholders; record titles overwritten; concept hints kept
   where generic. Substantive — non-empty `records.updated[]`,
   `concepts.upserts[]`.
-- `maintain.json` — `/ztn:maintain` emission. Real batch from the same
+- `maintain.json` — `/minder:mem:maintain` emission. Real batch from the same
   pipeline; carries `stats` only because no graph-completion changes
   were emitted that run.
-- `lint.json` — `/ztn:lint` emission. Real batch with non-zero
+- `lint.json` — `/minder:mem:lint` emission. Real batch with non-zero
   `autofixes_applied` and the `autofixes_by_fix_id` breakdown.
-- `agent-lens.json` — `/ztn:agent-lens` emission. **Synthesized**: it
+- `agent-lens.json` — `/minder:mem:agent-lens` emission. **Synthesized**: it
   pins the expected shape rather than sanitizing a real batch. Real
   `{ts}-agent-lens.json` manifests now exist under
   `_system/state/batches/`, so this fixture is due to be replaced with
@@ -72,5 +72,5 @@ for path in sorted(glob.glob('zettelkasten/_system/docs/manifest-schema/fixtures
 EOF
 ```
 
-The same logic runs in `/ztn:lint` Scan H (manifest schema validation
-— see ztn-lint SKILL.md).
+The same logic runs in `/minder:mem:lint` Scan H (manifest schema validation
+— see minder-mem-lint SKILL.md).

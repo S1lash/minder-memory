@@ -14,9 +14,9 @@ Engine paths in short:
 
 - `integrations/claude-code/{rules,commands,skills}/` — Claude Code
   prompts and skills.
-- `integrations/minder-ztn-mcp/` — MCP integration guide.
+- `integrations/minder-memory-mcp/` — MCP integration guide.
 - `integrations/obsidian/` — Obsidian vault config seed (`.obsidian/`
-  defaults + `minder-ztn.md` dashboard). Idempotent seeder runs from
+  defaults + `minder-memory.md` dashboard). Idempotent seeder runs from
   `claude-code/install.sh`; never overwrites a friend's live `.obsidian/`.
 - `scripts/` — release, sync, gates, migrations; `scripts/lib/` holds
   the primitives they share.
@@ -44,7 +44,7 @@ Engine paths in short:
   dev/CI commands.
 - `.claude/skills/` — the canonical skill-discovery tree (symlinks
   here, dereferenced into real files on release) and
-  `.claude/agents/ztn-role.md`, the subagent the roles tick spawns.
+  `.claude/agents/minder-mem-role.md`, the subagent the roles tick spawns.
 - `docs/{onboarding,upstream-sync,scheduling,obsidian,privacy,CHANGELOG}.md`
   — the friend-facing docs.
 - `.gitignore`, `.gitattributes` (forces LF — a CRLF checkout breaks
@@ -64,7 +64,7 @@ engine changes.
 
 ## Workflow
 
-1. Fork the upstream skeleton (the public `minder-ztn` repo).
+1. Fork the upstream skeleton (the public `minder-memory` repo).
 2. Branch off `main` (`feat/<short-slug>` or `fix/<short-slug>`).
 3. Make engine changes only — never touch a path outside the manifest.
    A `template:` path is edited **only** for its spec portion (a
@@ -118,5 +118,5 @@ engine changes.
 The upstream maintainer authors engine changes in their personal
 instance, then runs `scripts/release_engine.py --target <skeleton-tree>`
 to publish to the public skeleton. Friends pick up the change via
-`/ztn:update` (interactive Claude skill — default) or
+`/minder:mem:update` (interactive Claude skill — default) or
 `scripts/sync_engine.sh` (non-interactive shell, CI / power users).

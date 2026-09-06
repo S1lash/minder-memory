@@ -60,7 +60,7 @@ SECRETS_STORE_REL_TO_BASE = "_system/state/secrets.enc.json"
 # The DECRYPTED file a role sources lives in the OS temp directory, never in
 # the repository (§6.4) — so `git status` cannot see it, staging cannot pick
 # it up, and it cannot survive into a commit by any path.
-SECRETS_TEMP_DIR_PREFIX = "ztn-roles-"
+SECRETS_TEMP_DIR_PREFIX = "minder-mem-roles-"
 SECRETS_TEMP_NAME = "secrets.env"
 
 # What makes a directory THIS subsystem's base: it carries the roles CLI.
@@ -225,7 +225,7 @@ def state_prefix_for(base: Path, role_id: str) -> str:
 
 
 def discover_base(repo: Path) -> Path:
-    """The one ZTN base in `repo`. Raises when it is not exactly one.
+    """The one Minder Memory base in `repo`. Raises when it is not exactly one.
 
     «Where is the base» is a fact, and a fact has one home. The base
     directory name is not a constant — the `writes` sugar expands from
@@ -255,7 +255,7 @@ def discover_base(repo: Path) -> Path:
         return found[0]
     if not found:
         raise RoleConfigError(
-            f"no ZTN base in {repo}: no directory there contains "
+            f"no Minder Memory base in {repo}: no directory there contains "
             f"{ROLES_CLI_REL_TO_BASE}"
         )
     raise RoleConfigError(

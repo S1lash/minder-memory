@@ -29,7 +29,7 @@ Inputs (deterministic, no LLM):
 
 Idempotency: the managed zone is rendered, then compared (timestamp/hash lines
 excluded) to what is already on disk. Identical → NO write at all (true no-op, so
-`/ztn:maintain` run twice produces a byte-identical tree). This is stricter than
+`/minder:mem:maintain` run twice produces a byte-identical tree). This is stricter than
 render_soul_values, which always rewrites the timestamp.
 
 Usage:
@@ -420,7 +420,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--stats", action="store_true",
                         help="print coverage stats (counts + blank axes) from "
                              "constitution state and exit 0; never read/write the "
-                             "hub file (used by /ztn:lint F.4 monthly coverage)")
+                             "hub file (used by /minder:mem:lint F.4 monthly coverage)")
     args = parser.parse_args(argv)
 
     base = repo_root()

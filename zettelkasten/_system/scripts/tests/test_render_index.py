@@ -10,7 +10,7 @@ from tests._fixture import (  # type: ignore
     VALID_NOTE,
     VALID_PERSONAL_NOTE,
     VALID_SENSITIVE_NOTE,
-    clear_ztn_env,
+    clear_minder_memory_env,
     make_fixture,
 )
 import render_index as r  # type: ignore
@@ -135,7 +135,7 @@ def _write(base: Path, rel: str, content: str) -> Path:
 
 class RenderIndexTests(unittest.TestCase):
     def tearDown(self) -> None:
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_empty_base_renders_with_zero_counts(self):
         with tempfile.TemporaryDirectory() as tmp:

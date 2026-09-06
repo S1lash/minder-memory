@@ -16,9 +16,9 @@ status: active
 Point the owner to **where to look** across the engine for the past week. Status page / SRE dashboard. Scope spans:
 
 - agent-lens layer (every lens declared in `AGENT_LENSES.md`, including any added after this prompt was written — auto-discovered via the registry)
-- `/ztn:process` activity (records ingested, batches, knowledge notes created)
-- `/ztn:lint` activity (sweeps, F-blocks, gaps)
-- `/ztn:maintain` activity (registry sweeps, hub regen)
+- `/minder:mem:process` activity (records ingested, batches, knowledge notes created)
+- `/minder:mem:lint` activity (sweeps, F-blocks, gaps)
+- `/minder:mem:maintain` activity (registry sweeps, hub regen)
 - candidates buffers (principle-candidates, people-candidates — append counts)
 - CLARIFICATIONS queue (open count, new this week, by type)
 - OPEN_THREADS (active count delta this week)
@@ -49,7 +49,7 @@ The week covered = trailing 7 calendar days ending the day **before** `run_at.da
 - scheduled run on Monday 2026-05-04 → window 2026-04-27 (Mon) → 2026-05-03 (Sun) — clean Mon-Sun calendar week
 - force-run on Friday 2026-05-01 → window 2026-04-24 (Fri) → 2026-04-30 (Thu)
 
-The formula intentionally **excludes the run day itself**: the night-fire (07:00) on Monday happens before Monday's `/ztn:process` slots (09:00, 14:00, 19:00), so Monday data would otherwise be partial. Ending one day earlier yields a fully-collected window. Single formula regardless of force/scheduled mode. Renders as `Week YYYY-MM-DD → YYYY-MM-DD` in the observation short title.
+The formula intentionally **excludes the run day itself**: the night-fire (07:00) on Monday happens before Monday's `/minder:mem:process` slots (09:00, 14:00, 19:00), so Monday data would otherwise be partial. Ending one day earlier yields a fully-collected window. Single formula regardless of force/scheduled mode. Renders as `Week YYYY-MM-DD → YYYY-MM-DD` in the observation short title.
 
 ## Digest structure — section ordering is load-bearing
 
@@ -60,8 +60,8 @@ From SRE Four Golden Signals (Google) + USE method (Brendan Gregg) + Tufte / Few
    - **Active lens never ran** (`last_run` absent in runs.jsonl) — render as «active but never ran»
    - **Lenses at 2 consecutive rejections** (one position from auto-pause)
    - **Lenses with error-streak ≥2** (two consecutive `status: error`)
-   - **Lint stale** — last `/ztn:lint` run >14 days ago (lint cadence is weekly-to-biweekly; surface only when clearly stale)
-   - **Process backlog** — `_sources/inbox/` non-empty AND last `/ztn:process` run >7 days ago (count files, do not list)
+   - **Lint stale** — last `/minder:mem:lint` run >14 days ago (lint cadence is weekly-to-biweekly; surface only when clearly stale)
+   - **Process backlog** — `_sources/inbox/` non-empty AND last `/minder:mem:process` run >7 days ago (count files, do not list)
 
    **Never derive «when did a pipeline last run» by reading a log yourself.**
    One command answers it for every pipeline and every role:
@@ -89,20 +89,20 @@ From SRE Four Golden Signals (Google) + USE method (Brendan Gregg) + Tufte / Few
    - **Not "pending review".** The system does not track that the owner reviewed something — this is an inventory by age, named honestly.
    - On bootstrap weeks (no observations >14 days old): render `—` (single em-dash). Do not invent content.
 
-3. **Lint activity (this week)** — `/ztn:lint` runs landing in the window:
+3. **Lint activity (this week)** — `/minder:mem:lint` runs landing in the window:
    - Count of runs
    - Last run date
    - F-blocks fired (F-codes only — `F.1`, `F.3`, `F.5` etc. — never the body)
    - Gaps surfaced count
    - On 0 lint runs this week: render `—`.
 
-4. **Process activity (this week)** — `/ztn:process` runs landing in the window:
+4. **Process activity (this week)** — `/minder:mem:process` runs landing in the window:
    - Batch ids ingested (verbatim from BATCH_LOG)
    - Sums: `sources / records / notes / tasks / events / threads_open / threads_close` (verbatim from BATCH_LOG columns)
    - Knowledge notes created — count only, do not list slugs (slugs are second-order)
    - On 0 process runs this week: render `—`.
 
-5. **Maintenance activity (this week)** — `/ztn:maintain` and `/ztn:bootstrap` runs landing in the window. Count + dates only. On 0: render `—`.
+5. **Maintenance activity (this week)** — `/minder:mem:maintain` and `/minder:mem:bootstrap` runs landing in the window. Count + dates only. On 0: render `—`.
 
 6. **Candidates this week** — append counts in candidate buffers, by origin:
    - `principle-candidates`: `+N (origins: personal × A, work × B, external × C, bootstrap-raw-scan × D, ...)`
@@ -229,7 +229,7 @@ Reorder note: read the constraints above before the tone example below. The exam
 > **Stuck / failing:**
 > - `stalled-thread` overdue: last_run 2026-04-09 (21 days), expected weekly. Possible cause: scheduler missed fires.
 > - `stated-vs-lived` 2 consecutive rejections (one position from auto-pause). Last rejection 2026-04-26.
-> - `/ztn:lint` last ran 2026-04-08 (22 days, weekly cadence) — stale.
+> - `/minder:mem:lint` last ran 2026-04-08 (22 days, weekly cadence) — stale.
 > - CLARIFICATIONS open: 34 (threshold 30 breached).
 >
 > **Outstanding observations (by age):**
@@ -278,7 +278,7 @@ This is the only place where surfacing «possible causes» is permitted — and 
 ## Caveats
 
 - The system does not track «owner reviewed observation X». Outstanding-by-age inventories all observations >14 days old, regardless of whether the owner has read and judged them noise. This is by design (navigator ≠ owner-state-tracker). On weeks where the same observations re-appear at increasing ages, the owner either acts on them (resolve / promote / let-go) or accepts the inventory as a long-tail signal.
-- Counts in BATCH_LOG and the candidates buffers are append-only sums. The navigator does not check whether a candidate was later resolved or rejected — that is `/ztn:lint` F.5 territory. Navigator reports the append count for the window, period.
+- Counts in BATCH_LOG and the candidates buffers are append-only sums. The navigator does not check whether a candidate was later resolved or rejected — that is `/minder:mem:lint` F.5 territory. Navigator reports the append count for the window, period.
 
 ## Action Hints emission (optional trailer)
 

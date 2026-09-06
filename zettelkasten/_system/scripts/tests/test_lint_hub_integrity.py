@@ -30,17 +30,17 @@ def _scaffold(root: Path) -> None:
 
 class DefaultRootTests(unittest.TestCase):
     def _run_with_base(self, root: Path, argv: list[str]) -> tuple[int, str, str]:
-        old = os.environ.get("ZTN_BASE")
-        os.environ["ZTN_BASE"] = str(root)
+        old = os.environ.get("MINDER_MEMORY_BASE")
+        os.environ["MINDER_MEMORY_BASE"] = str(root)
         out_buf, err_buf = io.StringIO(), io.StringIO()
         try:
             with redirect_stdout(out_buf), redirect_stderr(err_buf):
                 rc = lhi.main(argv)
         finally:
             if old is None:
-                os.environ.pop("ZTN_BASE", None)
+                os.environ.pop("MINDER_MEMORY_BASE", None)
             else:
-                os.environ["ZTN_BASE"] = old
+                os.environ["MINDER_MEMORY_BASE"] = old
         return rc, out_buf.getvalue(), err_buf.getvalue()
 
     def test_default_root_resolves_to_base(self):

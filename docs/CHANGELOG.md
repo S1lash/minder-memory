@@ -2,6 +2,62 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.0.0 — The product is Minder Memory
+
+The second memory has its own name inside the Minder ecosystem: **Minder
+Memory**, short form **Minder Mem**. «ZTN» was the method it grew from, not the
+product, and it stays only as something you can still say out loud — «найди в
+ZTN» keeps working, because the hot rule lists the former name among its
+aliases, permanently.
+
+**What changes on your machine.** Every skill answers to `/minder:mem:<name>`
+now — `/minder:mem:process`, `/minder:mem:update`, `/minder:mem:save` and the
+rest; the `/ztn:*` names are gone. The update re-wires your Claude Code home by
+itself (migration 031): the old links under `~/.claude` are removed, the new
+rule `minder-memory.md` and the new skills are linked, the managed block in
+`~/.claude/CLAUDE.md` is refreshed in place, and your `upstream` remote is
+pointed at the renamed skeleton once the new address answers. Open a new
+session afterwards so the re-wired rules load.
+
+**What the update renames for you.** Migration 032 runs the engine's one
+rename map over your whole clone — the registries and system files that were
+seeded once, the vault config and dashboard (your edits travel with it), your
+notes, records, hubs and the append-only state — so nothing in your base says
+the old name any more. Only `_sources/` is left as recorded: a transcript is
+evidence of what was said. The rename is deterministic, idempotent, and one
+`git` step away from undone.
+
+**Names you hold outside the repository — these are renamed, not read twice.**
+The base-path variable is `MINDER_MEMORY_BASE` and the credential-store key is
+`MINDER_MEMORY_ROLES_KEY`; the former `ZTN_BASE`, `MINDER_ZTN_BASE` and
+`ZTN_ROLES_KEY` are no longer read at all. Your scheduled routines hold the
+prompt text and the environment they were given, so `/minder:mem:update` walks
+the upgrade checklist (`docs/upgrade-1.0.0.md`) with you after the sync: it
+renames the variable in each cloud routine, switches a pasted prompt body to
+the current one, shows you the shell-profile and collector lines that name the
+old form, and proves each item closed. Until the key is renamed, a role that
+reaches an outside service cannot decrypt its credentials — that is why the
+checklist runs first, not last.
+
+**The manifest contract says one name.** Emitters write
+`processor: minder:mem:<pipeline>`; the schema (`urn:minder-memory:manifest-schema:v2.3`)
+accepts only that spelling, and migration 032 rewrites the batches and buffers
+already on disk to it — the append-only files keep their order and every line,
+only the name changes.
+
+**The floor.** The migration chain now starts at 031; the migrations that
+shaped a base between older releases and 0.69.0 are no longer part of the
+engine. A clone below 0.69.0 updates to 0.69.0 first
+(`scripts/sync_engine.sh --self-heal --branch release/0.69.0` — the self-heal
+puts that release's own update machinery in place first), commits, then
+updates to this release; the sync refuses the direct jump and prints the path.
+
+**One defect fixed on the way.** The sync read the engine list from the clone's
+OWN manifest, so a path that existed only in the new one was never fetched on
+the update that introduced it — while the retirement step, reading the new
+manifest, had already removed its predecessor. The sync now reads the manifest
+it is about to apply.
+
 ## 0.69.0 — A tag can no longer name a project you never had, and a migration can no longer arrive untested
 
 Two holes of the same shape: a rule that was written down and watched by

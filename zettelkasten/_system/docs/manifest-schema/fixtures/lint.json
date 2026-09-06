@@ -1,7 +1,7 @@
 {
   "batch_id": "20260502-230016",
   "timestamp": "2026-05-02T22:58:48Z",
-  "processor": "ztn:lint",
+  "processor": "minder:mem:lint",
   "format_version": "2.0",
   "stats": {
     "scans_executed": [

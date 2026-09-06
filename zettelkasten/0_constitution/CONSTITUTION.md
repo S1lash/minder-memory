@@ -1,7 +1,7 @@
 # Constitution — Protocol Document
 
 > Curated typed set of axioms, principles, and rules that govern how Claude agents
-> (Claude Code, `/ztn:*` pipelines, future MCP consumers) reason and act on owner's
+> (Claude Code, `/minder:mem:*` pipelines, future MCP consumers) reason and act on owner's
 > behalf. Lives as markdown + YAML frontmatter under `0_constitution/`. Single source
 > of truth; every derivative view (harness rules, SOUL.Values, MCP payload, bootstrap
 > export) is auto-generated from this tree.
@@ -48,12 +48,12 @@ owner's behalf. It answers three questions for any non-trivial decision:
 3. *Is this a trade-off between principles?* (surfaces reasoning for logged decision)
 
 **What it is not.** It is not:
-- A knowledge base (that is ZTN `_records/` + PARA folders).
+- A knowledge base (that is Minder Memory `_records/` + PARA folders).
 - A task/goal list (that is `_system/TASKS.md`).
 - A people registry (that is `3_resources/people/PEOPLE.md`).
-- A session journal (that is `_sources/` + `/ztn-recap`).
+- A session journal (that is `_sources/` + `/minder:mem:recap`).
 
-**Quality-first layer.** Unlike ZTN knowledge (capture-first: better save too much
+**Quality-first layer.** Unlike Minder Memory knowledge (capture-first: better save too much
 than lose facts), constitution is curated narrowly. Noise in the constitution causes
 agents to behave like someone who is not owner. Principles enter via narrow triggers
 and human review; they never accumulate on autopilot.
@@ -71,10 +71,10 @@ cannot manufacture essence — it holds the space in which discipline applies.
 |---|---|---|
 | `_system/views/constitution-core.md` (advisory ≤80 lines) | `gen_constitution_core.py` | Claude Code harness; symlink `~/.claude/rules/constitution-core.md` → this file once per machine |
 | `_system/views/CONSTITUTION_INDEX.md` | `gen_constitution_index.py` | Human navigation + lint |
-| `_system/SOUL.md` Values zone (between markers) | `render_soul_values.py` | `/ztn:process`, `/ztn:maintain`, `/ztn:lint` via SOUL load |
+| `_system/SOUL.md` Values zone (between markers) | `render_soul_values.py` | `/minder:mem:process`, `/minder:mem:maintain`, `/minder:mem:lint` via SOUL load |
 
 All three generators are orchestrated by `regen_all.py` (and the
-`/ztn:regen-constitution` skill). Every pipeline that reads a derived view
+`/minder:mem:regen-constitution` skill). Every pipeline that reads a derived view
 regenerates first — single trigger, one consistent rule.
 
 Shareable exports for external users (wife / friends) are not part of the
@@ -90,7 +90,7 @@ run after a fresh clone reads SOUL.md
 on clone, SOUL would be stale until someone explicitly runs the regen
 skill. Committing them turns cloning into «works immediately». Every
 subsequent regen produces a small timestamp diff — that is expected;
-see the `/ztn:regen-constitution` SKILL rollback section if you need to
+see the `/minder:mem:regen-constitution` SKILL rollback section if you need to
 discard accidental regens.
 
 ### Placeholder principles — schema-only fixture, not content
@@ -132,7 +132,7 @@ Three types, ordered by abstraction:
 - *"What is a line I never cross regardless of context?"* → `rule`.
 
 **No other types.** If a candidate does not fit — it is probably a preference, a
-heuristic without rule-content, or knowledge. It belongs elsewhere (ZTN notes,
+heuristic without rule-content, or knowledge. It belongs elsewhere (Minder Memory notes,
 project conventions, team rules).
 
 ---
@@ -173,7 +173,7 @@ core: true                                  # true | false. Target: 5–8 notes
 # Access control — see §7
 scope: shared                               # REQUIRED. shared | personal |
                                             # sensitive
-applies_to: [claude-code, ztn, chatgpt]     # REQUIRED. Closed enum subset; see §7.
+applies_to: [claude-code, minder-memory, chatgpt]     # REQUIRED. Closed enum subset; see §7.
 
 # Relationships
 derived_from: []                            # list of {id}; empty for pure axioms
@@ -238,7 +238,7 @@ source_weight:
 | `binding` | `hard`, `soft` |
 | `core` | `true`, `false` |
 | `scope` | `shared`, `personal`, `sensitive` |
-| `applies_to` | subset of `claude-code`, `ztn`, `chatgpt`, `claude-desktop`, `life-advice`, `work-code`, `bootstrap`, `minder` |
+| `applies_to` | subset of `claude-code`, `minder-memory`, `chatgpt`, `claude-desktop`, `life-advice`, `work-code`, `bootstrap`, `minder` |
 | `confidence` | `proven`, `working`, `experimental` |
 | `status` | `active`, `candidate`, `archived`, `placeholder` |
 | `cognitive_axes` | OPTIONAL list. Slugs from the cognitive-model lens axis SoT (`_system/registries/lenses/cognitive-model/prompt.md`); not a closed enum here — the hub render validates membership and drops unknowns. When promoting a `dimension`-tagged candidate from the buffer into a new principle, copy its `dimension` slug here so `hub-cognitive-model` promotes the axis. |
@@ -388,7 +388,7 @@ table with per-consumer subsets.
 | Consumer | Current | Future (multi-user) |
 |---|---|---|
 | Local Claude Code session | All scopes | shared + personal; sensitive on explicit request |
-| `/ztn:process` / `/ztn:maintain` / `/ztn:lint` | All scopes via SOUL.Values + query | shared + personal |
+| `/minder:mem:process` / `/minder:mem:maintain` / `/minder:mem:lint` | All scopes via SOUL.Values + query | shared + personal |
 | Claude Desktop (personal token) | n/a (dogfood offline) | shared + personal |
 | ChatGPT via public MCP token | n/a | shared only |
 | Bootstrap export to external user | n/a | shared only (physical strip) |
@@ -415,8 +415,8 @@ Four writeability levels, from most permissive to most restrictive.
 
 | Level | Allowed actions | Who performs | Mechanism |
 |---|---|---|---|
-| **L1 — Autonomous** | Append to `## Evidence Trail`; bump `last_applied`; append to `_system/state/principle-candidates.jsonl`; regenerate `_system/views/CONSTITUTION_INDEX.md`; auto-render SOUL.Values zone. | Any pipeline or skill (`/ztn:process`, `/ztn:maintain`, `/ztn:lint`, `/check-decision`, `/ztn:capture-candidate`). | Write without commit. Dirty tree accumulates until owner commits. |
-| **L2 — Auto with notify** | Merge exact-duplicate candidate into existing principle's Evidence Trail; add edge-case reference to `## Related`; mark candidate as suggested-noise for human review. | `/ztn:lint` Scan F.5 (LLM-judge verdicts at `confidence > 0.8`). | Evidence Trail append + info-level CLARIFICATION with LLM reasoning; owner can override. |
+| **L1 — Autonomous** | Append to `## Evidence Trail`; bump `last_applied`; append to `_system/state/principle-candidates.jsonl`; regenerate `_system/views/CONSTITUTION_INDEX.md`; auto-render SOUL.Values zone. | Any pipeline or skill (`/minder:mem:process`, `/minder:mem:maintain`, `/minder:mem:lint`, `/check-decision`, `/minder:mem:capture-candidate`). | Write without commit. Dirty tree accumulates until owner commits. |
+| **L2 — Auto with notify** | Merge exact-duplicate candidate into existing principle's Evidence Trail; add edge-case reference to `## Related`; mark candidate as suggested-noise for human review. | `/minder:mem:lint` Scan F.5 (LLM-judge verdicts at `confidence > 0.8`). | Evidence Trail append + info-level CLARIFICATION with LLM reasoning; owner can override. |
 | **L3 — Human-gated via CLARIFICATION** | Land a new principle; deprecate an existing one; change `priority_tier`; change `core` flag; change `scope` / `applies_to`; rewrite `statement`; confirm `last_reviewed`. | Owner manually, as part of CLARIFICATIONS sweep. | Weekly / monthly batch review. |
 | **L4 — Never automatic** | Change content inside any `core: true` note; promote a principle to `priority_tier: 1`; assign `scope: sensitive`. | Owner only, with deliberate double-read before save. | Manual edit. Even in batch review, pause. |
 
@@ -450,17 +450,17 @@ the principle appears as a dated entry in this section.
 
 | Event | Emitter | Example body |
 |---|---|---|
-| `extraction` | `/ztn:bootstrap --layer constitution` or manual authoring | `extraction from [[source-note]] — tagged as axiom candidate` |
+| `extraction` | `/minder:mem:bootstrap --layer constitution` or manual authoring | `extraction from [[source-note]] — tagged as axiom candidate` |
 | `landing` | Owner manual | `landed in constitution after human review` |
 | `refinement` | Owner manual or session edit | `rephrased in session [[session-id]] — {reason}` |
 | `citation-aligned` | `/check-decision` auto-append | `cited in [[record]] — verdict: aligned` |
 | `citation-violated` | `/check-decision` auto-append | `contradicted by [[record]] — deviation: {reason}` |
 | `citation-tradeoff` | `/check-decision` auto-append | `tradeoff in [[record]] — with [[other-principle-id]]` |
-| `stale-surfaced` | `/ztn:lint` Scan F.1 | `surfaced as stale (>180 days since last_reviewed)` |
+| `stale-surfaced` | `/minder:mem:lint` Scan F.1 | `surfaced as stale (>180 days since last_reviewed)` |
 | `review-confirmed` | Owner manual | `confirmed on review — still applicable` |
 | `deprecated` | Owner manual | `deprecated — reason: {reason}; status: archived` |
-| `automerge-exact` | `/ztn:lint` Scan F.5 | `absorbed exact-duplicate candidate [[candidate-ref]]` |
-| `automerge-llm` | `/ztn:lint` Scan F.5 | `absorbed semantic duplicate candidate [[candidate-ref]] — LLM confidence: 0.{NN}` |
+| `automerge-exact` | `/minder:mem:lint` Scan F.5 | `absorbed exact-duplicate candidate [[candidate-ref]]` |
+| `automerge-llm` | `/minder:mem:lint` Scan F.5 | `absorbed semantic duplicate candidate [[candidate-ref]] — LLM confidence: 0.{NN}` |
 | `compacted` | `compact_evidence_trail.py` | `[compacted] YYYY-MM..YYYY-MM — {N} entries → summary: {one-line}` |
 
 **Side effect of citations:**
@@ -469,7 +469,7 @@ the principle appears as a dated entry in this section.
 - Length of Evidence Trail is a believability signal: richly-cited principles
   weigh more in tie-breaking than aspirational ones.
 
-**Compaction** (triggered by `/ztn:lint` Scan F.7 when entries > 50):
+**Compaction** (triggered by `/minder:mem:lint` Scan F.7 when entries > 50):
 - LLM proposes a one-line summary for entries older than 6 months.
 - Summary enters CLARIFICATION; owner approves / rejects / edits options.
 - On approval, `compact_evidence_trail.py` rewrites the section between sentinel
@@ -486,19 +486,19 @@ the same existing review flow (no new cadence).
 
 | Type | Emitted by | Trigger | Required human action |
 |---|---|---|---|
-| `principle-stale` | `/ztn:lint` Scan F.1 (daily) | `last_reviewed` > 180 days | Confirm / rephrase / deprecate |
-| `principle-drift` | `/ztn:process` Step 3.x | Decision contradicts active principle, `confidence ≥ 0.8` | Was deviation intentional? Refine principle, add exception, or reconsider decision |
-| `principle-drift-retro` | `/ztn:lint --rescan-drift` (manual) | Historical drift found after principle edit | Same as above; scoped to retrospective decisions |
-| `principle-tradeoff` | `/ztn:process` Step 3.x | Decision trades two principles | Confirm the trade-off; optionally log explicit reasoning into the record |
-| `principle-candidate-batch` | `/ztn:lint` Scan F.3 (weekly) | Candidates buffer non-empty | Review candidates inline: promote / reject / defer |
-| `principle-automerge-exact` | `/ztn:lint` Scan F.5 (daily, info) | Exact content match between candidate and active principle | Info-only; owner may override if absorption was wrong |
-| `principle-automerge-llm` | `/ztn:lint` Scan F.5 (daily, info) | LLM-judge verdict `(a)` with `confidence > 0.8` | Info-only; LLM reasoning preserved for audit; override possible |
-| `principle-extended-llm` | `/ztn:lint` Scan F.5 (daily, info) | LLM-judge verdict `(b)` with `confidence > 0.8` | Info-only; candidate added as edge-case reference; override possible |
-| `core-bloat` | `/ztn:lint` Scan F.6 (daily) | `core: true` count > 10 | Revisit compression — which core entries can be demoted or derived? |
-| `evidence-trail-compact` | `/ztn:lint` Scan F.7 (weekly) | Principle Evidence Trail > 50 entries | Choose: LLM-compact / keep / selective |
-| `lint-archive-failure` | `/ztn:lint` Scan F.3 (weekly) | Candidate archive write + read-back failed | Investigate; buffer was NOT cleared (candidates preserved) |
+| `principle-stale` | `/minder:mem:lint` Scan F.1 (daily) | `last_reviewed` > 180 days | Confirm / rephrase / deprecate |
+| `principle-drift` | `/minder:mem:process` Step 3.x | Decision contradicts active principle, `confidence ≥ 0.8` | Was deviation intentional? Refine principle, add exception, or reconsider decision |
+| `principle-drift-retro` | `/minder:mem:lint --rescan-drift` (manual) | Historical drift found after principle edit | Same as above; scoped to retrospective decisions |
+| `principle-tradeoff` | `/minder:mem:process` Step 3.x | Decision trades two principles | Confirm the trade-off; optionally log explicit reasoning into the record |
+| `principle-candidate-batch` | `/minder:mem:lint` Scan F.3 (weekly) | Candidates buffer non-empty | Review candidates inline: promote / reject / defer |
+| `principle-automerge-exact` | `/minder:mem:lint` Scan F.5 (daily, info) | Exact content match between candidate and active principle | Info-only; owner may override if absorption was wrong |
+| `principle-automerge-llm` | `/minder:mem:lint` Scan F.5 (daily, info) | LLM-judge verdict `(a)` with `confidence > 0.8` | Info-only; LLM reasoning preserved for audit; override possible |
+| `principle-extended-llm` | `/minder:mem:lint` Scan F.5 (daily, info) | LLM-judge verdict `(b)` with `confidence > 0.8` | Info-only; candidate added as edge-case reference; override possible |
+| `core-bloat` | `/minder:mem:lint` Scan F.6 (daily) | `core: true` count > 10 | Revisit compression — which core entries can be demoted or derived? |
+| `evidence-trail-compact` | `/minder:mem:lint` Scan F.7 (weekly) | Principle Evidence Trail > 50 entries | Choose: LLM-compact / keep / selective |
+| `lint-archive-failure` | `/minder:mem:lint` Scan F.3 (weekly) | Candidate archive write + read-back failed | Investigate; buffer was NOT cleared (candidates preserved) |
 | `soul-manual-edit-to-auto-zone` | `render_soul_values.py` pre-commit | Text between SOUL auto-zone markers differs from expected render without matching `0_constitution/` change | Owner intended to edit a principle but edited the view |
-| `principle-automerge-scope-mismatch` | `/ztn:lint` Scan F.5 (daily) | Candidate matches principle semantically but scopes differ | Owner decides which scope is correct before merge |
+| `principle-automerge-scope-mismatch` | `/minder:mem:lint` Scan F.5 (daily) | Candidate matches principle semantically but scopes differ | Owner decides which scope is correct before merge |
 
 See [`_system/state/CLARIFICATIONS.md`](../_system/state/CLARIFICATIONS.md) for how types are
 formatted and resolved in-line (this registry is the canonical type list).
@@ -511,9 +511,9 @@ How an observation becomes part of the core.
 
 ```
  (1) Observation in session
-      ↓  [/ztn:capture-candidate — L1, auto]
+      ↓  [/minder:mem:capture-candidate — L1, auto]
  (2) Candidate in _system/state/principle-candidates.jsonl
-      ↓  [/ztn:lint F.5 daily: either auto-merge/extend at L2, or wait]
+      ↓  [/minder:mem:lint F.5 daily: either auto-merge/extend at L2, or wait]
  (3a) Merged into existing principle (Evidence Trail appended)
        ↓  [Evidence Trail grows — L1, auto]
  (3b) Aggregated into weekly F.3 CLARIFICATION
@@ -545,7 +545,7 @@ Evidence Trail entry, or an archive file. Auditable end-to-end.
   non-trivial decision that seems to touch constitution domains (ethics, identity,
   work philosophy, relationships) — invoke `/check-decision` before acting.
 - When you observe one of the capture triggers (see `~/.claude/CLAUDE.md`
-  "Constitution capture" section) — invoke `/ztn:capture-candidate`. Do not ask
+  "Constitution capture" section) — invoke `/minder:mem:capture-candidate`. Do not ask
   permission. The buffer is append-only; owner resolves in batch.
 - Do not edit any file under `0_constitution/` directly. The only allowed writes
   are L1 actions through the scripts / skills listed in the matrix above.
@@ -554,9 +554,9 @@ Evidence Trail entry, or an archive file. Auditable end-to-end.
 
 - **Authoring** a new principle: write the `.md` by hand, include full frontmatter,
   seed the Evidence Trail with at least one `extraction` or `landing` entry.
-  Run `/ztn:regen-constitution` to refresh derived views, then `git add`.
+  Run `/minder:mem:regen-constitution` to refresh derived views, then `git add`.
 - **Refining** an existing principle: edit the file; run
-  `/ztn:regen-constitution`; add a `refinement` Evidence Trail entry.
+  `/minder:mem:regen-constitution`; add a `refinement` Evidence Trail entry.
 - **Deprecating** a principle: set `status: archived`, append a `deprecated`
   Evidence Trail entry of the form `deprecated — reason: {reason}; status: archived`.
   The `reason: {reason}` payload is the contract-required archival reason
@@ -590,12 +590,12 @@ approved by owner before any code is written.
    (see §8) never occur without owner. Automation is restricted to L1 and
    narrowly-authorised L2.
 
-3. **Source of truth in ZTN.** The canonical form of every principle is the
+3. **Source of truth in Minder Memory.** The canonical form of every principle is the
    markdown file under `0_constitution/`. Every other surface is a derived view.
    Editing a view is wasted effort — it regenerates from source on next run.
 
 4. **No new cadences.** Constitution maintenance piggy-backs on the existing
-   `/ztn:lint` nightly and the existing CLARIFICATIONS sweep. No new review
+   `/minder:mem:lint` nightly and the existing CLARIFICATIONS sweep. No new review
    ritual, no new cron entries beyond the nightly lint.
 
 5. **Stale is dangerous.** `last_reviewed > 180 days` surfaces a CLARIFICATION.
@@ -633,10 +633,10 @@ approved by owner before any code is written.
 
 14. **Transformation scripts use no LLM.** Mechanical work (filtering, rendering,
     indexing, archiving) is Python + PyYAML, deterministic. LLM use is reserved
-    for reasoning tasks (`/check-decision`, `/ztn:lint` Scan F.5 merge judgment,
-    `/ztn:lint` Scan F.7 compaction suggestion).
+    for reasoning tasks (`/check-decision`, `/minder:mem:lint` Scan F.5 merge judgment,
+    `/minder:mem:lint` Scan F.7 compaction suggestion).
 
-15. **Capture agent writes only to the buffer.** `/ztn:capture-candidate` never
+15. **Capture agent writes only to the buffer.** `/minder:mem:capture-candidate` never
     decides anything about the constitution. It appends to
     `_system/state/principle-candidates.jsonl`. Compression discipline is not spread
     across many agents.
@@ -676,7 +676,7 @@ framing: positive
 binding: hard
 core: true
 scope: shared
-applies_to: [claude-code, ztn, chatgpt, life-advice]
+applies_to: [claude-code, minder-memory, chatgpt, life-advice]
 derived_from: []
 contradicts: []
 confidence: proven

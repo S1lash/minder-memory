@@ -13,7 +13,7 @@ framing: positive
 binding: soft
 core: true
 scope: shared
-applies_to: [ztn]
+applies_to: [minder-memory]
 derived_from: []
 contradicts: []
 confidence: starter

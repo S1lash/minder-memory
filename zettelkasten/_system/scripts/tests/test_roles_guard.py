@@ -1436,7 +1436,7 @@ class InboxShapeTests(unittest.TestCase):
             self.assertFalse(repo_path(repo, rel).exists())
 
     def test_a_flat_inbox_note_survives_end_to_end(self):
-        """SIBLING — the shape `/ztn:process` expects must reach the inbox."""
+        """SIBLING — the shape `/minder:mem:process` expects must reach the inbox."""
         rel = INBOX_PREFIX + "2026-07-28-notion.md"
         with tempfile.TemporaryDirectory() as tmp:
             repo = init_repo(Path(tmp))
@@ -2865,7 +2865,7 @@ class GuardInputIsNotRoleWritableTests(unittest.TestCase):
     def test_a_planted_hook_is_a_surface_change(self):
         """The hooks PATH was watched; the hooks were not — and the tick runs
         `git commit` per role, so a planted `post-commit` executes inside the
-        tick's own process, which is where `ZTN_ROLES_KEY` lives."""
+        tick's own process, which is where `MINDER_MEMORY_ROLES_KEY` lives."""
         with tempfile.TemporaryDirectory() as tmp:
             repo = self._prepared(tmp)
             before = guard.git_surface(repo)

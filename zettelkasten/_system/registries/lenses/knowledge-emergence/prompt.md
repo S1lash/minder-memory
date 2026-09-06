@@ -26,7 +26,7 @@ rather than records. Records are «what the owner said»; knowledge is
 distilled material is post-filter, so recurrence here means a real
 pattern in his thinking, not just talking-volume.
 
-The lens defends Layer 3 (hubs) of the ZTN doctrine
+The lens defends Layer 3 (hubs) of the Minder Memory doctrine
 (`5_meta/CONCEPT.md` §«Три слоя»): hubs are the synthesis layer, the
 highest-leverage tier. Their growth currently rests entirely on owner-
 noticing. This lens makes promotion candidates visible.

@@ -1,7 +1,7 @@
 # Obsidian Integration
 
-Opinionated Obsidian vault config for the ZTN base. Seeds a `.obsidian/`
-directory and a root `minder-ztn.md` dashboard so the vault opens cleanly with
+Opinionated Obsidian vault config for the Minder Memory base. Seeds a `.obsidian/`
+directory and a root `minder-memory.md` dashboard so the vault opens cleanly with
 engine paths hidden, wikilinks preserved, Properties UI in passive
 mode, and a curated set of bookmarks, hotkeys, and graph presets.
 
@@ -17,9 +17,9 @@ mode, and a curated set of bookmarks, hotkeys, and graph presets.
 | `vault-config/graph.json` | Graph view defaults + colour groups by PARA layer |
 | `vault-config/bookmarks.json` | Pre-pinned navigation tree (Now / Identity / Registries / Browse / Obsidian docs) |
 | `vault-config/hotkeys.json` | `Cmd+Shift+G` graph, `Cmd+Shift+L` local graph, `Cmd+Shift+B` bookmarks, etc. |
-| `vault-config/snippets/ztn-hide-engine-paths.css` | Hides engine runtime paths from the file tree |
-| `vault-config/snippets/ztn-note-types.css` | Coloured borders + emoji prefixes per note type |
-| `minder-ztn.template.md` | Dashboard seeded into vault root |
+| `vault-config/snippets/minder-memory-hide-engine-paths.css` | Hides engine runtime paths from the file tree |
+| `vault-config/snippets/minder-memory-note-types.css` | Coloured borders + emoji prefixes per note type |
+| `minder-memory.template.md` | Dashboard seeded into vault root |
 | `guide.md` | Friend-facing usage guide (hotkeys, workflows, recipes) |
 | `views.md` | Graph and search preset queries (copy-paste reference) |
 | `seed.sh` | Idempotent seeder |
@@ -34,7 +34,7 @@ the end, which:
 - Copies `vault-config/` (recursively, including `snippets/`) →
   `<vault>/.obsidian/` only if the destination does not exist.
   Friend's customisations are preserved on subsequent syncs.
-- Copies `minder-ztn.template.md` → `<vault>/minder-ztn.md` only if missing.
+- Copies `minder-memory.template.md` → `<vault>/minder-memory.md` only if missing.
 - Detects missing recommended community plugins and prints install
   instructions.
 
@@ -44,9 +44,9 @@ the existing `.obsidian/` to `.obsidian.backup-{ts}/` first.
 ## Engine constraints honoured
 
 - `useMarkdownLinks: false` and `newLinkFormat: shortest` — required so
-  Obsidian preserves the `[[wikilink]]` format that ZTN skills emit and
-  parse. Changing these will break round-trip with `/ztn:process` and
-  `/ztn:maintain`.
+  Obsidian preserves the `[[wikilink]]` format that Minder Memory skills emit and
+  parse. Changing these will break round-trip with `/minder:mem:process` and
+  `/minder:mem:maintain`.
 - `propertiesInDocument: source` — keeps frontmatter as YAML text in the
   editor. Properties UI is still available via the panel but does not
   auto-rewrite the document. This matters because engine skills are

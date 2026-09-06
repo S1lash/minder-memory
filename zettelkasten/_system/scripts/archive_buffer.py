@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Archive + verify + clear a weekly-aggregation candidate buffer.
 
-Mechanical part of `/ztn:lint` weekly sub-scans:
+Mechanical part of `/minder:mem:lint` weekly sub-scans:
 - Scan F.3 — `principle-candidates.jsonl`
 - Scan C.5 — `people-candidates.jsonl`
 

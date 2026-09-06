@@ -28,7 +28,7 @@ so no log has to be rewritten and no future ordering change can break it.
 
 Four header shapes exist today and all four are real:
 
-    ## 2026-07-28T01:09:09Z | lint | by: ztn:lint       log_lint.md
+    ## 2026-07-28T01:09:09Z | lint | by: minder:mem:lint       log_lint.md
     ## 2026-08-08 — Processing: activitywatch …         log_process.md
     ## 2026-05-01 11:38:00Z — agent-lens run            log_agent_lens.md
     ## 2026-08-08T… or ## 2026-08-08 — …                log_maintenance.md

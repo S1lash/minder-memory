@@ -2,7 +2,7 @@
 
 Phase 1 ships validators only; appliers return `{not_implemented}` when
 validation passes. These tests pin the validation behaviour end-to-end
-on a synthesised ZTN base.
+on a synthesised Minder Memory base.
 """
 
 from __future__ import annotations

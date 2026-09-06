@@ -1,9 +1,9 @@
-You are running the autonomous weekly tick of `/ztn:content --maintain` (the
+You are running the autonomous weekly tick of `/minder:mem:content --maintain` (the
 draft-maintainer). There is no human in this loop. The contract below is
 load-bearing.
 
 This tick runs **after** the `content-synthesis` lens, which produces its weekly
-verdict in the `/ztn:agent-lens --all-due` Monday tick. Cadence: lens Monday,
+verdict in the `/minder:mem:agent-lens --all-due` Monday tick. Cadence: lens Monday,
 maintainer Tuesday — producer and consumer in separate scheduler contexts on
 purpose (the maintainer must not be the same context that just produced the lens
 output). The maintainer reads the latest lens output + the content map + the
@@ -11,7 +11,7 @@ ledger and keeps the living drafts in `6_posts/drafts/` alive.
 
 ## Invocation contract (read first)
 
-The ZTN skills in this prompt — `/ztn:sync-data`, `/ztn:content` — are invoked
+The Minder Memory skills in this prompt — `/minder:mem:sync-data`, `/minder:mem:content` — are invoked
 **as slash commands in this same conversation**. Skills are committed to the
 cloned repo at `.claude/skills/<name>/SKILL.md`, so the runtime loads them
 automatically — write the slash command literally as the next action and it
@@ -20,19 +20,19 @@ invocation.
 
 **Single-commit guarantee.** This tick produces **exactly one git commit + one
 git push**, both from `bash scripts/scheduler/finalize-tick.sh` at Step 5. No
-other path in this prompt commits or pushes. `/ztn:save` is **forbidden** in
+other path in this prompt commits or pushes. `/minder:mem:save` is **forbidden** in
 scheduler ticks. Any intermediate `git commit`, `git push`, or `git add` outside
 the helper scripts listed below is a contract violation.
 
 **Hard prohibitions:**
 
-- Do NOT invoke `/ztn:save` in any form. Use `finalize-tick.sh` at Step 5.
+- Do NOT invoke `/minder:mem:save` in any form. Use `finalize-tick.sh` at Step 5.
 - Do NOT call `git commit`, `git push`, `git add` directly outside the listed
   helper scripts. **One explicit exception:** Step 5b (MCP delivery fallback,
   runs only when finalize-tick reports `gh CLI not found in PATH`) uses one
   direct `git push origin "HEAD:<sandbox>"` per its strict per-step instructions.
   No other direct git/gh calls are authorized.
-- Do NOT open any `integrations/claude-code/skills/ztn-*/SKILL.md` and
+- Do NOT open any `integrations/claude-code/skills/minder-mem-*/SKILL.md` and
   re-implement its steps with Bash / Read / Edit. Skills are loaded by the
   runtime — invoke via slash, never re-execute.
 - Do NOT use the Agent / Task tool as a substitute for slash invocation. The
@@ -53,7 +53,7 @@ the helper scripts listed below is a contract violation.
 - Do NOT narrate or summarise between steps.
 - If the working tree looks "dirty" after Step 4 — new/updated drafts in
   `6_posts/drafts/` plus the updated `content-pipeline-state.json` ledger — that
-  is NORMAL output of `/ztn:content --maintain`. Do NOT try to "group by theme"
+  is NORMAL output of `/minder:mem:content --maintain`. Do NOT try to "group by theme"
   or "save progress"; Step 5's `finalize-tick.sh` collapses every dirty owner
   path into one commit.
 
@@ -74,7 +74,7 @@ Then exit `partial` immediately.
 ## Steps
 
 0. `bash scripts/scheduler/ensure-skills.sh` — verify the project-level
-   ZTN skills resolve at `.claude/skills/<name>/SKILL.md` before any slash
+   Minder Memory skills resolve at `.claude/skills/<name>/SKILL.md` before any slash
    invocation. This is the #1 cause of a tick dying at its first step: a
    clone where git symlinks did not survive (e.g. a Windows commit with
    `core.symlinks=false` materialises them as text files). On non-zero
@@ -84,7 +84,7 @@ Then exit `partial` immediately.
    cannot persist. Run failure-handling with cause
    `"skills unresolvable in this clone — apply the CHANGELOG 0.41.0 recovery, then re-run"`
    and exit `partial`. The durable fix is real-file skills delivered via
-   the skeleton + `/ztn:update`, not an in-tick repair.
+   the skeleton + `/minder:mem:update`, not an in-tick repair.
 
 1. `bash scripts/scheduler/pin-main.sh` — get on fresh `origin/main`, capture
    the starting sandbox branch, and best-effort recover any stranded scheduler
@@ -93,15 +93,15 @@ Then exit `partial` immediately.
 2. `bash scripts/scheduler/lock-check.sh` — abort if any pipeline lock
    (process / maintain / lint / agent-lens / content / resolve / roles) is
    recent (<2h).
-   Stale locks (>2h) are removed automatically. (`/ztn:content --maintain`
+   Stale locks (>2h) are removed automatically. (`/minder:mem:content --maintain`
    acquires `.content.lock` itself during Step 4 — this pre-check only guards
    against a concurrent pipeline run, including a crashed prior content tick.)
 
-3. `/ztn:sync-data` — safe `git pull --rebase` with conflict-refuse semantics.
+3. `/minder:mem:sync-data` — safe `git pull --rebase` with conflict-refuse semantics.
    - Returns "blocked" / non-zero → run failure-handling with cause
      `"sync-data blocked, owner action needed"`, exit `sync-blocked`.
 
-4. `/ztn:content --maintain` — exactly ONE invocation. Reads the latest
+4. `/minder:mem:content --maintain` — exactly ONE invocation. Reads the latest
    `content-synthesis` lens output + CONTENT_MAP.md + the ledger, and maintains
    the living drafts per its lifecycle (create / update / archive), resumable
    draft-by-draft via the ledger, owner-edited drafts left untouched. A missing
@@ -183,13 +183,13 @@ Then exit `partial` immediately.
 
 ## Forbidden in this tick
 
-- `/ztn:process`, `/ztn:lint`, `/ztn:maintain`, `/ztn:agent-lens`, `/ztn:roles` — separate
+- `/minder:mem:process`, `/minder:mem:lint`, `/minder:mem:maintain`, `/minder:mem:agent-lens`, `/minder:mem:roles` — separate
   schedules (the lens runs in the agent-lens Monday tick; the map is kept fresh
   by maintain after process batches)
-- `/ztn:resolve-clarifications` in any form
-- `/ztn:save` in any form (owner-interactive only — scheduler uses
+- `/minder:mem:resolve-clarifications` in any form
+- `/minder:mem:save` in any form (owner-interactive only — scheduler uses
   `finalize-tick.sh`)
-- `/ztn:update` — engine sync is owner-only
+- `/minder:mem:update` — engine sync is owner-only
 - direct `git commit`, `git push`, `git add` outside helper scripts
 - `git push --force` of any kind
 - creating a feature branch, worktree, or PR

@@ -2,7 +2,7 @@
   "batch_id": "20260601-094500",
   "timestamp": "2026-06-01T09:45:00Z",
   "format_version": "2.0",
-  "processor": "ztn:process",
+  "processor": "minder:mem:process",
   "sources_processed": [
     {
       "path": "_sources/processed/plaud/2026-06-01T08:00:00Z/transcript_with_summary.md",

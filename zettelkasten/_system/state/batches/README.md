@@ -1,8 +1,8 @@
 # `_system/state/batches/` — engine output directory
 
-Canonical location for the ZTN engine's append-only manifest output.
-Every persistent-state-changing run of `/ztn:process`, `/ztn:maintain`,
-`/ztn:lint`, or `/ztn:agent-lens` writes one pair of files into this
+Canonical location for the Minder Memory engine's append-only manifest output.
+Every persistent-state-changing run of `/minder:mem:process`, `/minder:mem:maintain`,
+`/minder:mem:lint`, or `/minder:mem:agent-lens` writes one pair of files into this
 directory: a machine-contract `.json` and a human-narrative `.md`.
 
 This README documents the **directory's** contract — naming,
@@ -18,7 +18,7 @@ and pinned by [`v2.json`](../../docs/manifest-schema/v2.json).
 One pair of files per batch:
 
 - **`{ts}-{skill}.json`** — machine contract. Validated against
-  `manifest-schema/v2.json` by `/ztn:lint` Scan H. Required for any
+  `manifest-schema/v2.json` by `/minder:mem:lint` Scan H. Required for any
   consumer integration.
 - **`{ts}-{skill}.md`** — human-facing narrative summary. Owner-
   oriented, not schema-validated, not consumed programmatically.
@@ -40,7 +40,7 @@ review of what a batch produced.
   on this prefix is monotone in time.
 - `{skill}` — one of `process`, `maintain`, `lint`, `agent-lens`.
   Matches the manifest's top-level `processor` field with the
-  `ztn:` prefix stripped.
+  `minder:mem:` prefix stripped.
 
 Active state contains only `{ts}-{skill}.{json,md}` per the
 naming above. Pre-JSON-manifest markdown summaries
@@ -60,7 +60,7 @@ rely on filesystem `ctime` / `mtime`: those change on copy, move,
 survives all of them.
 
 Within the same `{ts}`, the cross-skill lock matrix
-(ZTN doctrine §3.4) defines order:
+(Minder Memory doctrine §3.4) defines order:
 
 ```
 process → maintain → lint → agent-lens
@@ -93,7 +93,7 @@ already processed downstream MUST be a no-op.
 
 | File | Purpose | Validated | Consumed by |
 |---|---|---|---|
-| `{ts}-{skill}.json` | Machine contract | Yes — `manifest-schema/v2.json` via `/ztn:lint` Scan H | Any downstream consumer |
+| `{ts}-{skill}.json` | Machine contract | Yes — `manifest-schema/v2.json` via `/minder:mem:lint` Scan H | Any downstream consumer |
 | `{ts}-{skill}.md` | Owner-facing narrative | No | Humans only |
 
 Two files, same stem. They are written by the same skill in the
@@ -104,7 +104,7 @@ why the producer does not need both to be atomically co-written.)
 
 ## 6. Append-only retention
 
-ZTN never deletes batches. There is no automated cleanup, no
+Minder Memory never deletes batches. There is no automated cleanup, no
 retention cron, no time-based pruning. The directory grows
 monotonically; archival is an owner-driven move (§7), not a delete.
 
@@ -154,21 +154,20 @@ Path: `_system/state/batches/archive/{YYYY-MM}/`
 
 ## 8. Backup
 
-The ZTN repo has a GitHub remote. Every `git push` carries the
+The Minder Memory repo has a GitHub remote. Every `git push` carries the
 batches directory off the local box. There is no separate
-batches-only backup mechanism in A0-ZTN scope, by design — the
-engine's git repo is the unit of backup.
+batches-only backup mechanism, by design — the engine's git repo is the
+unit of backup.
 
 Per ARCHITECTURE.md §8.12.5 (one specific consumer's restore plan,
 in the minder-project repo), this directory doubles as a disaster-
 recovery source for downstream state: with the consumer's databases
-lost but ZTN intact, re-processing every `*.json` here re-derives
+lost but Minder Memory intact, re-processing every `*.json` here re-derives
 the typed-object state. This is a major-incident fallback, not
 routine restore.
 
 For deeper protection (account loss, mirror failure), GitHub
-mirroring or an off-site git remote is the owner's responsibility
-and is out of A0-ZTN scope.
+mirroring or an off-site git remote is the owner's responsibility.
 
 ---
 
@@ -177,7 +176,7 @@ and is out of A0-ZTN scope.
 - **Schema reference:**
   [`_system/docs/manifest-schema/README.md`](../../docs/manifest-schema/README.md)
   and [`v2.json`](../../docs/manifest-schema/v2.json)
-- **Validator:** `/ztn:lint` Scan H, backed by
+- **Validator:** `/minder:mem:lint` Scan H, backed by
   [`_system/scripts/lint_manifest_schema.py`](../../scripts/lint_manifest_schema.py)
 - **Per-skill manifest semantics:** ARCHITECTURE.md §8.11 in the
   minder-project repo (one specific downstream consumer's view of
@@ -190,8 +189,4 @@ and is out of A0-ZTN scope.
 
 ## 10. Status reference
 
-This file closes A0-ZTN deliverables **A0-5.2** (batches retention +
-ordering policy) and **A0-5.4** (`.md` summary files documentation),
-folded together per the plan. See
-`minder-project/strategy/A0-ZTN-PLAN.md` §4 and
-`minder-project/strategy/A0-ZTN-STATUS.md` for milestone context.
+This file cl

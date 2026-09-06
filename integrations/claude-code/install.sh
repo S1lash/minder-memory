@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
-# minder-ztn — Claude Code integration installer.
+# minder-memory — Claude Code integration installer.
 #
-# Sets up user-level Claude Code discoverability for ZTN rules / commands /
+# Sets up user-level Claude Code discoverability for Minder Memory rules / commands /
 # skills under ~/.claude/. Two layers:
 #
-#   - rules + commands carry the {{MINDER_ZTN_BASE}} placeholder. The
+#   - rules + commands carry the {{MINDER_MEMORY_BASE}} placeholder. The
 #     installer renders them into integrations/claude-code/built/ with the
 #     placeholder substituted by the absolute path to <repo>/zettelkasten,
 #     then symlinks ~/.claude/{rules,commands}/ entries to the rendered
 #     files. This path keeps the constitution-capture hook + ambient
-#     /ztn:capture-candidate / /ztn:check-decision reachable from any CWD.
+#     /minder:mem:capture-candidate / /minder:mem:check-decision reachable from any CWD.
 #   - skills use repo-relative `zettelkasten/...` paths in their source
-#     and need no rendering. The installer symlinks ~/.claude/skills/ztn-*
+#     and need no rendering. The installer symlinks ~/.claude/skills/minder-mem-*
 #     directly to the source under integrations/claude-code/skills/. The
 #     committed `.claude/skills/` symlinks at the repo root handle the
 #     project-level + cloud-Routines discovery layer — see README.md.
 #
 # Existing entries that would be overwritten are moved to a timestamped
-# backup directory under ~/.claude/.minder-ztn-backup-*.
+# backup directory under ~/.claude/.minder-memory-backup-*.
 #
 # Idempotent: re-running the installer refreshes rendered files and
 # replaces stale symlinks. Safe after `git pull` or after moving the repo.
@@ -34,7 +34,7 @@ set -euo pipefail
 #
 # Detecting the platform and re-executing ourselves once with the variable set
 # is the whole fix: the friend is never asked to know about an environment
-# variable, and the guard is inert everywhere else. `MINDER_ZTN_SYMLINK_REEXEC`
+# variable, and the guard is inert everywhere else. `MINDER_MEMORY_SYMLINK_REEXEC`
 # makes it strictly once — if the second run still cannot link, the failure is
 # real and must surface rather than loop.
 # ---------------------------------------------------------------------------
@@ -43,10 +43,10 @@ case "$(uname -s 2>/dev/null || echo unknown)" in
     case "${MSYS:-}" in
       *winsymlinks:nativestrict*) ;;
       *)
-        if [ -z "${MINDER_ZTN_SYMLINK_REEXEC:-}" ]; then
+        if [ -z "${MINDER_MEMORY_SYMLINK_REEXEC:-}" ]; then
           printf '[install] %s\n' "Git Bash detected — re-running with MSYS=winsymlinks:nativestrict so symlinks are real"
           MSYS="${MSYS:+$MSYS }winsymlinks:nativestrict" \
-          MINDER_ZTN_SYMLINK_REEXEC=1 \
+          MINDER_MEMORY_SYMLINK_REEXEC=1 \
             exec bash "${BASH_SOURCE[0]}" "$@"
         fi
         printf '[install] %s\n' "warning: MSYS=winsymlinks:nativestrict could not be applied; symlinks may be stubs" >&2
@@ -58,7 +58,7 @@ esac
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 INTEGR_ROOT="$SCRIPT_DIR"
-MINDER_ZTN_BASE="$REPO_ROOT/zettelkasten"
+MINDER_MEMORY_BASE="$REPO_ROOT/zettelkasten"
 
 SRC_RULES="$INTEGR_ROOT/rules"
 SRC_COMMANDS="$INTEGR_ROOT/commands"
@@ -75,7 +75,7 @@ TARGET_SKILLS="$CLAUDE_HOME/skills"
 TARGET_AGENTS="$CLAUDE_HOME/agents"
 
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
-BACKUP_DIR="$CLAUDE_HOME/.minder-ztn-backup-$TIMESTAMP"
+BACKUP_DIR="$CLAUDE_HOME/.minder-memory-backup-$TIMESTAMP"
 
 log() { printf '[install] %s\n' "$*"; }
 
@@ -83,7 +83,7 @@ render() {
   # render <src-file> <dst-file>
   local src="$1" dst="$2"
   mkdir -p "$(dirname "$dst")"
-  sed "s|{{MINDER_ZTN_BASE}}|$MINDER_ZTN_BASE|g" "$src" > "$dst"
+  sed "s|{{MINDER_MEMORY_BASE}}|$MINDER_MEMORY_BASE|g" "$src" > "$dst"
 }
 
 backup_if_exists() {
@@ -133,10 +133,10 @@ link() {
 }
 
 log "repo root: $REPO_ROOT"
-log "MINDER_ZTN_BASE: $MINDER_ZTN_BASE"
+log "MINDER_MEMORY_BASE: $MINDER_MEMORY_BASE"
 
 # --- Render templated rules + commands into built/ ---
-# Skills carry no {{MINDER_ZTN_BASE}} placeholder (sources use repo-relative
+# Skills carry no {{MINDER_MEMORY_BASE}} placeholder (sources use repo-relative
 # `zettelkasten/...` paths) — they are NOT rendered into built/ and the
 # user-level symlinks below point directly to the source tree.
 log "rendering templates into $BUILT"
@@ -148,10 +148,16 @@ for f in "$SRC_RULES"/*.md; do
   render "$f" "$BUILT_RULES/$(basename "$f")"
 done
 
-for f in "$SRC_COMMANDS"/*.md; do
-  [ -f "$f" ] || continue
-  render "$f" "$BUILT_COMMANDS/$(basename "$f")"
-done
+# Commands live in a namespace directory (`commands/minder/mem/<name>.md` is how
+# Claude Code spells `/minder:mem:<name>`), so they are rendered with their
+# relative path kept.
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  rel="${f#$SRC_COMMANDS/}"
+  render "$f" "$BUILT_COMMANDS/$rel"
+done <<COMMANDS
+$(find "$SRC_COMMANDS" -type f -name '*.md' | sort)
+COMMANDS
 
 # --- Symlinks ~/.claude/ -> rendered files ---
 log "creating symlinks under $CLAUDE_HOME"
@@ -162,28 +168,32 @@ for f in "$BUILT_RULES"/*.md; do
   [ -f "$f" ] || continue
   link "$f" "$TARGET_RULES/$(basename "$f")"
 done
-link "$MINDER_ZTN_BASE/_system/docs/constitution-capture.md" "$TARGET_RULES/constitution-capture.md"
-link "$MINDER_ZTN_BASE/_system/views/constitution-core.md" "$TARGET_RULES/constitution-core.md"
+link "$MINDER_MEMORY_BASE/_system/docs/constitution-capture.md" "$TARGET_RULES/constitution-capture.md"
+link "$MINDER_MEMORY_BASE/_system/views/constitution-core.md" "$TARGET_RULES/constitution-core.md"
 # Communication baseline — universal presentation spine, hot in every session.
 # Owner's calibration layers on top: SOUL → Context for Agents + the long-form playbook.
-link "$MINDER_ZTN_BASE/_system/docs/communication-baseline.md" "$TARGET_RULES/communication-baseline.md"
+link "$MINDER_MEMORY_BASE/_system/docs/communication-baseline.md" "$TARGET_RULES/communication-baseline.md"
 # Advisory baseline — universal reasoning spine (objective, stance toward third
 # parties, criteria, variance). Sibling of the presentation spine above: that one
 # governs how an answer is delivered, this one how it is reached. Owner's
 # calibration layers on top: their ai-interaction principles + the on-demand
 # decision-advisory playbook.
-link "$MINDER_ZTN_BASE/_system/docs/advisory-baseline.md" "$TARGET_RULES/advisory-baseline.md"
+link "$MINDER_MEMORY_BASE/_system/docs/advisory-baseline.md" "$TARGET_RULES/advisory-baseline.md"
 # Engine doctrine — operating philosophy auto-loaded in every session.
-# Every /ztn:* skill reads it; the symlink ensures it flows into ad-hoc
+# Every /minder:mem:* skill reads it; the symlink ensures it flows into ad-hoc
 # Claude Code sessions in this repo too (e.g. when owner is debugging
 # without invoking a skill).
-link "$MINDER_ZTN_BASE/_system/docs/ENGINE_DOCTRINE.md" "$TARGET_RULES/ztn-engine-doctrine.md"
+link "$MINDER_MEMORY_BASE/_system/docs/ENGINE_DOCTRINE.md" "$TARGET_RULES/minder-memory-engine-doctrine.md"
 
-# Commands
-for f in "$BUILT_COMMANDS"/*.md; do
-  [ -f "$f" ] || continue
-  link "$f" "$TARGET_COMMANDS/$(basename "$f")"
-done
+# Commands — one link for the product's namespace directory. `~/.claude/
+# commands/minder/` stays a REAL directory: it is the ecosystem's namespace,
+# and a sibling product links its own segment beside `mem`. Linking the whole
+# `minder/` directory would monopolise it.
+COMMANDS_NAMESPACE_DIR="$BUILT_COMMANDS/minder/mem"
+if [ -d "$COMMANDS_NAMESPACE_DIR" ]; then
+  mkdir -p "$TARGET_COMMANDS/minder"
+  link "$COMMANDS_NAMESPACE_DIR" "$TARGET_COMMANDS/minder/mem"
+fi
 
 # Skills (entire dir per skill) — symlink directly to source. No render
 # step (sources are placeholder-free), so user-level symlinks resolve to
@@ -198,12 +208,37 @@ done
 
 # Agent definitions the engine owns, by NAME — never a directory sweep, because
 # `.claude/agents/` is also where the owner drops their own agents and those are
-# not ours to link into a global home. Without this, `ztn-role` resolves only
-# when the session's CWD is inside the repo, so /ztn:role:add completes its
+# not ours to link into a global home. Without this, `minder-mem-role` resolves only
+# when the session's CWD is inside the repo, so /minder:mem:role:add completes its
 # whole interview and then fails its mandatory trial run with `agent-missing`.
-if [ -f "$REPO_ROOT/.claude/agents/ztn-role.md" ]; then
-  link "$REPO_ROOT/.claude/agents/ztn-role.md" "$TARGET_AGENTS/ztn-role.md"
+if [ -f "$REPO_ROOT/.claude/agents/minder-mem-role.md" ]; then
+  link "$REPO_ROOT/.claude/agents/minder-mem-role.md" "$TARGET_AGENTS/minder-mem-role.md"
 fi
+
+# Self-heal: a link under the four target directories that points into THIS
+# repository and no longer resolves is ours and dead — a rendered file that the
+# re-render above no longer produces, a skill or command that moved. Nothing
+# fails on a dangling link; the rule or skill simply stops loading, silently,
+# so it is removed here rather than left for someone to notice a month later.
+# A link that points anywhere else is not ours to touch.
+prune_dangling_links() {
+  local dir entry target
+  for dir in "$TARGET_RULES" "$TARGET_COMMANDS" "$TARGET_COMMANDS/minder" "$TARGET_SKILLS" "$TARGET_AGENTS"; do
+    [ -d "$dir" ] || continue
+    for entry in "$dir"/* "$dir"/.[!.]*; do
+      [ -L "$entry" ] || continue
+      [ -e "$entry" ] && continue
+      target="$(readlink "$entry")"
+      case "$target" in
+        "$REPO_ROOT"/*)
+          rm -f "$entry"
+          log "removed dangling link: $entry -> $target"
+          ;;
+      esac
+    done
+  done
+}
+prune_dangling_links
 
 # Repair project-level `.claude/skills/` at the repo root. Cloud Routines and
 # project-CWD sessions load skills from there, not from the user-level links
@@ -223,14 +258,14 @@ fi
 # Idempotent: managed block delimited by markers. Re-running install.sh
 # rewrites the block in place. uninstall.sh strips it.
 CLAUDE_MD="$CLAUDE_HOME/CLAUDE.md"
-BEGIN_MARK="<!-- MINDER-ZTN BEGIN — managed by install.sh, do not edit by hand -->"
-END_MARK="<!-- MINDER-ZTN END -->"
+BEGIN_MARK="<!-- MINDER-MEMORY BEGIN — managed by install.sh, do not edit by hand -->"
+END_MARK="<!-- MINDER-MEMORY END -->"
 
 managed_block() {
   cat <<BLOCK
 $BEGIN_MARK
-## Zettelkasten (ZTN) — Personal Knowledge Base
-- @~/.claude/rules/ztn.md
+## Zettelkasten (Minder Memory) — Personal Knowledge Base
+- @~/.claude/rules/minder-memory.md
 
 ## Constitution Capture — Global Hook
 - @~/.claude/rules/constitution-capture.md
@@ -259,9 +294,11 @@ elif grep -qF "$BEGIN_MARK" "$CLAUDE_MD"; then
   # `-v block="$(managed_block)"` value is rejected by some awk builds
   # (macOS bwk awk: «awk: newline in string»), which silently no-ops the
   # refresh — so the block is read from a file, never from a var.
+  # Only the first block found is replaced by the fresh one; any later block
+  # (a duplicate an earlier sequence of installs may have left) is dropped.
   managed_block > "$CLAUDE_MD.block"
   if awk -v begin="$BEGIN_MARK" -v end="$END_MARK" -v blockfile="$CLAUDE_MD.block" '
-    $0 == begin { while ((getline line < blockfile) > 0) print line; close(blockfile); skip = 1; next }
+    $0 == begin { if (!done) { while ((getline line < blockfile) > 0) print line; close(blockfile); done = 1 }; skip = 1; next }
     $0 == end   { skip = 0; next }
     !skip       { print }
   ' "$CLAUDE_MD" > "$CLAUDE_MD.tmp"; then
@@ -286,7 +323,7 @@ fi
 OBSIDIAN_SEED="$REPO_ROOT/integrations/obsidian/seed.sh"
 if [ -x "$OBSIDIAN_SEED" ]; then
   log "running Obsidian vault seeder"
-  MINDER_ZTN_BASE="$MINDER_ZTN_BASE" "$OBSIDIAN_SEED" || log "obsidian seed failed (non-fatal)"
+  MINDER_MEMORY_BASE="$MINDER_MEMORY_BASE" "$OBSIDIAN_SEED" || log "obsidian seed failed (non-fatal)"
 fi
 
 cat <<EOF
@@ -294,20 +331,20 @@ cat <<EOF
 [install] done.
 
 Wired into ~/.claude/CLAUDE.md (managed block):
-  - @~/.claude/rules/ztn.md                    (search triggers, decision-check discovery)
+  - @~/.claude/rules/minder-memory.md                    (search triggers, decision-check discovery)
   - @~/.claude/rules/constitution-capture.md   (global capture hook)
   - @~/.claude/rules/communication-baseline.md (universal presentation spine)
   - @~/.claude/rules/advisory-baseline.md      (universal reasoning spine)
   - @~/.claude/rules/constitution-core.md      (axioms / principles / rules)
 
 Obsidian vault config:
-  - Seeded into $MINDER_ZTN_BASE/.obsidian/ if not already present.
-  - Open the vault: Obsidian → Open folder as vault → $MINDER_ZTN_BASE
-  - Start at HOME.md (Cmd+O → "HOME").
+  - Seeded into $MINDER_MEMORY_BASE/.obsidian/ if not already present.
+  - Open the vault: Obsidian → Open folder as vault → $MINDER_MEMORY_BASE
+  - Start at minder-memory.md (Cmd+O → "minder-memory").
   - Reset to engine defaults later: bash integrations/obsidian/seed.sh --force
 
 Restart Claude Code (open a new session) to pick up the rules.
-Re-run this installer any time after a 'git pull' on minder-ztn — it is
+Re-run this installer any time after a 'git pull' on minder-memory — it is
 idempotent and refreshes the managed block in place.
 
 EOF

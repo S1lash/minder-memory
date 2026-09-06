@@ -18,11 +18,11 @@ Symlinks are preserved as symlinks, except under a deref-prefix
 (`.claude/skills/`) where they are dereferenced into real files — git
 symlinks do not survive a Windows clone.
 
-Used by the owner to assemble the public skeleton (`minder-ztn`) from
+Used by the owner to assemble the public skeleton (`minder-memory`) from
 the personal instance.
 
 Usage:
-  scripts/release_engine.py --target /tmp/minder-ztn-skeleton
+  scripts/release_engine.py --target /tmp/minder-memory-skeleton
   scripts/release_engine.py --target /tmp/skeleton --dry-run
 
 Verifies before write:
@@ -111,7 +111,7 @@ def parse_source_ids_from_template(template_path: Path) -> list[str]:
         # placeholder in that row is prose, not an identifier. Taken as one it
         # becomes a real directory in every friend's vault, named with
         # parentheses the whole engine otherwise keeps out of paths. A source
-        # ID is the portable identifier `/ztn:source-add` validates, so
+        # ID is the portable identifier `/minder:mem:source-add` validates, so
         # anything outside that shape is a rendering artifact and not a source.
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", first):
             continue
@@ -136,8 +136,8 @@ def _copy_symlink(src: Path, dst: Path, dry_run: bool, label: Path) -> None:
 # `integrations/claude-code/skills/` in the owner repo (native on macOS/Linux,
 # convenient for the dev loop) — but git symlinks do NOT survive a Windows
 # clone: with `core.symlinks=false` git materialises the symlink blob as a text
-# file containing the target path, so `.claude/skills/ztn-process` becomes a
-# FILE and `.claude/skills/ztn-process/SKILL.md` no longer exists. That breaks
+# file containing the target path, so `.claude/skills/minder-mem-process` becomes a
+# FILE and `.claude/skills/minder-mem-process/SKILL.md` no longer exists. That breaks
 # skill discovery for Cloud Routines and project-CWD sessions on friends'
 # machines. Dereferencing at release time makes the skeleton cross-platform.
 _DEREF_SYMLINK_PREFIXES: tuple[str, ...] = (".claude/skills/",)
@@ -200,7 +200,7 @@ def _copy_deref_symlink(src: Path, dst: Path, dry_run: bool, label: Path) -> int
 # Identity/values proposers are NOT gated here: `cognitive-model` mines private
 # reflections but only APPENDS to the high-recall `principle-candidates.jsonl`
 # review buffer (stamped `origin: agent-lens`, never auto-merged into
-# `0_constitution/` — the owner promotes via `/ztn:lint` F.5). Proposing is safe
+# `0_constitution/` — the owner promotes via `/minder:mem:lint` F.5). Proposing is safe
 # to ship on by default; promotion stays owner-sovereign. So it ships `active`
 # platform-wide.
 #
@@ -508,7 +508,7 @@ def main() -> int:
         print("  git init")
         print("  git add .")
         print('  git commit -m "Initial skeleton release"')
-        print("  gh repo create minder-ztn --public --source=. --remote=origin --push")
+        print("  gh repo create minder-memory --public --source=. --remote=origin --push")
         print("  gh repo edit --enable-issues --enable-projects --template")
 
     return 0

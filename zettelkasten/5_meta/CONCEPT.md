@@ -1,4 +1,4 @@
-# ZTN — Концепция системы управления знаниями
+# Minder Memory — Концепция системы управления знаниями
 
 **Статус:** Архитектурный документ (source of truth)
 
@@ -26,7 +26,7 @@
 
 ## Философия
 
-ZTN — это персональное «второе сознание». Не архив, не TODO-лист, не CRM.
+Minder Memory — это персональное «второе сознание». Не архив, не TODO-лист, не CRM.
 Система, которая *думает вместе с тобой*: запоминает контекст, видит связи между доменами,
 отслеживает эволюцию мышления.
 
@@ -54,7 +54,7 @@ Records обслуживают уровень 1. Knowledge — уровень 2.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         ZTN Architecture                        │
+│                         Minder Memory Architecture                        │
 │                                                                 │
 │  ┌──────────────────┐                                           │
 │  │   RAW SOURCES    │  plaud, dji, superwhisper, apple, claude  │
@@ -213,14 +213,14 @@ Target: ~5-8 `core: true` аксиом — несводимое ядро, из �
 несколько rules. Компрессия обязательна, раздувание ядра = потеря
 «цинической сути».
 
-### Философия «quality-first» vs ZTN capture-first
+### Философия «quality-first» vs Minder Memory capture-first
 
 | Слой | Philosophy | Почему |
 |---|---|---|
-| **ZTN memory** (records, knowledge, hubs) | capture-first | Знание, не записанное = потерянное. Шум отфильтруем позже |
+| **Minder Memory** (records, knowledge, hubs) | capture-first | Знание, не записанное = потерянное. Шум отфильтруем позже |
 | **Constitution** | quality-first | Шум в rules of engagement = агент ведёт себя не как owner. Лучше миссануть, чем испортить ядро |
 
-Это различие проявляется в infrastructure: capture в ZTN широкий, в
+Это различие проявляется в infrastructure: capture в Minder Memory широкий, в
 constitution — 4 узких trigger + 5 anti-trigger.
 
 ### Как конституция подключается к существующим пайплайнам
@@ -236,19 +236,19 @@ constitution — 4 узких trigger + 5 anti-trigger.
                  │
                  │ SOUL загружается во ВСЕ три пайплайна
                  ▼
-       /ztn:process /maintain /lint  ─── видят Values как часть system-prompt
+       /minder:mem:process /maintain /lint  ─── видят Values как часть system-prompt
 
        /check-decision — читает полное дерево по запросу (Opus reasoning)
-       /ztn:capture-candidate — фоновый capture наблюдений в buffer
+       /minder:mem:capture-candidate — фоновый capture наблюдений в buffer
 ```
 
 Правило единое: **любой пайплайн, читающий derived view, первым шагом
-зовёт `/ztn:regen-constitution`** (Architecture C). Это убирает
+зовёт `/minder:mem:regen-constitution`** (Architecture C). Это убирает
 «иногда auto, иногда руками» — один триггер, одно место.
 
 ### Ключевые решения
 
-1. **Source of truth в ZTN, не в model.** Constitution — markdown-файлы,
+1. **Source of truth в Minder Memory, не в model.** Constitution — markdown-файлы,
    не промпты. Переезд на новую модель ничего не ломает.
 2. **Scripts без LLM.** Фильтрация, рендер, архивирование, compaction —
    Python + PyYAML. Детерминизм важнее «умного». LLM зарезервирован для
@@ -269,7 +269,7 @@ constitution — 4 узких trigger + 5 anti-trigger.
   frontmatter, enum списки, резолюция конфликтов, writeability matrix,
   design rationale.
 - **Скрипты:** `_system/scripts/README.md`.
-- **Skills:** `~/.claude/skills/ztn-{regen-constitution,check-decision,capture-candidate}/`.
+- **Skills:** `~/.claude/skills/minder-mem-{regen-constitution,check-decision,capture-candidate}/`.
 
 ---
 
@@ -305,12 +305,12 @@ stripped). Spec: `_system/registries/CONCEPT_NAMING.md`.
 **Type enum** (lowercase, в манифесте только): `theme`, `tool`,
 `decision`, `idea`, `event`, `organization`, `skill`, `location`,
 `emotion`, `goal`, `value`, `preference`, `constraint`, `algorithm`,
-`fact`, `other`. `person` и `project` зарезервированы спецой, но ZTN
+`fact`, `other`. `person` и `project` зарезервированы спецой, но Minder Memory
 их в `concepts.upserts[]` не эмитит — они first-class через
 `tier1_objects.{people,projects}`.
 
 **Translation contract**: non-English source terms ОБЯЗАТЕЛЬНО
-переводятся семантически в `/ztn:process` Q15 ДО эмиссии. Никогда
+переводятся семантически в `/minder:mem:process` Q15 ДО эмиссии. Никогда
 не транслитерируются (раскалывает identity графа). Untranslatable
 terms — silent drop (теряем mention, но сохраняем граф stable).
 
@@ -367,8 +367,8 @@ surface-don't-decide правило.
   downstream здесь не называется.
 - **Helpers:** `_system/scripts/_common.py` (normalize_concept_name,
   normalize_audience_tag, recompute_hub_trio).
-- **Producer-side:** `/ztn:process` Step 3.4 Q15/Q16 + Step 4.7.
-- **Post-write defence-in-depth:** `/ztn:lint` Scan A.7 +
+- **Producer-side:** `/minder:mem:process` Step 3.4 Q15/Q16 + Step 4.7.
+- **Post-write defence-in-depth:** `/minder:mem:lint` Scan A.7 +
   `lint_concept_audit.py`.
 - **Manifest emitter:** `emit_batch_manifest.py`.
 
@@ -524,9 +524,9 @@ tags:
 
 ### log_process.md — хронологический лог операций
 
-Каждый запуск `/ztn:process` создаёт запись в `_system/state/log_process.md`
-(параллельные лог-файлы: `log_maintenance.md` для `/ztn:maintain` +
-`/ztn:bootstrap`, `log_lint.md` для `/ztn:lint`):
+Каждый запуск `/minder:mem:process` создаёт запись в `_system/state/log_process.md`
+(параллельные лог-файлы: `log_maintenance.md` для `/minder:mem:maintain` +
+`/minder:mem:bootstrap`, `log_lint.md` для `/minder:mem:lint`):
 
 ```markdown
 ## 2026-03-30 — Processing Run
@@ -575,7 +575,7 @@ who decided, scope (final/tentative), supersedes. Implicit consensus detection �
 ## Обработка транскриптов
 
 > **Примечание:** Нумерация шагов ниже — концептуальная (для объяснения архитектуры).
-> Точная нумерация executable pipeline: SKILL.md (`/ztn:process`), Steps 0-6.
+> Точная нумерация executable pipeline: SKILL.md (`/minder:mem:process`), Steps 0-6.
 
 ### Процесс детерминирован. Суждения — нет.
 
@@ -618,7 +618,7 @@ Opus-level LLM справляется с этими нюансами лучше,
                     │  1. LOAD CONTEXT    │
                     │  registries, hubs,  │
                     │  related notes,     │
-                    │  existing ZTN       │
+                    │  existing Minder Memory       │
                     │  knowledge (ADR-017)│
                     └─────────┬───────────┘
                               │
@@ -721,7 +721,7 @@ People Resolution Map — живой и мутабельный: новые лю�
 3. **Related notes:** если транскрипт упоминает проект/человека — загружаем
    последние 2-3 заметки по этой теме для контекста эволюции
 4. **PROCESSED.md** — чтобы не обработать дважды
-5. **Existing ZTN knowledge** (ADR-017) — релевантные knowledge notes и hubs,
+5. **Existing Minder Memory knowledge** (ADR-017) — релевантные knowledge notes и hubs,
    чтобы LLM мог отличить *новый* инсайт от *повторения* уже известного
 
 **Зачем:** Контекст позволяет LLM определить: это *новый* инсайт или *развитие*
@@ -1056,7 +1056,7 @@ tags:
 
 ## Query → Compound паттерн
 
-Когда пользователь задаёт вопрос по ZTN, и ответ требует синтеза из нескольких заметок,
+Когда пользователь задаёт вопрос по Minder Memory, и ответ требует синтеза из нескольких заметок,
 результат может быть *сохранён обратно* в систему как новая knowledge note или hub.
 
 ```
@@ -1136,13 +1136,13 @@ LLM применяет коррекции, обновляя заметки, пр
 
 ## Генерализация
 
-ZTN спроектирован для одного пользователя, но архитектура допускает *калибровку*.
+Minder Memory спроектирован для одного пользователя, но архитектура допускает *калибровку*.
 
 ### Три уровня adoption
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Level 3: Full ZTN                                           │
+│ Level 3: Full Minder Memory                                           │
 │ Records + Knowledge + Hubs                                  │
 │ Для: knowledge worker, лидер с множеством контекстов        │
 │ "Второе сознание": синтез, эволюция, cross-domain           │
@@ -1189,7 +1189,7 @@ ADR-027: контекст, решение, рассмотренные альте
 
 ## Интеллектуальное наследие
 
-ZTN стоит на плечах нескольких систем и мыслителей:
+Minder Memory стоит на плечах нескольких систем и мыслителей:
 
 ### Niklas Luhmann — Zettelkasten (1951-1997)
 
@@ -1297,7 +1297,7 @@ Wikilinks = explicit, deliberate connections. Embeddings = latent, discovered co
 
 1. **Surface catalog (INDEX.md)** — `_system/views/INDEX.md`, авто-
    генерируется `_system/scripts/render_index.py` (запускается
-   `/ztn:maintain` Step 7.6 + доступен напрямую). Покрывает knowledge
+   `/minder:mem:maintain` Step 7.6 + доступен напрямую). Покрывает knowledge
    (`1_projects` / `2_areas` / `3_resources`) + archive (`4_archive/`,
    маркер `[archived]`) + constitution (`0_constitution/{axiom,principle,
    rule}/`, маркер `tier N`) + hubs (`5_meta/mocs/`). Faceted by PARA

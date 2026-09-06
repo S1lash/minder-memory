@@ -1,16 +1,16 @@
-You are running the autonomous daily tick of `/ztn:roles`. There is no human in
+You are running the autonomous daily tick of `/minder:mem:roles`. There is no human in
 this loop. The contract below is load-bearing.
 
 ## Invocation contract (read first)
 
-The ZTN skills in this prompt — `/ztn:sync-data`, `/ztn:roles` — are invoked
+The Minder Memory skills in this prompt — `/minder:mem:sync-data`, `/minder:mem:roles` — are invoked
 **as slash commands in this same conversation**. Skills are committed to the
 cloned repo at `.claude/skills/<name>/SKILL.md`, so the runtime loads them
 automatically — write the slash command literally as the next action and it
 executes. Step 0 verifies this layout resolved in the clone before any slash
 invocation.
 
-`/ztn:roles` acquires `.roles.lock`, asks the CLI which roles are due, and runs
+`/minder:mem:roles` acquires `.roles.lock`, asks the CLI which roles are due, and runs
 each one **sequentially** as a subagent bounded by its own `timeout_seconds`.
 After every run — success, error, timeout or crash alike — it checks what that
 role touched against its declared `writes:`, reverts what is out of zone, and
@@ -18,23 +18,23 @@ appends one line to `_system/roles/{id}/log.jsonl`.
 
 **Single-commit guarantee.** This tick delivers **exactly one commit to
 `origin/main`**, through `bash scripts/scheduler/finalize-tick.sh` at Step 5.
-`/ztn:roles` makes a local commit per role, each marked `[scheduled]`, so a
+`/minder:mem:roles` makes a local commit per role, each marked `[scheduled]`, so a
 role's work is durable before the next one starts; Step 5 folds all of them into
 the single delivered commit. No other path in this prompt commits or pushes.
-`/ztn:save` is **forbidden** in scheduler ticks. Any intermediate `git commit`,
+`/minder:mem:save` is **forbidden** in scheduler ticks. Any intermediate `git commit`,
 `git push`, or `git add` outside the helper scripts listed below is a contract
 violation.
 
 **Hard prohibitions:**
 
-- Do NOT invoke `/ztn:save` in any form. Use `finalize-tick.sh` at Step 5.
+- Do NOT invoke `/minder:mem:save` in any form. Use `finalize-tick.sh` at Step 5.
 - Do NOT call `git commit`, `git push`, `git add` directly outside the
-  listed helper scripts and `/ztn:roles`'s own per-role commits. **One explicit
+  listed helper scripts and `/minder:mem:roles`'s own per-role commits. **One explicit
   exception:** Step 5b (MCP delivery fallback, runs only when finalize-tick
   reports `gh CLI not found in PATH`) uses one direct
   `git push origin "HEAD:<sandbox>"` per its strict per-step instructions. No
   other direct git/gh calls are authorized.
-- Do NOT open `integrations/claude-code/skills/ztn-*/SKILL.md` and
+- Do NOT open `integrations/claude-code/skills/minder-mem-*/SKILL.md` and
   re-implement its steps with Bash / Read / Edit. Skills are loaded by the
   runtime — invoke via slash, never re-execute.
 - Do NOT run a role yourself, and do NOT use the Agent / Task tool as a
@@ -42,7 +42,7 @@ violation.
   is preserved; the scheduler contract does not govern it.
 - Do NOT read, print or echo any credential — not the encrypted store at
   `_system/state/secrets.enc.json`, not the decrypted file the tick materialises
-  outside the repository, and not `ZTN_ROLES_KEY` itself. Roles load the decrypted
+  outside the repository, and not `MINDER_MEMORY_ROLES_KEY` itself. Roles load the decrypted
   file inside their own shell; nothing in this tick needs its contents, and
   anything echoed lands in the tick log, which is committed.
 - Do NOT run any history-rewriting or work-discarding git command directly:
@@ -87,7 +87,7 @@ Then exit `partial` immediately.
 ## Steps
 
 0. `bash scripts/scheduler/ensure-skills.sh` — verify the project-level
-   ZTN skills resolve at `.claude/skills/<name>/SKILL.md` before any slash
+   Minder Memory skills resolve at `.claude/skills/<name>/SKILL.md` before any slash
    invocation. This is the #1 cause of a tick dying at its first step: a
    clone where git symlinks did not survive (e.g. a Windows commit with
    `core.symlinks=false` materialises them as text files). On non-zero
@@ -97,7 +97,7 @@ Then exit `partial` immediately.
    cannot persist. Run failure-handling with cause
    `"skills unresolvable in this clone — apply the CHANGELOG 0.41.0 recovery, then re-run"`
    and exit `partial`. The durable fix is real-file skills delivered via
-   the skeleton + `/ztn:update`, not an in-tick repair.
+   the skeleton + `/minder:mem:update`, not an in-tick repair.
 
 1. `bash scripts/scheduler/pin-main.sh` — get on fresh `origin/main`,
    capture the starting sandbox branch, and best-effort recover any
@@ -105,11 +105,11 @@ Then exit `partial` immediately.
 
 2. `bash scripts/scheduler/lock-check.sh` — abort if any pipeline lock
    (process / maintain / lint / agent-lens / content / resolve / roles) is recent
-   (<2h). Stale locks (>2h) are removed automatically. (`/ztn:roles` acquires
+   (<2h). Stale locks (>2h) are removed automatically. (`/minder:mem:roles` acquires
    `.roles.lock` itself during Step 4 — this pre-check only guards against a
    concurrent pipeline run, including a crashed prior roles tick.)
 
-3. `/ztn:sync-data` — safe `git pull --rebase` with conflict-refuse
+3. `/minder:mem:sync-data` — safe `git pull --rebase` with conflict-refuse
    semantics.
    - Returns "blocked" / non-zero → run failure-handling with cause
      `"sync-data blocked, owner action needed"`, exit `sync-blocked`.
@@ -134,30 +134,30 @@ Then exit `partial` immediately.
    right matters most.
    - **Exit 0 and exit 3 are both fine — do NOT run failure-handling for
      either.** Exit 3 means the store still cannot be opened, and the tick
-     already has a path for that: `/ztn:roles` reports
+     already has a path for that: `/minder:mem:roles` reports
      `role-secrets-unavailable`, skips only the roles that declare a
      credential, and runs the rest. Aborting there would turn a partial
      degradation into a total one.
    - **Any OTHER exit code is a real problem and is reported.** Exit 2 is «more
-     than one ZTN base in this repository»; a missing script exits 127 and means
+     than one Minder Memory base in this repository»; a missing script exits 127 and means
      the clone is short a file — a half-applied update. Neither is advisory, and
      neither produces a signal anywhere else, so run failure-handling with the
      step's own stderr as the cause and exit `partial`. A blanket amnesty here
      was the only one in the whole prompt family, and it swallowed exactly the
      two conditions nothing downstream would catch.
 
-4. `/ztn:roles` — exactly ONE invocation. Runs every due role sequentially:
+4. `/minder:mem:roles` — exactly ONE invocation. Runs every due role sequentially:
    checks each one's diff, logs its run, and commits that role's own paths
    before dispatching the next. Roles with no cadence due, and roles that
    error, are both normal outcomes.
    - On skill-level error (lock held, CLI unusable) → run failure-handling,
      exit `partial`.
    - **`agent-missing` is a skill-level error with one known cause**: the
-     runtime cannot resolve the `ztn-role` subagent, so no role can be
-     dispatched at all. It means the clone's `.claude/agents/ztn-role.md` did
+     runtime cannot resolve the `minder-mem-role` subagent, so no role can be
+     dispatched at all. It means the clone's `.claude/agents/minder-mem-role.md` did
      not survive (the same Windows symlink hazard Step 0 guards for skills), or
      an outdated `install.sh` never linked it. Run failure-handling with cause
-     `"ztn-role agent unresolvable in this clone — re-run install.sh, then re-run"`
+     `"minder-mem-role agent unresolvable in this clone — re-run install.sh, then re-run"`
      and exit `partial`. Do not substitute a general-purpose agent: a foreign
      system prompt wrapped around the run frame is a different creature with the
      same shell.
@@ -260,17 +260,17 @@ Then exit `partial` immediately.
 
 ## Forbidden in this tick
 
-- `/ztn:process`, `/ztn:lint`, `/ztn:agent-lens`, `/ztn:content` — separate
+- `/minder:mem:process`, `/minder:mem:lint`, `/minder:mem:agent-lens`, `/minder:mem:content` — separate
   schedules, and every one of them aborts on `.roles.lock` anyway
-- `/ztn:role:add`, `/ztn:role:edit` — role creation and editing are owner-driven
+- `/minder:mem:role:add`, `/minder:mem:role:edit` — role creation and editing are owner-driven
   conversations, never autonomous
-- `/ztn:resolve-clarifications` — owner-only interactive; auto-mode is
+- `/minder:mem:resolve-clarifications` — owner-only interactive; auto-mode is
   dispatched only by lint Step 7.5, never from roles
-- `/ztn:save` in any form (owner-interactive only — scheduler uses
+- `/minder:mem:save` in any form (owner-interactive only — scheduler uses
   `finalize-tick.sh`)
-- `/ztn:update` — engine sync is owner-only
+- `/minder:mem:update` — engine sync is owner-only
 - direct `git commit`, `git push`, `git add` outside helper scripts and
-  `/ztn:roles`'s own per-role commits
+  `/minder:mem:roles`'s own per-role commits
 - `git push --force` of any kind
 - creating a feature branch, worktree, or PR
 - leaving any non-`main` branch behind on completion

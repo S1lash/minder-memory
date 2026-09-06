@@ -1,7 +1,7 @@
 # Skeleton extraction manifest.
 #
 # Single source of truth for which paths leave this personal instance and
-# land in the public skeleton (`minder-ztn`).
+# land in the public skeleton (`minder-memory`).
 #
 # Categories:
 #   engine    — synced upstream-to-downstream as engine updates land.
@@ -42,7 +42,7 @@ engine:
   - integrations/claude-code/uninstall.sh
   - integrations/claude-code/scheduler-prompts/
   - integrations/claude-code/SETUP_PROMPT.md
-  - integrations/minder-ztn-mcp/
+  - integrations/minder-memory-mcp/
 
   # Obsidian vault config seed — `vault-config/` ships canonical
   # `.obsidian/` defaults; `seed.sh` is invoked by Claude install.sh and
@@ -72,9 +72,9 @@ engine:
   - zettelkasten/_system/state/batches/README.md
 
   # Onboarding profile seed — pristine template shipped VERBATIM (keeps
-  # the `.template.md` suffix, so /ztn:process never ingests it via the
+  # the `.template.md` suffix, so /minder:mem:process never ingests it via the
   # engine-wide `*.template.md` exclusion). Friends copy it to PROFILE.md
-  # in the same folder and fill the copy; /ztn:bootstrap reads the filled
+  # in the same folder and fill the copy; /minder:mem:bootstrap reads the filled
   # profile as PRIMARY source for SOUL.md and moves consumed files to
   # _sources/processed/describe-me/. Listed under engine (not template)
   # so spec updates to the template keep syncing.
@@ -123,7 +123,7 @@ engine:
   - zettelkasten/5_meta/PROCESSING_PRINCIPLES.md
   - zettelkasten/5_meta/templates/
 
-  # Constitution starter pack (opt-in via /ztn:bootstrap --with-starter-axioms)
+  # Constitution starter pack (opt-in via /minder:mem:bootstrap --with-starter-axioms)
   - zettelkasten/5_meta/starter-pack/
 
   # Engine quick-reference docs
@@ -166,11 +166,11 @@ engine:
   # all. The symlinks exist for the dev loop here; the skeleton gets files.
   - .claude/skills/
 
-  # Subagent definition spawned by the `/ztn:roles` tick for each due role.
+  # Subagent definition spawned by the `/minder:mem:roles` tick for each due role.
   # Listed as a single file, not a directory: `.claude/agents/` is also where
   # an owner drops their own personal agents, and a directory entry would ship
   # those upstream. A second engine agent gains a line here.
-  - .claude/agents/ztn-role.md
+  - .claude/agents/minder-mem-role.md
 
   # The repo-local contract a coding agent reads first. Claude Code reads
   # `.claude/CLAUDE.md`; every other runtime reads this one, so shipping only
@@ -186,6 +186,7 @@ engine:
   - docs/obsidian.md
   - docs/privacy.md
   - docs/CHANGELOG.md
+  - docs/upgrade-1.0.0.md
 
 # --- Seed contract (three conventions, made explicit so nothing drifts) ---
 # Every seed file is EXACTLY one of three kinds. The kind is DECLARED, never
@@ -228,7 +229,7 @@ template:
   - zettelkasten/_system/registries/SOURCES.template.md
   # AUDIENCES ships as template (not engine) because the file carries
   # both spec sections AND an owner-mutable Extensions table. Spec
-  # updates flow via /ztn:update or manual diff; sync_engine.sh skips
+  # updates flow via /minder:mem:update or manual diff; sync_engine.sh skips
   # templates so owner extensions are never wiped.
   - zettelkasten/_system/registries/AUDIENCES.template.md
   # DOMAINS ships as template — same rationale as AUDIENCES (spec sections
@@ -248,11 +249,11 @@ template:
   - zettelkasten/_system/state/log_process.template.md
   - zettelkasten/_system/state/log_lint.template.md
   # insights-config seeds the smart-resolve engine driven by
-  # /ztn:resolve-clarifications. Ships under .template; resolver copies
+  # /minder:mem:resolve-clarifications. Ships under .template; resolver copies
   # to live path on first run when missing. Owner-mutable thereafter.
   - zettelkasten/_system/state/insights-config.yaml.template
   # Content pipeline ledger — the only new content-pipeline state. Seeds
-  # empty; /ztn:content --maintain populates `drafts` on first run.
+  # empty; /minder:mem:content --maintain populates `drafts` on first run.
   - zettelkasten/_system/state/content-pipeline-state.template.json
 
   # NOTE: the metric-day threshold/lexicon YAMLs are NOT seeded here.
@@ -264,18 +265,18 @@ template:
   # leak). The plain `{base}.yaml` is an engine-managed baseline mirror,
   # gate-enforced byte-identical to its `.template.yaml` sibling — never a
   # template seed, so it is not listed here (avoids the template↔engine
-  # double-listing that would let /ztn:update silently overwrite it).
+  # double-listing that would let /minder:mem:update silently overwrite it).
 
   # Views (auto-generated, but file must exist for skills to write)
   - zettelkasten/_system/views/CURRENT_CONTEXT.template.md
   - zettelkasten/_system/views/HUB_INDEX.template.md
   - zettelkasten/_system/views/INDEX.template.md
   - zettelkasten/_system/views/CONTENT_MAP.template.md
-  # Stub so installer symlink resolves before first /ztn:regen-constitution
+  # Stub so installer symlink resolves before first /minder:mem:regen-constitution
   - zettelkasten/_system/views/constitution-core.template.md
 
   # Cognitive-model hub seed. Ships the empty axis scaffold; on the
-  # friend's first /ztn:maintain, render_cognitive_model_hub.py backfills
+  # friend's first /minder:mem:maintain, render_cognitive_model_hub.py backfills
   # it from THEIR own tagged principles. The live owner hub
   # (5_meta/mocs/hub-cognitive-model.md) is owner-data — never shipped
   # (the whole 5_meta/mocs/ dir is excluded; only this template uploads).
@@ -289,9 +290,9 @@ template:
 # kept, NOT stripped — because the owning skill materialises the live file on
 # first run when it is missing. Format: `<template-path>  # skill: <skill>`.
 seed_skill:
-  # ztn-resolve-clarifications copies → insights-config.yaml on first resolve run
+  # minder-mem-resolve-clarifications copies → insights-config.yaml on first resolve run
   - zettelkasten/_system/state/insights-config.yaml.template
-  # ztn-content copies → content-pipeline-state.json on first --maintain run
+  # minder-mem-content copies → content-pipeline-state.json on first --maintain run
   - zettelkasten/_system/state/content-pipeline-state.template.json
 
 
@@ -332,9 +333,9 @@ exclude:
   - zettelkasten/_system/registries/SOURCES.md
   - zettelkasten/_system/registries/AUDIENCES.md
   - zettelkasten/_system/registries/DOMAINS.md
-  # CONCEPTS.md is auto-generated by /ztn:maintain Step 4.5 from each
+  # CONCEPTS.md is auto-generated by /minder:mem:maintain Step 4.5 from each
   # tenant's corpus; no template ships — friends populate via their
-  # own /ztn:maintain runs.
+  # own /minder:mem:maintain runs.
   - zettelkasten/_system/registries/CONCEPTS.md
 
   # Runtime state
@@ -346,13 +347,16 @@ exclude:
   # `.obsidian.backup-*` directories are created by `seed.sh --force`.
   - zettelkasten/.obsidian/
   - zettelkasten/.obsidian.backup-
+  # The dashboard under its current name and its two former ones — a clone
+  # that has not yet renamed it must not ship it either.
+  - zettelkasten/minder-memory.md
   - zettelkasten/minder-ztn.md
   - zettelkasten/HOME.md
   # Help docs rendered into the vault by integrations/obsidian/seed.sh.
   # Engine source lives in `integrations/obsidian/{guide,views}.md` and
   # `docs/{privacy,CHANGELOG}.md`. Excluded because a clone must never ship
   # ANOTHER instance's vault — not because the copies are owner content. They
-  # are DERIVED: regenerated on every seeder run and by `/ztn:update`
+  # are DERIVED: regenerated on every seeder run and by `/minder:mem:update`
   # Step 6.5, and a hand edit in them is undone by the next run. Calling them
   # owner-data is what once froze them at install time.
   - zettelkasten/5_meta/help/
@@ -403,6 +407,9 @@ exclude:
   # name mentioned only in prose, never in a PEOPLE.md row).
 
 
+# minder-memory-rebrand: keep-legacy-tokens — the rows under retired: name paths
+# the engine deleted; a former name there is the point, and the rename map must
+# not turn a retirement into a live path.
 retired:
   # Both recorders in this engine were once called simply "telemetry" — one
   # for a tick's token consumption, one for a check-decision run. A reader had
@@ -517,6 +524,113 @@ retired:
   - zettelkasten/_system/registries/TOOLS.template.md
 
   # The MCP integration under its former name. It ships now as
-  # `integrations/minder-ztn-mcp/`; the old directory left behind is a second
+  # `integrations/minder-memory-mcp/`; the old directory left behind is a second
   # copy of instructions that no longer match the tool.
   - integrations/claude-mcp
+
+  # The product is Minder Memory (engine 1.0.0). Every artifact that carried
+  # the former name moved: the twenty skills (`ztn-<name>` → `minder-mem-<name>`),
+  # the two commands (now `commands/minder/mem/<name>.md`), the hot rule, the
+  # role agent, the MCP integration guide, the Obsidian dashboard seed and its
+  # two CSS snippets. A clone keeps the old copies beside the new ones without
+  # these rows — two skills answering one purpose, a rule file nothing imports.
+  - .claude/skills/ztn-agent-lens
+  - .claude/skills/ztn-agent-lens-add
+  - .claude/skills/ztn-bootstrap
+  - .claude/skills/ztn-capture-candidate
+  - .claude/skills/ztn-check-decision
+  - .claude/skills/ztn-content
+  - .claude/skills/ztn-lint
+  - .claude/skills/ztn-maintain
+  - .claude/skills/ztn-process
+  - .claude/skills/ztn-regen-constitution
+  - .claude/skills/ztn-resolve-clarifications
+  - .claude/skills/ztn-role-add
+  - .claude/skills/ztn-role-ask
+  - .claude/skills/ztn-role-edit
+  - .claude/skills/ztn-role-list
+  - .claude/skills/ztn-roles
+  - .claude/skills/ztn-save
+  - .claude/skills/ztn-source-add
+  - .claude/skills/ztn-sync-data
+  - .claude/skills/ztn-update
+  - integrations/claude-code/skills/ztn-agent-lens
+  - integrations/claude-code/skills/ztn-agent-lens-add
+  - integrations/claude-code/skills/ztn-bootstrap
+  - integrations/claude-code/skills/ztn-capture-candidate
+  - integrations/claude-code/skills/ztn-check-decision
+  - integrations/claude-code/skills/ztn-content
+  - integrations/claude-code/skills/ztn-lint
+  - integrations/claude-code/skills/ztn-maintain
+  - integrations/claude-code/skills/ztn-process
+  - integrations/claude-code/skills/ztn-regen-constitution
+  - integrations/claude-code/skills/ztn-resolve-clarifications
+  - integrations/claude-code/skills/ztn-role-add
+  - integrations/claude-code/skills/ztn-role-ask
+  - integrations/claude-code/skills/ztn-role-edit
+  - integrations/claude-code/skills/ztn-role-list
+  - integrations/claude-code/skills/ztn-roles
+  - integrations/claude-code/skills/ztn-save
+  - integrations/claude-code/skills/ztn-source-add
+  - integrations/claude-code/skills/ztn-sync-data
+  - integrations/claude-code/skills/ztn-update
+  - integrations/claude-code/commands/ztn-recap.md
+  - integrations/claude-code/commands/ztn-search.md
+  - integrations/claude-code/rules/ztn.md
+  - .claude/agents/ztn-role.md
+  - integrations/minder-ztn-mcp
+  - integrations/obsidian/minder-ztn.template.md
+  - integrations/obsidian/vault-config/snippets/ztn-hide-engine-paths.css
+  - integrations/obsidian/vault-config/snippets/ztn-note-types.css
+  - zettelkasten/5_skills/ztn-agent-lens-add.md
+  - zettelkasten/5_skills/ztn-agent-lens.md
+  - zettelkasten/5_skills/ztn-process.md
+  - zettelkasten/5_skills/ztn-role-add.md
+  - zettelkasten/5_skills/ztn-role-ask.md
+  - zettelkasten/5_skills/ztn-role-edit.md
+  - zettelkasten/5_skills/ztn-role-list.md
+  - zettelkasten/5_skills/ztn-roles.md
+  # 1.0.0 — removed with the executed migration chain (002–030) and the single-spelling manifest contract
+  - zettelkasten/_system/scripts/tests/test_migrations.py
+  - zettelkasten/_system/docs/manifest-schema/fixtures/process-legacy-processor.json
+  # 1.0.0 — the executed migration chain 002–030 and its helpers; a clone below 0.69.0 updates via release/0.69.0 first (scripts/lib/version_floor.py)
+  - scripts/migrations/_018_handoff.py
+  - scripts/migrations/_018_memory.py
+  - scripts/migrations/_018_plan.py
+  - scripts/migrations/_018_selfcheck.py
+  - scripts/migrations/_023_owner_persona.py
+  - scripts/migrations/_024_retirement_schema.py
+  - scripts/migrations/_025_identity_report.py
+  - scripts/migrations/_027_starter_axiom_audit.py
+  - scripts/migrations/_028_decision_runs_backfill.py
+  - scripts/migrations/_030_seed_orphan_baseline.py
+  - scripts/migrations/_identity_migration_lib.py
+  - scripts/migrations/002-sources-family-column.sh
+  - scripts/migrations/003-lens-precedent-pre-biometric-mark.sh
+  - scripts/migrations/004-scheduler-single-commit-protocol.sh
+  - scripts/migrations/005-scheduler-pr-merge-delivery.sh
+  - scripts/migrations/006-describe-me-top-level-source.sh
+  - scripts/migrations/007-backfill-manifest-conformance.sh
+  - scripts/migrations/008-content-skill-rename.sh
+  - scripts/migrations/009-biometric-per-source-namespace.sh
+  - scripts/migrations/010-cognitive-model-hub-seed.sh
+  - scripts/migrations/011-backfill-task-aggregation.sh
+  - scripts/migrations/012-backfill-calendar-aggregation.sh
+  - scripts/migrations/013-hub-index-completeness.sh
+  - scripts/migrations/014-repair-evidence-trail-fence.sh
+  - scripts/migrations/015-cognitive-model-activate.sh
+  - scripts/migrations/016-roles-subsystem-removed.sh
+  - scripts/migrations/017-roles-subsystem-returns.sh
+  - scripts/migrations/018-roles-previous-shape-handoff.sh
+  - scripts/migrations/019-portability-repair.sh
+  - scripts/migrations/020-roles-previous-shape-memory.sh
+  - scripts/migrations/021-maintain-step-and-prompt-loader.sh
+  - scripts/migrations/022-retire-old-roles-log.sh
+  - scripts/migrations/023-owner-persona.sh
+  - scripts/migrations/024-retirement-schema.sh
+  - scripts/migrations/025-identity-report.sh
+  - scripts/migrations/026-advisory-baseline-wiring.sh
+  - scripts/migrations/027-starter-axiom-hot-audit.sh
+  - scripts/migrations/028-decision-runs-format-version.sh
+  - scripts/migrations/029-refresh-vault-help.sh
+  - scripts/migrations/030-seed-orphan-baseline.sh

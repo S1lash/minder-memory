@@ -1,10 +1,10 @@
-# minder-ztn
+# minder-memory
 
 > **Your second consciousness.** Voice in, structured memory out.
 > Self-hosted, privacy-first, lives in your git repo.
 
 A personal knowledge system that thinks alongside you. You speak,
-record, journal — minder-ztn ingests it, files it into structured
+record, journal — minder-memory ingests it, files it into structured
 records, distills patterns into knowledge, and surfaces what you'd
 otherwise miss: stalled threads, drift between your stated values
 and actual behaviour, cross-domain connections that re-shape how
@@ -26,20 +26,20 @@ Three things make it different from a notes app:
 
 ## What it looks like
 
-**Daily.** Open the Obsidian vault. Your dashboard (`minder-ztn.md`) shows
+**Daily.** Open the Obsidian vault. Your dashboard (`minder-memory.md`) shows
 focus snapshot, open threads, today's clarifications, recent meetings
 and observations, active projects, people you track. Click into any
 record — local graph reveals who, what, when, and which principles
 were in play.
 
 **Capture.** Speak. Drop a transcript into the inbox. Run
-`/ztn:process` from Claude Code. The engine slots it into records,
+`/minder:mem:process` from Claude Code. The engine slots it into records,
 links the right people and projects, captures principle candidates,
 opens follow-up threads — overnight if you want, autonomously.
 
 **Reflect.** Switch to a graph preset — *People web*, *Decision
 lineage*, *Project landscape*. See your week as a network. Run
-`/ztn:lint` (nightly by default) to surface drift. Resolve
+`/minder:mem:lint` (nightly by default) to surface drift. Resolve
 clarifications when convenient.
 
 **Distill.** When a record-level capture matures into knowledge, it
@@ -50,17 +50,17 @@ are owner-gated; the engine never silently elevates.
 ## Quickstart (10 minutes)
 
 ```bash
-# 1. Create your own ZTN repo from this template
-#    Replace <maintainer>/minder-ztn with this repo's own URL
-gh repo create my-ztn --template <maintainer>/minder-ztn --private --clone
-cd my-ztn
+# 1. Create your own Minder Memory repo from this template
+#    Replace <maintainer>/minder-memory with this repo's own URL
+gh repo create my-minder-memory --template <maintainer>/minder-memory --private --clone
+cd my-minder-memory
 
 # 2. Install the Claude Code integration + Obsidian vault config
 bash integrations/claude-code/install.sh
 
 # 3. Open Claude Code in the repo and run:
-#    /ztn:bootstrap
-#    /ztn:resolve-clarifications
+#    /minder:mem:bootstrap
+#    /minder:mem:resolve-clarifications
 
 # 4. Open Obsidian → Open folder as vault → zettelkasten/
 #    Install three community plugins (Dataview, Tasks, Front Matter
@@ -69,9 +69,9 @@ bash integrations/claude-code/install.sh
 
 That's the whole setup. From here, the daily flow is:
 
-- `/ztn:process` — voice transcripts in `_sources/inbox/` → records
-- `/ztn:lint` — nightly drift detection (auto-scheduled)
-- `/ztn:agent-lens` — outside-view observations (auto-scheduled)
+- `/minder:mem:process` — voice transcripts in `_sources/inbox/` → records
+- `/minder:mem:lint` — nightly drift detection (auto-scheduled)
+- `/minder:mem:agent-lens` — outside-view observations (auto-scheduled)
 - Open the Obsidian vault for orientation, review, and reading
 
 Full walkthrough: `docs/onboarding.md`.
@@ -89,12 +89,12 @@ Daily use manual (hotkeys, graph presets, recipes):
 - **Pipeline scripts** (`zettelkasten/_system/scripts/`) — Python
   workers behind the skills (constitution regen, evidence-trail
   compactor, candidate buffers, format autofix, manifest emission).
-- **Sync tooling** (`scripts/sync_engine.sh`, `/ztn:update`) — pull
+- **Sync tooling** (`scripts/sync_engine.sh`, `/minder:mem:update`) — pull
   engine updates without touching your data.
 
 ## Run it on a schedule
 
-Five engine-shipped scheduler prompts make ZTN largely autonomous:
+Five engine-shipped scheduler prompts make Minder Memory largely autonomous:
 
 | Prompt | Cadence | What it does |
 |---|---|---|
@@ -114,7 +114,7 @@ what stays local — `docs/privacy.md`.
 
 ## Updates
 
-Pull engine improvements with `/ztn:update` (interactive Claude
+Pull engine improvements with `/minder:mem:update` (interactive Claude
 skill) or `scripts/sync_engine.sh` (CI / power users). Your records,
 constitution, and registries are never touched by updates. Release
 notes: `docs/CHANGELOG.md`.

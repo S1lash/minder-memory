@@ -159,7 +159,7 @@ class RolesCliTestCase(unittest.TestCase):
     `tick-begin` / `role-begin` write snapshots under a per-tick directory in
     the OS temp dir (§7). The tick removes it in wave 2 — but the SUITE must
     not rely on wave 2 to stay clean, or every run silently accretes a
-    `ztn-roles-*` directory and a later run could read stale state from one.
+    `minder-mem-roles-*` directory and a later run could read stale state from one.
 
     Two layers, and the first is what matters:
 
@@ -1905,7 +1905,7 @@ class AnchorNoteShapeTests(RolesCliTestCase):
 
     The behavioural tests above are deliberately shape-agnostic and stay that
     way; these exist so the contract a consumer reads — the concierge's
-    preflight gate, `/ztn:role:list` — cannot drift silently.
+    preflight gate, `/minder:mem:role:list` — cannot drift silently.
     """
 
     def test_notes_are_a_separate_top_level_list_from_findings(self):
@@ -2233,7 +2233,7 @@ class TempDirHygieneTests(unittest.TestCase):
         """SIBLING — cleanup must remove only what this run created. A real
         tick may be in flight in another process; deleting its snapshot
         directory would make the guard attribute its writes to nobody."""
-        marker = Path(tempfile.gettempdir()) / "ztn-roles-not-ours-testfixture"
+        marker = Path(tempfile.gettempdir()) / "minder-mem-roles-not-ours-testfixture"
         marker.mkdir(exist_ok=True)
         before = roles_tmp_entries()
         self.assertIn(marker, before)

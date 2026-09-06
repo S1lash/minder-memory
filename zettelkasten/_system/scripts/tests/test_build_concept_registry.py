@@ -8,7 +8,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from tests._fixture import clear_ztn_env, make_fixture  # type: ignore
+from tests._fixture import clear_minder_memory_env, make_fixture  # type: ignore
 
 import build_concept_registry as bcr  # type: ignore
 
@@ -45,7 +45,7 @@ class HarvestCorpusTests(unittest.TestCase):
             self.assertEqual(api.mentions, 3)
             self.assertEqual(api.first_seen, date(2026, 3, 15))
             self.assertEqual(api.last_seen, date(2026, 4, 3))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_normalises_dirty_concept_names(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -57,7 +57,7 @@ class HarvestCorpusTests(unittest.TestCase):
             agg, _ = bcr.build(fx.base)
             self.assertIn("api_v2_design", agg)
             self.assertIn("rate_limit", agg)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_empty_corpus_is_clean(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -66,7 +66,7 @@ class HarvestCorpusTests(unittest.TestCase):
             self.assertEqual(agg, {})
             self.assertEqual(stats["mentions_seen"], 0)
             self.assertEqual(stats["batches_read"], 0)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_skips_template_files(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -77,7 +77,7 @@ class HarvestCorpusTests(unittest.TestCase):
             )
             agg, _ = bcr.build(fx.base)
             self.assertNotIn("placeholder_concept", agg)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class HarvestBatchesTests(unittest.TestCase):
@@ -107,7 +107,7 @@ class HarvestBatchesTests(unittest.TestCase):
             agg, _ = bcr.build(fx.base)
             self.assertEqual(agg["api_v2_design"].type, "idea")
             self.assertEqual(agg["api_v2_design"].subtype, "rest")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_drops_type_outside_emit_set(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -125,7 +125,7 @@ class HarvestBatchesTests(unittest.TestCase):
             agg, _ = bcr.build(fx.base)
             self.assertIsNone(agg.get("ivan_petrov").type if agg.get("ivan_petrov") else None)
             self.assertIsNone(agg.get("acme_payments").type if agg.get("acme_payments") else None)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_unparseable_batch_does_not_crash(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -135,7 +135,7 @@ class HarvestBatchesTests(unittest.TestCase):
             (batches / "bad.json").write_text("not json{", encoding="utf-8")
             agg, stats = bcr.build(fx.base)
             self.assertEqual(stats["batches_read"], 0)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class AliasPreservationTests(unittest.TestCase):
@@ -157,7 +157,7 @@ class AliasPreservationTests(unittest.TestCase):
             )
             agg, _ = bcr.build(fx.base)
             self.assertEqual(agg["api_v2_design"].aliases, ["api_v2", "api2"])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_orphan_aliases_kept_with_zero_mentions(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -174,7 +174,7 @@ class AliasPreservationTests(unittest.TestCase):
             self.assertIn("renamed_concept", agg)
             self.assertEqual(agg["renamed_concept"].mentions, 0)
             self.assertEqual(agg["renamed_concept"].aliases, ["old_name"])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class RenderTests(unittest.TestCase):
@@ -208,7 +208,7 @@ class RenderTests(unittest.TestCase):
         self.assertNotIn("total_concepts:", out)
 
     def test_stats_dict_still_carries_counts(self):
-        # Counters live in the stats dict (consumed by /ztn:maintain
+        # Counters live in the stats dict (consumed by /minder:mem:maintain
         # batch manifest → Minder downstream). Removing them from the
         # rendered markdown is purely a frontmatter cleanup.
         with tempfile.TemporaryDirectory() as tmp:
@@ -220,7 +220,7 @@ class RenderTests(unittest.TestCase):
             _, stats = bcr.build(fx.base)
             self.assertIn("total_concepts", stats)
             self.assertIn("total_mentions", stats)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class IdempotenceTests(unittest.TestCase):
@@ -238,7 +238,7 @@ class IdempotenceTests(unittest.TestCase):
             second = registry.read_text(encoding="utf-8")
             # Same date semantics — idempotent on identical inputs
             self.assertEqual(first, second)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 if __name__ == "__main__":

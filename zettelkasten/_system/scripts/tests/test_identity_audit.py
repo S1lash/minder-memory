@@ -899,8 +899,8 @@ class CoverageTests(unittest.TestCase):
         for rel, expected in (
             ("0_constitution/principle/principle-work-001.md", "live"),
             ("6_posts/drafts/some-post.md", "live"),
-            ("5_skills/ztn-process.md", "live"),
-            ("minder-ztn.md", "live"),
+            ("5_skills/minder-mem-process.md", "live"),
+            ("minder-memory.md", "live"),
         ):
             rule = ia.classify(rel)
             self.assertIsNotNone(rule, rel)

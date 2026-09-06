@@ -61,7 +61,7 @@ def repo_root() -> Path:
 
     Not to be confused with `_system/scripts/_common.py::repo_root`, which
     despite the name returns the ZETTELKASTEN BASE (`<repo>/zettelkasten`, or
-    whatever `ZTN_BASE` points at). The two live in separate `sys.path` worlds
+    whatever `MINDER_MEMORY_BASE` points at). The two live in separate `sys.path` worlds
     and no module imports both, so the collision is latent rather than live —
     but a future module that imported the wrong one would get a path one level
     off and no error. If you are in `_system/scripts/`, you want that one.

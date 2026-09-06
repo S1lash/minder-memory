@@ -16,10 +16,10 @@ class _BaseSetup(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.base = Path(self._tmp.name) / "zettelkasten"
         (self.base / "_system/state").mkdir(parents=True)
-        os.environ["ZTN_BASE"] = str(self.base)
+        os.environ["MINDER_MEMORY_BASE"] = str(self.base)
 
     def tearDown(self) -> None:
-        os.environ.pop("ZTN_BASE", None)
+        os.environ.pop("MINDER_MEMORY_BASE", None)
         self._tmp.cleanup()
 
 

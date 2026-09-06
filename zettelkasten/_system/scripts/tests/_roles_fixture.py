@@ -60,7 +60,7 @@ def read_text(path: Path) -> str:
 
 
 # --------------------------------------------------------------------------
-# a ZTN base
+# a Minder Memory base
 # --------------------------------------------------------------------------
 
 DEFAULT_BODY = (
@@ -227,13 +227,13 @@ def secrets_path(base: Path) -> Path:
 #
 # `<base>/_system/state/secrets.enc.json` is COMMITTED — a flat
 # `{name: ciphertext}` map, each value encrypted independently. The key lives
-# only in `ZTN_ROLES_KEY`, per run, from the scheduler's environment.
+# only in `MINDER_MEMORY_ROLES_KEY`, per run, from the scheduler's environment.
 #
 # These helpers build a store WITHOUT going through the module under test, so
 # a test can assert on real ciphertext that the engine did not produce — and
 # so a broken writer cannot make its own reader look correct.
 
-KEY_ENV = "ZTN_ROLES_KEY"                       # §6.3, verbatim
+KEY_ENV = "MINDER_MEMORY_ROLES_KEY"                       # §6.3, verbatim
 STORE_RELPATH = "zettelkasten/_system/state/secrets.enc.json"
 
 
@@ -274,19 +274,19 @@ def read_store(base: Path) -> dict:
 
 
 def key_env(value: str | None):
-    """Context manager setting (or clearing) `ZTN_ROLES_KEY` for a block."""
+    """Context manager setting (or clearing) `MINDER_MEMORY_ROLES_KEY` for a block."""
     import unittest.mock
-    if value is None:
-        env = {k: v for k, v in os.environ.items() if k != KEY_ENV}
-        return unittest.mock.patch.dict(os.environ, env, clear=True)
-    return unittest.mock.patch.dict(os.environ, {KEY_ENV: value})
+    env = {k: v for k, v in os.environ.items() if k != KEY_ENV}
+    if value is not None:
+        env[KEY_ENV] = value
+    return unittest.mock.patch.dict(os.environ, env, clear=True)
 
 
 def write_secrets(base: Path, pairs: dict) -> Path:
     """Give a base real, USABLE credentials, and return the decrypted file.
 
     Since §6 a credential is usable only when three things line up: the
-    encrypted store is committed, `ZTN_ROLES_KEY` is set, and the tick has
+    encrypted store is committed, `MINDER_MEMORY_ROLES_KEY` is set, and the tick has
     materialised the decrypted file the guard and the role both read. This
     does all three, because every caller wants «this base has working
     credentials» and none of them wants to know that it now takes three steps.
@@ -385,7 +385,7 @@ COMMITTED_TREE = {
 def init_repo(tmp: Path, base_dirname: str = BASE_DIRNAME) -> Path:
     """A throwaway repo with the zettelkasten skeleton committed.
 
-    Returns the repo root. `<repo>/<base_dirname>` is a usable ZTN base, so a
+    Returns the repo root. `<repo>/<base_dirname>` is a usable Minder Memory base, so a
     guard test and a context test can share one fixture. `base_dirname` is a
     parameter for the same reason `make_base`'s is: the sugar derives from
     `base.name`, so a fixture that can only build `zettelkasten/` cannot catch
@@ -493,20 +493,20 @@ def read_json(path: Path):
 # `tick-begin` / `role-begin` write their snapshots to a per-tick subdirectory
 # of the OS temp dir (§7). The tick removes that directory in wave 2, but the
 # TEST SUITE must not depend on wave 2 to stay clean: a suite that leaves a
-# `ztn-roles-*` directory behind on every run silently fills the developer's
+# `minder-mem-roles-*` directory behind on every run silently fills the developer's
 # temp dir and, worse, leaves state a later run could read. These helpers let
 # a TestCase record what existed before and remove only what it created.
 
-ROLES_TMP_GLOB = "ztn-roles-*"
+ROLES_TMP_GLOB = "minder-mem-roles-*"
 
 
 def roles_tmp_entries() -> set:
-    """Every `ztn-roles-*` entry currently in the OS temp directory."""
+    """Every `minder-mem-roles-*` entry currently in the OS temp directory."""
     return set(Path(tempfile.gettempdir()).glob(ROLES_TMP_GLOB))
 
 
 def purge_roles_tmp(known: set) -> list:
-    """Remove every `ztn-roles-*` entry that is NOT in `known`.
+    """Remove every `minder-mem-roles-*` entry that is NOT in `known`.
 
     Returns what it removed, so a test can assert the suite created some
     litter and then assert it is gone.

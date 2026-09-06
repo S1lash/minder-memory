@@ -108,7 +108,7 @@ def test_maintain_manifest_emission(tmp_path):
     manifest_path = base / "_system" / "state" / "batches" / "20240125-091500-maintain.json"
     assert manifest_path.exists()
     m = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert m["processor"] == "ztn:maintain"
+    assert m["processor"] == "minder:mem:maintain"
     assert m["format_version"] == "2.0"
     assert m["batch_id"] == "20240125-091500"
     assert "biometric" in m["tier2_objects"]
@@ -133,7 +133,7 @@ def test_maintain_manifest_merges_existing(tmp_path):
     pre.parent.mkdir(parents=True, exist_ok=True)
     pre.write_text(json.dumps({
         "batch_id": "20240125-091500",
-        "processor": "ztn:maintain",
+        "processor": "minder:mem:maintain",
         "format_version": "2.0",
         "hubs": {"updated": [{"path": "5_meta/mocs/foo.md"}]},
         "stats": {"upstream_batch_id": "20240125-091500", "back_refs_written": 3},

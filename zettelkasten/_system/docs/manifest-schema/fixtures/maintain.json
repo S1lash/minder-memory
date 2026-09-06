@@ -1,7 +1,7 @@
 {
   "batch_id": "20260502-215258",
   "timestamp": "2026-05-02T22:51:32Z",
-  "processor": "ztn:maintain",
+  "processor": "minder:mem:maintain",
   "format_version": "2.0",
   "hubs": {
     "updated": []

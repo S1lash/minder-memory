@@ -49,7 +49,7 @@ from _common import (
 
 
 # In single-user dogfood phase SOUL.Values loads all three scopes (shared,
-# personal, sensitive). SOUL is read by /ztn:process, /ztn:maintain, /ztn:lint
+# personal, sensitive). SOUL is read by /minder:mem:process, /minder:mem:maintain, /minder:mem:lint
 # system prompts, so this keeps the user's full identity visible to their own
 # pipelines. Flip to {"shared", "personal"} when sharing scenarios land.
 SOUL_VALUES_SCOPES = {"shared", "personal", "sensitive"}
@@ -186,7 +186,7 @@ def append_clarification_drift(path: Path, current: str, expected: str) -> None:
         "`0_constitution/`, but edited the generated view by mistake.",
         "**To resolve:** Copy the intended change into the relevant "
         "`0_constitution/{type}/{domain}/*.md` and run "
-        "`/ztn:regen-constitution`. The auto-zone will be overwritten.",
+        "`/minder:mem:regen-constitution`. The auto-zone will be overwritten.",
         "",
         "**Expected render (next overwrite will produce this):**",
         "",

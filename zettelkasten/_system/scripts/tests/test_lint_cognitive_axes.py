@@ -62,7 +62,7 @@ def _hub(base: Path, is_sensitive="false", audience="[]"):
 
 
 def _run(base: Path, monkeypatch) -> list[dict]:
-    monkeypatch.setenv("ZTN_BASE", str(base))
+    monkeypatch.setenv("MINDER_MEMORY_BASE", str(base))
     import importlib
     import lint_cognitive_axes as mod
     importlib.reload(mod)

@@ -19,10 +19,10 @@ two are documented in `CONCEPT_NAMING.md` (open name graph) and
 ## Why a frozen mirror, not free-form vocabulary
 
 The set is **owned downstream**: Minder's Java enum is the source of
-truth. ZTN mirrors it for two reasons:
+truth. Minder Memory mirrors it for two reasons:
 
 1. **Subagent disambiguation.** When the concept-matcher subagent
-   coins a new concept (`/ztn:process` Step 3.4.5, in either inbox
+   coins a new concept (`/minder:mem:process` Step 3.4.5, in either inbox
    mode or `--reprocess-corpus` mode), it must assign a type so downstream
    consumers route the node correctly. The 18-value vocabulary plus
    per-value descriptions gives the subagent enough context to
@@ -33,7 +33,7 @@ truth. ZTN mirrors it for two reasons:
    exactly one machine. Resolution itself is owned by that test
    (`test_common.py::TestConceptTypeMirror`): it walks up from the checkout
    looking for a descendant ending in that suffix, honours
-   `ZTN_CONCEPT_TYPE_JAVA` when the file lives elsewhere, and asserts both
+   `MINDER_MEMORY_CONCEPT_TYPE_JAVA` when the file lives elsewhere, and asserts both
    sets match. It is a
    **local** guard, not a CI one: the Java source is only reachable
    where the Minder repo is checked out alongside this one, and the
@@ -49,7 +49,7 @@ call to land the change).
 
 ## Mirror vs emit gate
 
-The mirror is **18 values**. ZTN's emission gate is **16** —
+The mirror is **18 values**. Minder Memory's emission gate is **16** —
 `person` and `project` are excluded from the concept channel because
 they are first-class entities with dedicated registries
 (`PEOPLE.md`, `PROJECTS.md`). See `_system/docs/batch-format.md`
@@ -78,9 +78,9 @@ Groups are presentational; the mirror is flat at the validation set.
 
 | Code | Java enum | Description | Notes |
 |---|---|---|---|
-| `person` | `PERSON` | People and contacts | **NOT emitted by ZTN concept channel** — people are first-class entities (PEOPLE.md). Mirror entry exists for round-trip parity with Java only. |
+| `person` | `PERSON` | People and contacts | **NOT emitted by Minder Memory concept channel** — people are first-class entities (PEOPLE.md). Mirror entry exists for round-trip parity with Java only. |
 | `organization` | `ORGANIZATION` | Companies, teams, communities | A company, team, project group, community. Distinct from `project` (initiatives) and `person` (individuals). |
-| `project` | `PROJECT` | Projects and initiatives | **NOT emitted by ZTN concept channel** — projects are first-class entities (PROJECTS.md). Mirror entry exists for round-trip parity with Java only. |
+| `project` | `PROJECT` | Projects and initiatives | **NOT emitted by Minder Memory concept channel** — projects are first-class entities (PROJECTS.md). Mirror entry exists for round-trip parity with Java only. |
 | `idea` | `IDEA` | Ideas and concepts | A specific idea or proposal. Distinct from `theme` (broad topic) by being a concrete, articulable proposition. |
 | `tool` | `TOOL` | Technologies and instruments | Software, frameworks, hardware, methodologies-as-tools. Distinct from `skill` by being external; `skill` is a competency. |
 | `skill` | `SKILL` | Skills and competencies | A capability someone has or is acquiring. Distinct from `tool` (the thing) and `learning` (the act of acquiring). |
@@ -167,9 +167,9 @@ explicitly excludes them from the assignable set.
 ## Relationship to Minder downstream
 
 Minder's `ConceptType.fromCode(code)` accepts any of the 18 codes
-verbatim and falls back to `OTHER` on unknown. ZTN's emission
+verbatim and falls back to `OTHER` on unknown. Minder Memory's emission
 guarantees codes are always in the 16 emit set, so downstream never
-hits the `OTHER` fallback for a ZTN-emitted entry — `OTHER` rows in
+hits the `OTHER` fallback for a Minder Memory-emitted entry — `OTHER` rows in
 Minder come from external sources or owner manual edits.
 
 When Minder's enum evolves:

@@ -13,7 +13,7 @@ from tests._fixture import (  # type: ignore
     VALID_PERSONAL_NOTE,
     VALID_PLACEHOLDER_CORE,
     VALID_SENSITIVE_NOTE,
-    clear_ztn_env,
+    clear_minder_memory_env,
     make_fixture,
 )
 import render_soul_values as r  # type: ignore
@@ -33,7 +33,7 @@ class RenderSoulTests(unittest.TestCase):
             self.assertIn(r.SOUL_MARKER_START, text)
             self.assertIn(r.SOUL_MARKER_END, text)
             self.assertIn("If it can be better", text)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_sensitive_scope_is_included_in_dogfood(self):
         """Single-user dogfood: SOUL.Values loads all three scopes."""
@@ -47,7 +47,7 @@ class RenderSoulTests(unittest.TestCase):
             rc = r.main(["--soul", str(soul_path)])
             self.assertEqual(rc, 0)
             self.assertIn("work email", soul_path.read_text(encoding="utf-8").lower())
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_placeholder_never_in_values(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -58,7 +58,7 @@ class RenderSoulTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             text = soul_path.read_text(encoding="utf-8")
             self.assertNotIn("Placeholder content never ships.", text)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_missing_markers_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -70,7 +70,7 @@ class RenderSoulTests(unittest.TestCase):
             with self.assertRaises(SystemExit) as ctx_mgr:
                 r.main(["--soul", str(soul_path)])
             self.assertNotEqual(ctx_mgr.exception.code, 0)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_duplicate_marker_pair_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -84,7 +84,7 @@ class RenderSoulTests(unittest.TestCase):
             soul_path = fx.write_system_file("SOUL.md", double)
             with self.assertRaises(SystemExit):
                 r.main(["--soul", str(soul_path)])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_drift_triggers_clarification_when_opted_in(self):
         """Realistic flow: initial render establishes source hash, then user
@@ -116,7 +116,7 @@ class RenderSoulTests(unittest.TestCase):
             ])
             self.assertEqual(rc, 0)
             self.assertIn("soul-manual-edit-to-auto-zone", clar_path.read_text(encoding="utf-8"))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_source_change_is_not_drift(self):
         """Refreshing after editing a principle under 0_constitution/ must
@@ -147,7 +147,7 @@ class RenderSoulTests(unittest.TestCase):
             ])
             # No drift CLARIFICATION should have been written
             self.assertNotIn("soul-manual-edit-to-auto-zone", clar_path.read_text(encoding="utf-8"))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_trailing_whitespace_is_not_drift(self):
         """Editors that add trailing spaces shouldn't trigger drift."""
@@ -176,7 +176,7 @@ class RenderSoulTests(unittest.TestCase):
                 "soul-manual-edit-to-auto-zone",
                 clar_path.read_text(encoding="utf-8"),
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_idempotent_when_no_drift(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -193,7 +193,7 @@ class RenderSoulTests(unittest.TestCase):
                     if "Last regenerated:" not in line
                 )
             self.assertEqual(strip_ts(once), strip_ts(twice))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 if __name__ == "__main__":

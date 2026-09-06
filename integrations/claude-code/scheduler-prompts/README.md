@@ -1,6 +1,6 @@
 # scheduler-prompts/
 
-The tick contracts for the autonomous ZTN loop. Each `.md` file in this
+The tick contracts for the autonomous Minder Memory loop. Each `.md` file in this
 directory contains **only** the prompt — no headers, no meta, no fences — so a
 tick can be handed the file's whole content as its instructions.
 
@@ -15,11 +15,11 @@ For full design rationale, cadence, and plug-in instructions see
 
 | File | What it runs | Recommended cadence |
 |---|---|---|
-| `process-scheduled.md` | `/ztn:sync-data` → `/ztn:process` → `/ztn:maintain --no-sync-check` → `finalize-tick.sh scheduler/process` | ≥ 3× per day, e.g. cron `0 9,14,19 * * *` |
-| `agent-lens-nightly.md` | `/ztn:sync-data` → `/ztn:agent-lens --all-due` → `finalize-tick.sh scheduler/agent-lens` | 1× nightly, e.g. cron `0 3 * * *` |
-| `lint-nightly.md` | `/ztn:sync-data` → `/ztn:lint` (Step 7.5 dispatches `/ztn:resolve-clarifications --auto-mode` inline) → `finalize-tick.sh scheduler/lint` | 1× nightly, e.g. cron `0 5 * * *` |
-| `content-tick.md` | `/ztn:sync-data` → `/ztn:content --maintain` (draft-maintainer) → `finalize-tick.sh scheduler/content` | 1× weekly Tuesday, e.g. cron `0 6 * * 2` |
-| `roles-nightly.md` | `/ztn:sync-data` → `/ztn:roles` (every due role, sequentially) → `finalize-tick.sh scheduler/roles` | 1× daily, e.g. cron `0 7 * * *` |
+| `process-scheduled.md` | `/minder:mem:sync-data` → `/minder:mem:process` → `/minder:mem:maintain --no-sync-check` → `finalize-tick.sh scheduler/process` | ≥ 3× per day, e.g. cron `0 9,14,19 * * *` |
+| `agent-lens-nightly.md` | `/minder:mem:sync-data` → `/minder:mem:agent-lens --all-due` → `finalize-tick.sh scheduler/agent-lens` | 1× nightly, e.g. cron `0 3 * * *` |
+| `lint-nightly.md` | `/minder:mem:sync-data` → `/minder:mem:lint` (Step 7.5 dispatches `/minder:mem:resolve-clarifications --auto-mode` inline) → `finalize-tick.sh scheduler/lint` | 1× nightly, e.g. cron `0 5 * * *` |
+| `content-tick.md` | `/minder:mem:sync-data` → `/minder:mem:content --maintain` (draft-maintainer) → `finalize-tick.sh scheduler/content` | 1× weekly Tuesday, e.g. cron `0 6 * * 2` |
+| `roles-nightly.md` | `/minder:mem:sync-data` → `/minder:mem:roles` (every due role, sequentially) → `finalize-tick.sh scheduler/roles` | 1× daily, e.g. cron `0 7 * * *` |
 
 The `content-synthesis` lens (the content pipeline's classifier) is NOT a
 separate tick — it is a registered agent-lens (`weekly (mon)`), so the existing
@@ -102,21 +102,21 @@ Every scheduler tick produces **exactly one commit on `origin/main`**.
   Refuses to rewrite history if owner has manual non-scheduled commits
   ahead of `origin/main` (no force-push, ever).
 
-`/ztn:save` is **owner-interactive only**. Scheduler prompts must never
+`/minder:mem:save` is **owner-interactive only**. Scheduler prompts must never
 invoke it (slash form or otherwise) and must never call `git commit` /
 `git push` / `git add` / `gh` directly outside the helper scripts.
 
 There is no `maintain` prompt — maintain has no cadence of its own and
-runs as Step 4.5 of the process tick, right after `/ztn:process` returns
+runs as Step 4.5 of the process tick, right after `/minder:mem:process` returns
 and releases its lock. There is no separate `resolve-clarifications` prompt
 — `--auto-mode` is dispatched by lint Step 7.5 inline; interactive
 mode is owner-only by design. There is no prompt for
-`/ztn:role:{add,edit,list,ask}` — creating and changing a role is a
+`/minder:mem:role:{add,edit,list,ask}` — creating and changing a role is a
 conversation with the owner, never a scheduled act.
 
 `roles-nightly.md` is the one prompt whose skill commits inside its own
 tick: the roles write guard may not revert a path that was already dirty
-when a role started, so `/ztn:roles` commits each role's own paths —
+when a role started, so `/minder:mem:roles` commits each role's own paths —
 `[scheduled]` in every subject — before dispatching the next, and
 `finalize-tick.sh` folds them into the single delivered commit. One
 commit still reaches `origin/main` per tick.
@@ -143,11 +143,11 @@ Step 7.5 dispatches resolve to consume hints + new CLARIFICATIONS
 + existing queue, and either auto-applies safe additive proposals
 or queues residue for owner.
 
-**Manifest emission per tick.** `/ztn:process` Step 5.5 writes both
+**Manifest emission per tick.** `/minder:mem:process` Step 5.5 writes both
 `{batch_id}.md` (markdown report) and `{batch_id}.json` (machine-
 parseable JSON manifest; canonical schema in
-`_system/docs/manifest-schema/`). `/ztn:maintain`
-Step 6.6 writes its own `{batch_id}-maintain.json`, and `/ztn:lint`
+`_system/docs/manifest-schema/`). `/minder:mem:maintain`
+Step 6.6 writes its own `{batch_id}-maintain.json`, and `/minder:mem:lint`
 Step 7.6 its own `{batch_id}-lint.json`. All of them commit
 through `finalize-tick.sh` at the tail of the scheduler tick.
 
@@ -181,7 +181,7 @@ Three properties are deliberate and should survive any edit to these prompts:
   work. When it measures nothing it writes `status: unmeasured` and the
   reason.
 - **Because it cannot fail loudly, something else must notice it going
-  quiet** — `/ztn:lint` Scan A.13 checks that every `[scheduled]` commit
+  quiet** — `/minder:mem:lint` Scan A.13 checks that every `[scheduled]` commit
   carries a telemetry line, and raises `telemetry-missing` when one does not.
 
 One consequence is deliberate and worth stating, because it changes what the
@@ -194,7 +194,7 @@ that is too aggressive is exactly the thing this data is meant to make
 visible. The alternative, skipping the line when nothing else changed, would
 hide the cheapest waste there is to find.
 
-Ticks only. A manual `/ztn:process` writes no telemetry and raises nothing:
+Ticks only. A manual `/minder:mem:process` writes no telemetry and raises nothing:
 A.13 anchors on `[scheduled]` commits precisely so an owner working by hand
 is never nagged.
 
@@ -226,16 +226,16 @@ reads is the current one, and the body remains fully self-contained.
 cron + `claude --print`, launchd, GitHub Actions on a private fork:
 same prompt bodies. Ensure the agent has:
 
-- filesystem access to the ZTN repo working tree
+- filesystem access to the Minder Memory repo working tree
 - configured git identity for autonomous push
 - authentication to `origin` (SSH key in the runner / token in env)
 - a way to surface a non-`success` status (logs, email, pager) — the
   prompts report `partial` / `sync-blocked` instead of `success`
 
-## After `/ztn:update`
+## After `/minder:mem:update`
 
 **Nothing to do, as long as your routines hold the loader.** These prompt
-bodies are engine-shipped, `/ztn:update` keeps the files current, and a
+bodies are engine-shipped, `/minder:mem:update` keeps the files current, and a
 routine set up per «Plug-in» above holds only a one-line loader that reads
 the current file at run time — so the next tick after an update already runs
 the new contract.
@@ -257,36 +257,36 @@ What the scheduler will NEVER do, regardless of which prompt is run:
 
 - `git push --force` (of any kind, including `--force-with-lease`)
 - direct `git commit`, `git push`, `git add` outside helper scripts
-- `/ztn:save` in any form (owner-interactive only)
+- `/minder:mem:save` in any form (owner-interactive only)
 - staging engine paths (scripts/, integrations/, docs/, `_system/docs/`,
   `_system/scripts/`, `.engine-manifest.yml`, etc.) — `finalize-tick.sh`
   filters them and logs to CLARIFICATIONS
-- `/ztn:resolve-clarifications` (owner-only)
-- `/ztn:update` (owner-only)
+- `/minder:mem:resolve-clarifications` (owner-only)
+- `/minder:mem:update` (owner-only)
 - pause and ask the human
 
 Anything that would be a question becomes a row in
 `_system/state/CLARIFICATIONS.md` (under `### Scheduler failures` for
-terminal errors). Owner reviews via `/ztn:resolve-clarifications` on
+terminal errors). Owner reviews via `/minder:mem:resolve-clarifications` on
 the next morning routine.
 
 ## Cadence guidance
 
 Recommended:
 
-- `ztn-process` — minimum 3× per day (09/14/19 local). Higher
-  frequency is fine; `/ztn:process` is a no-op when
+- `minder-mem-process` — minimum 3× per day (09/14/19 local). Higher
+  frequency is fine; `/minder:mem:process` is a no-op when
   `_sources/inbox/` is empty. Back-to-back ticks <5 min apart are
   wasteful (Claude Code rate / token budget).
-- `ztn-agent-lens` (03:00 local) and `ztn-lint` (05:00 local) —
+- `minder-mem-agent-lens` (03:00 local) and `minder-mem-lint` (05:00 local) —
   two nightly ticks. Agent-lens runs first in its own scheduler-
   agent context (lens production isolated from resolve consumption,
   no confirmation bias). Lint runs ~2 h later, dispatches
-  `/ztn:resolve-clarifications --auto-mode` via Step 7.5 inline so
+  `/minder:mem:resolve-clarifications --auto-mode` via Step 7.5 inline so
   the same tick that cleans invariants also consumes fresh hints +
   CLARIFICATIONS. Owner wakes up to fully committed queue + lens
   outputs + resolve session log.
-- `ztn-roles` (07:00 local) — after lint, before the first process
+- `minder-mem-roles` (07:00 local) — after lint, before the first process
   tick, so an inbox note a role leaves is folded in the same morning.
   The tick time is also the floor for every role's cadence anchor: a
   role declaring `daily 14:00` is never due at a 07:00 tick, because

@@ -164,7 +164,7 @@ Skip emission when:
 
 - Recurrence state is `fading-echo` (low signal, owner already saw it).
 - Confidence is `low` (surface in body as «watching»; do not propose).
-- Either endpoint is a record (let `/ztn:process` distil first).
+- Either endpoint is a record (let `/minder:mem:process` distil first).
 - The bridge is between three+ notes — that is a hub candidate, not a
   pairwise wikilink; let `knowledge-emergence` propose the hub instead
   of forcing two-of-three wikilinks.

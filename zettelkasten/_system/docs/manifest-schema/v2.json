@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:ztn:manifest-schema:v2.2",
-  "title": "ZTN engine batch manifest — v2.x",
-  "description": "Universal output contract emitted by every ZTN engine skill that produces persistent state changes (/ztn:process, /ztn:maintain, /ztn:lint, /ztn:agent-lens). Single shape, distinguished by the top-level `processor` field. SemVer: MAJOR breaks consumers, MINOR additive (new optional fields, sections, entity types). Forward-compat slot `section_extras: jsonb` lives both top-level and per-section. Audience-tag whitelist enforcement happens at the ZTN registry layer (lint scan A.7 against AUDIENCES.md, owner-extensible per tenant) — this schema enforces type only. Concept-name format conformance is producer-side guarantee (ZTN normalisers in `_system/scripts/_common.py`); this schema does not re-validate the regex. Privacy trio (`origin`, `audience_tags`, `is_sensitive`) is required-slot on every Tier 0/1/2 entity emission with conservative-safe defaults applied at emission time.",
+  "$id": "urn:minder-memory:manifest-schema:v2.3",
+  "title": "Minder Memory engine batch manifest — v2.x",
+  "description": "Universal output contract emitted by every Minder Memory engine skill that produces persistent state changes (/minder:mem:process, /minder:mem:maintain, /minder:mem:lint, /minder:mem:agent-lens). Single shape, distinguished by the top-level `processor` field. SemVer: MAJOR breaks consumers, MINOR additive (new optional fields, sections, entity types). Forward-compat slot `section_extras: jsonb` lives both top-level and per-section. Audience-tag whitelist enforcement happens at the Minder Memory registry layer (lint scan A.7 against AUDIENCES.md, owner-extensible per tenant) — this schema enforces type only. Concept-name format conformance is producer-side guarantee (Minder Memory normalisers in `_system/scripts/_common.py`); this schema does not re-validate the regex. Privacy trio (`origin`, `audience_tags`, `is_sensitive`) is required-slot on every Tier 0/1/2 entity emission with conservative-safe defaults applied at emission time.",
 
   "type": "object",
   "required": ["batch_id", "timestamp", "format_version", "processor"],
@@ -27,13 +27,13 @@
 
     "sensitive_entities": {
       "type": "array",
-      "description": "Per-batch summary of every entity emitted with is_sensitive=true. Populated at /ztn:process emission time so downstream consumers can apply extra-friction policy without re-scanning.",
+      "description": "Per-batch summary of every entity emitted with is_sensitive=true. Populated at /minder:mem:process emission time so downstream consumers can apply extra-friction policy without re-scanning.",
       "items": { "$ref": "#/$defs/sensitive_entity_entry" }
     },
 
     "threads_opened": {
       "type": "array",
-      "description": "Strategic open-thread surfaced this batch (currently /ztn:maintain only). Tier 1 thread type is deferred — schema slot only.",
+      "description": "Strategic open-thread surfaced this batch (currently /minder:mem:maintain only). Tier 1 thread type is deferred — schema slot only.",
       "items": { "type": "object" }
     },
     "threads_resolved": {
@@ -48,7 +48,7 @@
 
   "allOf": [
     {
-      "if":   { "properties": { "processor": { "const": "ztn:process" } } },
+      "if":   { "properties": { "processor": { "const": "minder:mem:process" } } },
       "then": {
         "required": [
           "sources_processed", "records", "knowledge_notes",
@@ -57,15 +57,15 @@
       }
     },
     {
-      "if":   { "properties": { "processor": { "const": "ztn:maintain" } } },
+      "if":   { "properties": { "processor": { "const": "minder:mem:maintain" } } },
       "then": { "required": ["stats"] }
     },
     {
-      "if":   { "properties": { "processor": { "const": "ztn:lint" } } },
+      "if":   { "properties": { "processor": { "const": "minder:mem:lint" } } },
       "then": { "required": ["stats"] }
     },
     {
-      "if":   { "properties": { "processor": { "const": "ztn:agent-lens" } } },
+      "if":   { "properties": { "processor": { "const": "minder:mem:agent-lens" } } },
       "then": { "required": ["stats"] }
     }
   ],
@@ -88,8 +88,8 @@
     },
     "processor": {
       "type": "string",
-      "description": "Which ZTN engine skill emitted this manifest (universal contract).",
-      "enum": ["ztn:process", "ztn:maintain", "ztn:lint", "ztn:agent-lens"]
+      "description": "Which Minder Memory engine skill emitted this manifest (universal contract).",
+      "enum": ["minder:mem:process", "minder:mem:maintain", "minder:mem:lint", "minder:mem:agent-lens"]
     },
 
     "section_extras": {
@@ -100,7 +100,7 @@
 
     "concept_name": {
       "type": "string",
-      "description": "Snake_case ASCII concept identifier per `_system/registries/CONCEPT_NAMING.md`. Producer-side guarantee — ZTN normalisers in `_common.py` enforce the format BEFORE manifest emission. Schema accepts any string here so consumer round-trips of legitimate names with internal underscores stay valid; format violations would only appear if producer-side guarantee is bypassed (caught by lint Scan A.7 defence-in-depth).",
+      "description": "Snake_case ASCII concept identifier per `_system/registries/CONCEPT_NAMING.md`. Producer-side guarantee — Minder Memory normalisers in `_common.py` enforce the format BEFORE manifest emission. Schema accepts any string here so consumer round-trips of legitimate names with internal underscores stay valid; format violations would only appear if producer-side guarantee is bypassed (caught by lint Scan A.7 defence-in-depth).",
       "minLength": 1,
       "maxLength": 64
     },
@@ -110,7 +110,7 @@
     },
     "concept_type_enum": {
       "type": "string",
-      "description": "Concept type. ZTN-emitted manifests deliberately exclude `person` and `project` from `concepts.upserts[]` — those have first-class channels (`tier1_objects.people`, `tier1_objects.projects`). The full CONCEPT_NAMING enum is wider (18 values incl. person/project) to cover downstream graph completeness; this schema's emission enum is the 17-value ZTN subset.",
+      "description": "Concept type. Minder Memory-emitted manifests deliberately exclude `person` and `project` from `concepts.upserts[]` — those have first-class channels (`tier1_objects.people`, `tier1_objects.projects`). The full CONCEPT_NAMING enum is wider (18 values incl. person/project) to cover downstream graph completeness; this schema's emission enum is the 17-value Minder Memory subset.",
       "enum": [
         "theme", "tool", "decision", "idea", "event", "organization",
         "skill", "technical", "location", "emotion", "goal", "value",
@@ -129,7 +129,7 @@
     },
     "audience_tags": {
       "type": "array",
-      "description": "Whitelist enforcement lives in `/ztn:lint` Scan A.7 reading `_system/registries/AUDIENCES.md` (canonical 5 + tenant-extensible Extensions table). Schema cannot enumerate dynamic per-tenant extensions; type-only check here. Default `[]` (owner-only).",
+      "description": "Whitelist enforcement lives in `/minder:mem:lint` Scan A.7 reading `_system/registries/AUDIENCES.md` (canonical 5 + tenant-extensible Extensions table). Schema cannot enumerate dynamic per-tenant extensions; type-only check here. Default `[]` (owner-only).",
       "items": { "type": "string" }
     },
     "is_sensitive": {
@@ -272,7 +272,7 @@
         "subtype":           { "anyOf": [{ "$ref": "#/$defs/concept_name" }, { "type": "null" }] },
         "related_concepts":  { "$ref": "#/$defs/concept_name_list" },
         "previous_slugs":    { "$ref": "#/$defs/concept_name_list" },
-        "status":            { "enum": ["active", "deprecated"], "description": "Default `active`. /ztn:lint emits `deprecated` after multi-step CLARIFICATION review." },
+        "status":            { "enum": ["active", "deprecated"], "description": "Default `active`. /minder:mem:lint emits `deprecated` after multi-step CLARIFICATION review." },
         "section_extras":    { "$ref": "#/$defs/section_extras" }
       }
     },
@@ -476,14 +476,14 @@
     },
     "tier1_person_entry": {
       "type": "object",
-      "description": "People upserts. Privacy trio NOT required at row level (PEOPLE.md is owner-curated registry — see batch-format.md `Owner-curated registries`); accepted opportunistically. `tier_suggested` is /ztn:maintain's soft suggestion (separate from `tier`) — applied only after owner approval via `/ztn:resolve-clarifications`.",
+      "description": "People upserts. Privacy trio NOT required at row level (PEOPLE.md is owner-curated registry — see batch-format.md `Owner-curated registries`); accepted opportunistically. `tier_suggested` is /minder:mem:maintain's soft suggestion (separate from `tier`) — applied only after owner approval via `/minder:mem:resolve-clarifications`.",
       "required": ["id"],
       "properties": {
         "id":                    { "type": "string" },
         "display_name":          { "type": "string" },
         "org":                   { "type": "string" },
         "tier":                  { "type": "string", "description": "Current tier as recorded in PEOPLE.md (T1 / T2 / etc.)." },
-        "tier_suggested":        { "type": "string", "description": "/ztn:maintain soft suggestion. Distinct from `tier`. Owner approval via CLARIFICATION; next batch carries application." },
+        "tier_suggested":        { "type": "string", "description": "/minder:mem:maintain soft suggestion. Distinct from `tier`. Owner approval via CLARIFICATION; next batch carries application." },
         "mention_count":         { "type": "integer", "minimum": 0 },
         "mention_count_delta":   { "type": "integer" },
         "origin":                { "$ref": "#/$defs/origin" },

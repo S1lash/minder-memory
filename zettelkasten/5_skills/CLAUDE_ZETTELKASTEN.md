@@ -13,7 +13,7 @@ modified: '2026-08-15'
 
 ---
 
-## При каждом вызове /ztn:process
+## При каждом вызове /minder:mem:process
 
 ### Обязательно прочитать:
 
@@ -93,7 +93,7 @@ modified: '2026-08-15'
 - **Files**: `YYYYMMDD-short-semantic-name.md`
 - **Tags**: `category/specific-tag` (kebab-case OK; **distinct axis** from `concepts:`)
 - **Concepts**: `snake_case_ascii` (English-only; per CONCEPT_NAMING.md). Translation, never transliteration; engine drops on impossibility
-- **People**: `firstname-lastname` (transliterated, lowercase, dash). Голое имя без фамилии — НЕ CLARIFICATION: уходит в `_system/state/people-candidates.jsonl`, `/ztn:lint` C.5 еженедельно поднимает только повторяющиеся
+- **People**: `firstname-lastname` (transliterated, lowercase, dash). Голое имя без фамилии — НЕ CLARIFICATION: уходит в `_system/state/people-candidates.jsonl`, `/minder:mem:lint` C.5 еженедельно поднимает только повторяющиеся
 - **Projects**: `short-descriptive-name`
 
 ---
@@ -106,32 +106,32 @@ modified: '2026-08-15'
 
 ---
 
-## ZTN Skills
+## Minder Memory Skills
 
 | Skill | Purpose |
 |-------|---------|
-| `/ztn:process` | Обработка транскриптов → records + notes + batch report |
-| `/ztn:maintain` | After-batch integrator: threads, hub linkage, CURRENT_CONTEXT regen |
-| `/ztn:lint` | Nightly consistency, dedup, profile gen, Lint Context Store |
-| `/ztn:bootstrap` | One-shot populator системных файлов. Disposable. Три режима: established / fresh-onboarding / mixed |
-| `/ztn:recap` | Session recap → `_sources/inbox/claude-sessions/`; адаптивно сохраняет verbatim-артефакты (тост/письмо/пост) в `_sources/inbox/crafted/` (`--crafted` / `--crafted-only`), двусторонняя связь |
-| `/ztn:search` | Поиск по базе |
-| `/ztn:agent-lens` | Прогон линз «взгляда со стороны» по их каденции → `_system/agent-lens/{id}/{date}.md` |
-| `/ztn:agent-lens-add` | Консьерж создания линзы: разговор на обычном языке → готовая линза (папка + строка в реестре) |
-| `/ztn:capture-candidate` | Append одного кандидата-принципа в `_system/state/principle-candidates.jsonl`. Fire-and-forget, без локов |
-| `/ztn:check-decision` | Проверка решения против активного дерева конституции; вердикт + цитаты + запись Evidence Trail |
-| `/ztn:regen-constitution` | Регенерация производных представлений (CONSTITUTION_INDEX, constitution-core, INDEX, TAGS-зона, SOUL Values) |
-| `/ztn:source-add` | Регистрация нового типа источника: строка в SOURCES.md + парные папки inbox/processed |
-| `/ztn:content` | Status из CONTENT_MAP · `--draft <topic>` · `--maintain` (draft-maintainer: живые черновики в 6_posts/drafts/) |
-| `/ztn:resolve-clarifications` | Interactive разбор очереди CLARIFICATIONS — кластеризация по темам, numbered questions, hypothesis pre-forming против constitution-core, archive resolved |
-| `/ztn:save` | Категоризованный commit + push в `origin`. Owner-friendly обёртка над git, без auto-chain из других скиллов |
-| `/ztn:sync-data` | Pull данных из `origin` с rebase (мульти-девайс). Refuses auto-merge на конфликтах прозы — escalates owner |
-| `/ztn:update` | Pull engine updates из `upstream` (skeleton). Detects local divergence на engine paths, asks per-file, runs migrations. Никогда не трогает data |
-| `/ztn:roles` | Scheduled tick: прогоняет каждую due-роль последовательно, проверяет её дифф против `writes:`, пишет строку в `_system/roles/{id}/log.jsonl` |
-| `/ztn:role:add` | Консьерж создания роли: развивает пожелание, зондирует реальные заметки, пишет `role.md`, проверяет предполётом (validate + живой вызов сервиса + пробный прогон) |
-| `/ztn:role:edit` | Открыть роль, поменять что/когда/куда, провалидировать перед записью. Пауза и возобновление — тот же путь |
-| `/ztn:role:list` | Что есть, за чем следит, когда последний раз отработала. Read-only |
-| `/ztn:role:ask` | Спросить роль; отвечает из своих state-файлов и лога, роль не запускает |
+| `/minder:mem:process` | Обработка транскриптов → records + notes + batch report |
+| `/minder:mem:maintain` | After-batch integrator: threads, hub linkage, CURRENT_CONTEXT regen |
+| `/minder:mem:lint` | Nightly consistency, dedup, profile gen, Lint Context Store |
+| `/minder:mem:bootstrap` | One-shot populator системных файлов. Disposable. Три режима: established / fresh-onboarding / mixed |
+| `/minder:mem:recap` | Session recap → `_sources/inbox/claude-sessions/`; адаптивно сохраняет verbatim-артефакты (тост/письмо/пост) в `_sources/inbox/crafted/` (`--crafted` / `--crafted-only`), двусторонняя связь |
+| `/minder:mem:search` | Поиск по базе |
+| `/minder:mem:agent-lens` | Прогон линз «взгляда со стороны» по их каденции → `_system/agent-lens/{id}/{date}.md` |
+| `/minder:mem:agent-lens-add` | Консьерж создания линзы: разговор на обычном языке → готовая линза (папка + строка в реестре) |
+| `/minder:mem:capture-candidate` | Append одного кандидата-принципа в `_system/state/principle-candidates.jsonl`. Fire-and-forget, без локов |
+| `/minder:mem:check-decision` | Проверка решения против активного дерева конституции; вердикт + цитаты + запись Evidence Trail |
+| `/minder:mem:regen-constitution` | Регенерация производных представлений (CONSTITUTION_INDEX, constitution-core, INDEX, TAGS-зона, SOUL Values) |
+| `/minder:mem:source-add` | Регистрация нового типа источника: строка в SOURCES.md + парные папки inbox/processed |
+| `/minder:mem:content` | Status из CONTENT_MAP · `--draft <topic>` · `--maintain` (draft-maintainer: живые черновики в 6_posts/drafts/) |
+| `/minder:mem:resolve-clarifications` | Interactive разбор очереди CLARIFICATIONS — кластеризация по темам, numbered questions, hypothesis pre-forming против constitution-core, archive resolved |
+| `/minder:mem:save` | Категоризованный commit + push в `origin`. Owner-friendly обёртка над git, без auto-chain из других скиллов |
+| `/minder:mem:sync-data` | Pull данных из `origin` с rebase (мульти-девайс). Refuses auto-merge на конфликтах прозы — escalates owner |
+| `/minder:mem:update` | Pull engine updates из `upstream` (skeleton). Detects local divergence на engine paths, asks per-file, runs migrations. Никогда не трогает data |
+| `/minder:mem:roles` | Scheduled tick: прогоняет каждую due-роль последовательно, проверяет её дифф против `writes:`, пишет строку в `_system/roles/{id}/log.jsonl` |
+| `/minder:mem:role:add` | Консьерж создания роли: развивает пожелание, зондирует реальные заметки, пишет `role.md`, проверяет предполётом (validate + живой вызов сервиса + пробный прогон) |
+| `/minder:mem:role:edit` | Открыть роль, поменять что/когда/куда, провалидировать перед записью. Пауза и возобновление — тот же путь |
+| `/minder:mem:role:list` | Что есть, за чем следит, когда последний раз отработала. Read-only |
+| `/minder:mem:role:ask` | Спросить роль; отвечает из своих state-файлов и лога, роль не запускает |
 
 ---
 
@@ -153,9 +153,9 @@ contract`). Всё это живёт в git log. Файл описывает IS,
 → `_system/docs/batch-format.md` — batch output contract
 → `5_meta/CONCEPT.md` — архитектура + ADRs
 → `5_meta/PROCESSING_PRINCIPLES.md` — 8 принципов обработки + `projects:`-ось
-→ `~/.claude/skills/ztn-process/SKILL.md` — pipeline /ztn:process
-→ `~/.claude/skills/ztn-maintain/SKILL.md` — pipeline /ztn:maintain
-→ `~/.claude/skills/ztn-lint/SKILL.md` — pipeline /ztn:lint
-→ `~/.claude/skills/ztn-bootstrap/SKILL.md` — bootstrap logic
+→ `~/.claude/skills/minder-mem-process/SKILL.md` — pipeline /minder:mem:process
+→ `~/.claude/skills/minder-mem-maintain/SKILL.md` — pipeline /minder:mem:maintain
+→ `~/.claude/skills/minder-mem-lint/SKILL.md` — pipeline /minder:mem:lint
+→ `~/.claude/skills/minder-mem-bootstrap/SKILL.md` — bootstrap logic
 → `_system/docs/ARCHITECTURE.md` — system design
 → `_system/docs/CONVENTIONS.md` — documentation style rules (binding)

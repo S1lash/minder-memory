@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Append a principle candidate to `_system/state/principle-candidates.jsonl`.
 
-Invoked by the `/ztn:capture-candidate` skill from any session (personal,
+Invoked by the `/minder:mem:capture-candidate` skill from any session (personal,
 work, external), and by any other producer that spots a candidate —
-`/ztn:maintain` Step 7.5 mines recurring decision rationale the same way.
+`/minder:mem:maintain` Step 7.5 mines recurring decision rationale the same way.
 Schema-validates inputs, enriches with origin + session id + date, appends
 atomically. No LLM, no reasoning — just a clean buffer write so the capture
 path is predictable regardless of session context.
@@ -25,7 +25,7 @@ Schema of each JSONL line:
       "origin": "personal | work | external",
       "session_id": "...",
       "record_ref": "[[...]]" | null,
-      "captured_by": "<producer>"    # default: "ztn:capture-candidate"
+      "captured_by": "<producer>"    # default: "minder:mem:capture-candidate"
     }
 
 Usage:
@@ -36,7 +36,7 @@ Usage:
         --suggested-type principle \\
         --suggested-domain tech \\
         [--origin personal|work|external] \\
-        [--captured-by ztn:maintain] \\
+        [--captured-by minder:mem:maintain] \\
         [--session-id ...] \\
         [--record-ref "[[...]]"] \\
         [--dry-run]
@@ -70,7 +70,7 @@ ALLOWED_ORIGINS: frozenset[str] = frozenset({"personal", "work", "external"})
 
 # The producer that ran when none is declared. Open on purpose — a new
 # producer names itself with a flag, it does not get a row in an enum here.
-DEFAULT_CAPTURED_BY = "ztn:capture-candidate"
+DEFAULT_CAPTURED_BY = "minder:mem:capture-candidate"
 
 
 def parse_applies_in_concepts(raw: str | None) -> list[str]:
@@ -196,7 +196,7 @@ def main(argv: list[str] | None = None) -> int:
                              "default: 'personal'")
     parser.add_argument("--captured-by", default=None,
                         help="the producer appending this line, e.g. "
-                             "'ztn:maintain'. Read at F.5 promotion, so a "
+                             "'minder:mem:maintain'. Read at F.5 promotion, so a "
                              f"wrong value decides promotion on the wrong "
                              f"evidence; default: {DEFAULT_CAPTURED_BY!r}")
     parser.add_argument("--session-id", default=None,

@@ -1,6 +1,6 @@
 """Tier II weekly worker — biometric × biometric + biometric × affect.
 
-Triggered by /ztn:maintain after-batch invocation. Idempotent weekly
+Triggered by /minder:mem:maintain after-batch invocation. Idempotent weekly
 gate via `_system/state/biometric/last_weekly_run.txt`: read current
 ISO week; if same as `last_weekly_run.txt`, no-op.
 
@@ -114,7 +114,7 @@ def run(
     iso_week = _iso_week_label(today_d)
 
     # Per-device namespace: each wearable's records + derived state live under
-    # `{source_id}/`. Caller (/ztn:maintain) runs the worker once per active
+    # `{source_id}/`. Caller (/minder:mem:maintain) runs the worker once per active
     # metric-day source.
     state_dir = base / "_system" / "state" / "biometric" / source_id
     views_dir = base / "_system" / "views" / "biometric" / source_id
@@ -466,7 +466,7 @@ def write_maintain_manifest(
     n_records: int,
     today_iso: str,
 ) -> Path:
-    """Emit (or merge into) v2-conformant `ztn:maintain` batch manifest.
+    """Emit (or merge into) v2-conformant `minder:mem:maintain` batch manifest.
 
     Required sections per `emit_batch_manifest.PROCESSOR_REQUIRED_SECTIONS`:
     `stats`. Tier II biometric output goes under `tier2_objects.biometric`
@@ -512,7 +512,7 @@ def write_maintain_manifest(
         manifest = {
             "batch_id": batch_id,
             "timestamp": today_iso + "T00:00:00Z" if "T" not in today_iso else today_iso,
-            "processor": "ztn:maintain",
+            "processor": "minder:mem:maintain",
             "format_version": "2.0",
             "hubs": {"updated": []},
             "tier1_objects": {"people": {"upserts": []}},

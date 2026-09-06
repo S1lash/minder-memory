@@ -1,7 +1,7 @@
-# ZTN Architecture
+# Minder Memory Architecture
 
 > The knowledge platform as it is built: a git repository of markdown files,
-> enriched in place by the ZTN skills. This document describes what runs on
+> enriched in place by the Minder Memory skills. This document describes what runs on
 > a machine that has installed the engine — the design principles behind it,
 > the alternatives it was weighed against, and the system files it maintains.
 
@@ -16,7 +16,7 @@
 
 1. [Philosophy & Key Decisions](#1-philosophy--key-decisions)
 2. [Why Not Minder / GBrain / Khoj](#2-why-not-minder--gbrain--khoj)
-3. [ZTN System Files](#3-ztn-system-files)
+3. [Minder Memory System Files](#3-minder-memory-system-files)
 4. [Risks & Open Questions](#4-risks--open-questions)
 
 ---
@@ -33,7 +33,7 @@ collaboration, and auditability. Everything else is a **lens** over these files.
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  PROCESSING LAYER: /ztn:process (Claude/Codex)  │  Classifies, atomizes, enriches notes
+│  PROCESSING LAYER: /minder:mem:process (Claude/Codex)  │  Classifies, atomizes, enriches notes
 ├─────────────────────────────────────────────────┤
 │  STORAGE LAYER: Git repository (markdown files) │  Single source of truth
 ├─────────────────────────────────────────────────┤
@@ -53,7 +53,7 @@ Each layer has a single responsibility. No layer duplicates another's work:
 Retrieval is deliberately outside this stack. The engine ships no index and no
 search daemon of its own; a reader — a chat client via MCP, an editor, `grep` —
 reads the files directly. Prompt templates for one such reader live in
-`integrations/minder-ztn-mcp/`, and they carry no dependency on the engine
+`integrations/minder-memory-mcp/`, and they carry no dependency on the engine
 beyond the on-disk conventions described here.
 
 ### Key Design Decisions
@@ -61,7 +61,7 @@ beyond the on-disk conventions described here.
 | Decision | Choice | Alternatives Considered | Rationale |
 |---|---|---|---|
 | Knowledge store | Git + markdown | PostgreSQL (Minder), GBrain Pages | Git = versioning + collaboration + no sync issues |
-| Enrichment | /ztn:process (Claude) | GBrain signal-detector, custom agents | Battle-tested skill, 8 processing principles, LLM classification |
+| Enrichment | /minder:mem:process (Claude) | GBrain signal-detector, custom agents | Battle-tested skill, 8 processing principles, LLM classification |
 | Interchange with consumers | Batch manifest (JSON + markdown) | Direct database access, custom API per consumer | One append-only contract, consumer-agnostic; schema in `manifest-schema/` |
 
 ---
@@ -75,18 +75,18 @@ rejects.
 ### Why Not Minder
 
 Minder is a 12-agent cognitive backend with PostgreSQL + Neo4j + Qdrant + Redis + MinIO.
-It was designed as a "smart brain" on top of ZTN but introduced:
-- **Data duplication**: ZTN in git AND Minder in 3 databases
+It was designed as a "smart brain" on top of Minder Memory but introduced:
+- **Data duplication**: Minder Memory in git AND Minder in 3 databases
 - **Sync complexity**: Changes in git need to be ingested into Minder
 - **Operational overhead**: 5 databases + Java app + blue-green deployment
 - **Scope creep**: 12 agents, concept graphs, multi-round processing — overkill for note search
 
-ZTN + /ztn:process already does enrichment. Minder duplicates this with its own pipeline.
+Minder Memory + /minder:mem:process already does enrichment. Minder duplicates this with its own pipeline.
 The platform works better with Minder removed entirely — not deferred, not optional, removed.
 
 **What Minder did well (preserved here):**
-- Entity extraction → already in /ztn:process
-- Task/event tracking → moved to ZTN _system/ files + BATCH_LOG
+- Entity extraction → already in /minder:mem:process
+- Task/event tracking → moved to Minder Memory _system/ files + BATCH_LOG
 
 ### Why Not GBrain
 
@@ -96,9 +96,9 @@ GBrain (github.com/garrytan/gbrain) is a Postgres-native knowledge system with:
 
 **Fundamental incompatibility**: GBrain ingests files into its own database. This creates
 a second source of truth alongside git. Every file change requires re-ingestion and sync.
-Using GBrain would mean replacing ZTN's git model, not augmenting it.
+Using GBrain would mean replacing Minder Memory's git model, not augmenting it.
 
-**GBrain features adopted as ZTN markdown structures:**
+**GBrain features adopted as Minder Memory markdown structures:**
 - SOUL.md (identity & state) → see Section 3
 - Compiled Truth + Timeline dual model → see Section 3
 - OPEN_THREADS.md (unresolved items) → see Section 3
@@ -116,7 +116,7 @@ Rejected because:
 
 ---
 
-## 3. ZTN System Files
+## 3. Minder Memory System Files
 
 Markdown structures the engine maintains. Детальные форматы и schemas —
 [SYSTEM_CONFIG.md](./SYSTEM_CONFIG.md); routing — [FOLDERS.md](../registries/FOLDERS.md).
@@ -162,10 +162,10 @@ PEOPLE.md registry с mention counting и tier'ами:
 Profile в `3_resources/people/{id}.md` = Tier 1 автоматически независимо от mention count.
 
 **Кто что делает:**
-- `/ztn:bootstrap` — первичная расстановка tiers, count mentions с нуля
-- `/ztn:process` — incremental mentions (1-per-file rule), tier только при insert нового person
-- `/ztn:maintain` — suggests Tier promote through CLARIFICATIONS, никогда не auto-apply
-- `/ztn:lint` — auto Tier 2→1 profile skeleton generation при достижении threshold (reviewed tier — validate requested)
+- `/minder:mem:bootstrap` — первичная расстановка tiers, count mentions с нуля
+- `/minder:mem:process` — incremental mentions (1-per-file rule), tier только при insert нового person
+- `/minder:mem:maintain` — suggests Tier promote through CLARIFICATIONS, никогда не auto-apply
+- `/minder:mem:lint` — auto Tier 2→1 profile skeleton generation при достижении threshold (reviewed tier — validate requested)
 
 ---
 
@@ -175,7 +175,7 @@ Profile в `3_resources/people/{id}.md` = Tier 1 автоматически не
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| **LLM API costs per owner** | MEDIUM | /ztn:process, /ztn:lint, /ztn:agent-lens and /ztn:roles all run on a paid model, on every scheduled tick. Frequent recordings × several daily ticks = nontrivial spend. Each owner pays for their own instance; cadence is the lever if it gets expensive. |
+| **LLM API costs per owner** | MEDIUM | /minder:mem:process, /minder:mem:lint, /minder:mem:agent-lens and /minder:mem:roles all run on a paid model, on every scheduled tick. Frequent recordings × several daily ticks = nontrivial spend. Each owner pays for their own instance; cadence is the lever if it gets expensive. |
 
 ### Open Questions
 
@@ -190,6 +190,6 @@ Profile в `3_resources/people/{id}.md` = Tier 1 автоматически не
    is unconventional. It works, but git wasn't designed for event-driven
    architectures. Merge conflicts, push races, and git lock files are real risks
    whenever more than one writer touches the same repo — the scheduled ticks
-   (`/ztn:process`, `/ztn:lint`, `/ztn:roles`) each commit and push, and the owner
-   commits from more than one device. `/ztn:sync-data` and the cross-skill lock
+   (`/minder:mem:process`, `/minder:mem:lint`, `/minder:mem:roles`) each commit and push, and the owner
+   commits from more than one device. `/minder:mem:sync-data` and the cross-skill lock
    matrix reduce the window; they do not close it.

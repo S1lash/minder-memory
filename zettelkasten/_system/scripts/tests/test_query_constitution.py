@@ -14,7 +14,7 @@ from tests._fixture import (  # type: ignore
     VALID_PERSONAL_NOTE,
     VALID_PLACEHOLDER_CORE,
     VALID_SENSITIVE_NOTE,
-    clear_ztn_env,
+    clear_minder_memory_env,
     make_fixture,
 )
 import query_constitution as q  # type: ignore
@@ -46,7 +46,7 @@ class QueryConstitutionTests(unittest.TestCase):
                 ids,
                 {"axiom-identity-001", "principle-tech-001", "rule-health-001"},
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_consumer_filter_narrows_by_applies_to(self):
         """Consumer filter is the one active narrowing in single-context
@@ -59,7 +59,7 @@ class QueryConstitutionTests(unittest.TestCase):
             out = _run(["--consumer", "claude-code"])
             ids = {p["id"] for p in out}
             self.assertEqual(ids, {"axiom-identity-001"})
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_domain_filter(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -69,7 +69,7 @@ class QueryConstitutionTests(unittest.TestCase):
             out = _run(["--domains", "tech"])
             ids = {p["id"] for p in out}
             self.assertEqual(ids, {"principle-tech-001"})
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_placeholder_excluded_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -77,7 +77,7 @@ class QueryConstitutionTests(unittest.TestCase):
             fx.write_principle("axiom/meta/001.md", VALID_PLACEHOLDER_CORE)
             out = _run([])
             self.assertEqual(out, [])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_placeholder_included_with_flag(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -86,7 +86,7 @@ class QueryConstitutionTests(unittest.TestCase):
             out = _run(["--include-placeholder"])
             ids = {p["id"] for p in out}
             self.assertEqual(ids, {"axiom-meta-001"})
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_emits_full_body(self):
         """Skill reasoning needs the full body text, not just statement."""
@@ -95,7 +95,7 @@ class QueryConstitutionTests(unittest.TestCase):
             fx.write_principle("axiom/identity/001.md", VALID_NOTE)
             out = _run([])
             self.assertIn("Choose the higher-quality path.", out[0]["body"])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_unknown_domain_raises(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -103,7 +103,7 @@ class QueryConstitutionTests(unittest.TestCase):
             fx.write_principle("axiom/identity/001.md", VALID_NOTE)
             with self.assertRaises(SystemExit):
                 q.main(["--domains", "bogus"])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 if __name__ == "__main__":

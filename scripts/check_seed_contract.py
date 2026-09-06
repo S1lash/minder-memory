@@ -44,8 +44,8 @@ from release_engine import load_manifest, repo_root
 # Engine `.template.*` files that legitimately ship verbatim (not seeds — their
 # own installers/skills consume them at their `.template` name).
 WHITELIST_TEMPLATE_BASENAMES = {
-    "minder-ztn.template.md",  # obsidian vault dashboard seed (seed.sh renames it)
-    "PROFILE.template.md",     # describe-me profile seed (excluded from /ztn:process by the *.template.md rule)
+    "minder-memory.template.md",  # obsidian vault dashboard seed (seed.sh renames it)
+    "PROFILE.template.md",     # describe-me profile seed (excluded from /minder:mem:process by the *.template.md rule)
 }
 
 
@@ -64,7 +64,7 @@ def static_checks(manifest: dict, repo: Path) -> list[str]:
         v.append(f"seed_skill entry not in template: {p}")
 
     # A template file must never sit under an engine directory — it would ship
-    # twice (engine dir copy + template seed) and /ztn:update (engine-only) would
+    # twice (engine dir copy + template seed) and /minder:mem:update (engine-only) would
     # silently overwrite the seeded owner file. Exact overlap or dir-prefix.
     engine_dirs = [e for e in engine if (repo / e).is_dir()]
     for t in sorted(template):

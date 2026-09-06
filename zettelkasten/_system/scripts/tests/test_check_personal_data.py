@@ -147,7 +147,7 @@ class TestSafeTermsGuard(unittest.TestCase):
                 root / "engine_file.md",
                 "Depersonalized worked example: id `ivan-petrov-dev`.\n"
                 "Built on top of the Minder engine architecture.\n"
-                "See also ZTN and Zettelkasten as generic terms.\n",
+                "See also Minder Memory and Zettelkasten as generic terms.\n",
             )
             hits = _scan(root, "engine_file.md")
             self.assertEqual(hits, [], hits)

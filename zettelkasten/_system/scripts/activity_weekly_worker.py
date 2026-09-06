@@ -1,6 +1,6 @@
 """Activity weekly worker — at-a-glance weekly rollup of computer-usage days.
 
-Mirrors `biometric_weekly_worker`: triggered by `/ztn:maintain` after-batch,
+Mirrors `biometric_weekly_worker`: triggered by `/minder:mem:maintain` after-batch,
 idempotent weekly gate via `_system/state/activity/{source}/last_weekly_run.txt`,
 ISO-week keyed, backfill on first run. Pure deterministic Python — no LLM.
 
@@ -544,7 +544,7 @@ def write_maintain_manifest(
     n_records: int,
     today_iso: str,
 ) -> Path:
-    """Emit (or merge into) the v2 `ztn:maintain` batch manifest under
+    """Emit (or merge into) the v2 `minder:mem:maintain` batch manifest under
     `tier2_objects.activity` (per ENGINE_DOCTRINE §3.8)."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -585,7 +585,7 @@ def write_maintain_manifest(
         manifest = {
             "batch_id": batch_id,
             "timestamp": today_iso + "T00:00:00Z" if "T" not in today_iso else today_iso,
-            "processor": "ztn:maintain",
+            "processor": "minder:mem:maintain",
             "format_version": "2.0",
             "hubs": {"updated": []},
             "tier1_objects": {"people": {"upserts": []}},

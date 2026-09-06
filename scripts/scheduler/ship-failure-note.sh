@@ -14,7 +14,7 @@
 # invisible for weeks. To prevent silent note loss, this script falls back
 # to a LOCAL commit (no push) tagged `scheduler/failure-local`. The note
 # lands in local history; the owner picks it up on their next interactive
-# session and `/ztn:save` ships it then. Local fallback never force-pushes
+# session and `/minder:mem:save` ships it then. Local fallback never force-pushes
 # and never amends history.
 #
 # Usage:
@@ -65,7 +65,7 @@ fi
 echo "ship-failure-note: finalize-tick refused (owner manual work ahead?); falling back to local-only commit" >&2
 
 # Local-only path. Stage just the CLARIFICATIONS edit, commit locally, do
-# not push. Owner's next `/ztn:save` (or the next scheduler tick once
+# not push. Owner's next `/minder:mem:save` (or the next scheduler tick once
 # their non-scheduled commits are pushed) ships this commit naturally.
 if ! git add -- "$CLAR" 2>/dev/null; then
   echo "ship-failure-note: failed to stage CLARIFICATIONS for local fallback" >&2

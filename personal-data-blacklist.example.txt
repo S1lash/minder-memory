@@ -1,4 +1,4 @@
-# Personal-data blacklist for YOUR ZTN instance.
+# Personal-data blacklist for YOUR Minder Memory instance.
 #
 # Copy this file to `personal-data-blacklist.txt` (same directory) and
 # replace the examples below with your own identifiers — name, handles,

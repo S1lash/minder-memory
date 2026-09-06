@@ -44,7 +44,7 @@
     "^_system/registries/DOMAINS\\.md$",
     "^3_resources/people/PEOPLE\\.md$",
     "^1_projects/PROJECTS\\.md$",
-    "^minder-ztn\\.md$",
+    "^minder-memory\\.md$",
     "^_records/.+/README\\.md$",
     "^_sources/",
     "\\.template\\.md$",

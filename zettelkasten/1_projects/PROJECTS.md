@@ -7,7 +7,7 @@ All projects in the system. Add a row when a new project is created.
 **Schema:**
 - `Scope` — `work` (employer / clients), `personal` (life, health, learning),
   `side` (side business, freelance, public projects), `mixed` (truly cross-context).
-  Owner-tagged; `/ztn:bootstrap` seeds with a hint from raw-scan source bias,
+  Owner-tagged; `/minder:mem:bootstrap` seeds with a hint from raw-scan source bias,
   owner edits. Empty `Scope` defaults to `work` for legacy rows.
 - `Status` — `active`, `paused`, `candidate` (added by bootstrap, awaiting owner review),
   `completed` (moved to `## Completed Projects`), `archived` (dropped before completion;

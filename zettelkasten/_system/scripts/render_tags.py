@@ -37,7 +37,7 @@ design and surfaced by the census rather than silently merged. A tag repeated
 inside one note's `tags:` list counts once — a use is a note, not a mention.
 
 Idempotency: the managed zone is rendered, then compared (timestamp line
-excluded) to what is on disk. Identical → NO write at all, so a `/ztn:maintain`
+excluded) to what is on disk. Identical → NO write at all, so a `/minder:mem:maintain`
 run twice produces a byte-identical tree.
 
 First run on a base whose TAGS.md predates the markers adopts the legacy
@@ -195,7 +195,7 @@ def render_zone_body(sections: list[dict], unique: int, uses: int) -> str:
         "",
     ]
     if not sections:
-        lines.append("_(no tags yet — populates as `/ztn:process` classifies content)_")
+        lines.append("_(no tags yet — populates as `/minder:mem:process` classifies content)_")
         lines.append("")
         return "\n".join(lines)
     for section in sections:

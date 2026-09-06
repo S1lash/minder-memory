@@ -67,8 +67,8 @@ project — say so; do not create one.
 ## Putting something back into the base
 
 You do not write records or knowledge notes — those are produced by
-`/ztn:process` from sources. If your work found something the base should know,
-leave **one note in the inbox** and the next `/ztn:process` run folds it in like
+`/minder:mem:process` from sources. If your work found something the base should know,
+leave **one note in the inbox** and the next `/minder:mem:process` run folds it in like
 any other source. This needs `inbox` among your allowed writes.
 
 - **One flat file** directly in `_sources/inbox/roles/`. Never a subfolder — the
@@ -86,7 +86,7 @@ any other source. This needs `inbox` among your allowed writes.
   ---
   ```
 
-  `/ztn:process` does not parse this block; it reads the whole file as content
+  `/minder:mem:process` does not parse this block; it reads the whole file as content
   and classifies it like any other source. The line is there so the note's origin
   stays legible after it moves to `_sources/processed/roles/` and a record cites
   it.
@@ -135,10 +135,10 @@ of them write, and nothing in a filename tells you which.
   for your role exits non-zero, your runner reads that as a broken guard, and
   every role after you tonight is simply not run. `tick-begin` destroys the
   baseline that decides what may be reverted; `log` forges your own run line.
-- **No pipeline skill** — `/ztn:process`, `/ztn:lint`, `/ztn:maintain`,
-  `/ztn:agent-lens` and their siblings. The tick running you holds `.roles.lock`
+- **No pipeline skill** — `/minder:mem:process`, `/minder:mem:lint`, `/minder:mem:maintain`,
+  `/minder:mem:agent-lens` and their siblings. The tick running you holds `.roles.lock`
   and every one of them aborts on it, so you would only be blocking against your
-  own runner. Your inbox note reaches `/ztn:process` on its own schedule.
+  own runner. Your inbox note reaches `/minder:mem:process` on its own schedule.
 - **Never run git, and never write engine state outside your allowed paths.** A
   commit from inside a role is reported as an error; an out-of-zone write is
   reverted.

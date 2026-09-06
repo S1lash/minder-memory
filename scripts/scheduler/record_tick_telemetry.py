@@ -15,7 +15,7 @@ nothing about cache reads, nothing about sub-agents, and is not what anyone
 means by "what did this tick cost". Any self-reported number would be
 invention. This reads the file instead.
 
-**Ticks only.** The scheduler prompts call this; a manual `/ztn:process` run
+**Ticks only.** The scheduler prompts call this; a manual `/minder:mem:process` run
 does not, and is not expected to. Nothing here detects or complains about an
 un-measured manual run — the tick is the unit being measured, and the lint
 backstop scopes itself to `[scheduled]` commits for the same reason.
@@ -152,7 +152,7 @@ def _first_user_text(path: Path) -> str:
 def label_for_subagent(path: Path) -> str:
     """Name a sub-agent transcript by what it actually ran.
 
-    A role's own id is recoverable because `/ztn:roles` hands each role an
+    A role's own id is recoverable because `/minder:mem:roles` hands each role an
     assignment file named `prompt-{id}.md`, and that path is the first thing
     in the sub-agent's transcript. The sibling `.meta.json` carries a
     `description` too, but it is free prose the dispatching model wrote
@@ -167,7 +167,7 @@ def label_for_subagent(path: Path) -> str:
     except (OSError, ValueError, TypeError):
         agent_type = ""
 
-    if agent_type == "ztn-role":
+    if agent_type == "minder-mem-role":
         match = ROLE_PROMPT_RE.search(_first_user_text(path))
         if match:
             return "role:" + match.group(1)

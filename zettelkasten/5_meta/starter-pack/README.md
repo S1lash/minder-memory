@@ -1,6 +1,6 @@
 # Constitution starter pack
 
-Optional generic axioms `/ztn:bootstrap --with-starter-axioms` can drop
+Optional generic axioms `/minder:mem:bootstrap --with-starter-axioms` can drop
 into your `0_constitution/axiom/{domain}/` as starting points. Engine
 ships these marked `confidence: starter` and `status: draft`, so it is
 obvious at a glance that you have not yet made them yours.
@@ -10,7 +10,7 @@ hot `constitution-core` view. What holds them back is `applies_to:` —
 `gen_constitution_core.py` selects a principle only when `core: true`,
 `status != placeholder`, and `applies_to` contains `claude-code`, and
 these ship without it. So adopting one means adding `claude-code` to its
-`applies_to`, then re-running `/ztn:regen-constitution`. Editing
+`applies_to`, then re-running `/minder:mem:regen-constitution`. Editing
 `confidence` or `status` alone changes nothing — those two fields are
 for you, not for the filter.
 
@@ -19,9 +19,9 @@ These are starting points, not prescriptions. Most users:
 - keep 1-3 that resonate, edit the wording into their own voice;
 - delete the rest;
 - write 5-10 of their own over the first month using
-  `/ztn:capture-candidate` while working with Claude.
+  `/minder:mem:capture-candidate` while working with Claude.
 
-If you don't want any starter content, run `/ztn:bootstrap` without the
+If you don't want any starter content, run `/minder:mem:bootstrap` without the
 flag — your `0_constitution/` stays empty and grows from your own
 captured candidates.
 

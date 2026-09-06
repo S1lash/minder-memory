@@ -614,6 +614,14 @@ RULES: tuple[Rule, ...] = (
         _entrypoint_streams,
     ),
     Rule(
+        "py-write-text-newline", "py",
+        "`Path.write_text(newline=...)` exists only from Python 3.10; the engine "
+        "runs on 3.9, where the call raises `TypeError` before writing anything",
+        "`lib.portable.write_text_utf8(path, text)` under `scripts/`, or "
+        "`open(path, \"w\", encoding=\"utf-8\", newline=\"\")` — the same LF bytes on every version",
+        regex_matcher(r"\.write_text\([^)]*\bnewline\s*=|^\s*newline\s*=\s*[\"']"),
+    ),
+    Rule(
         "py-stdin-unconfigured", "py",
         "`sys.stdin` decodes through the platform code page, so a Cyrillic path "
         "read from a pipe raises `UnicodeDecodeError` on Windows",

@@ -26,7 +26,7 @@ Three layers feed the final pattern list, in order:
    insufficient in practice (real coworker names, project names, and a
    verbatim axiom quote slipped through it before this layer existed).
    Guarded by `SAFE_TERMS` (synthetic placeholders and public product
-   names like `Minder`/`ZTN` are never turned into patterns, even though
+   names like `Minder`/`Minder Memory` are never turned into patterns, even though
    they appear literally in the registries as example rows or project
    names), a common-word stoplist, a minimum length, and a placeholder
    (`{...}`) skip — see `_finalize_pattern` and the source-specific
@@ -482,7 +482,8 @@ SAFE_TERMS = {
     "ivan-petrov", "petya-ivanov", "anna-smirnova", "maria-sidorova",
     "oleg-volkov", "katya-orlova", "sergey-kozlov", "john-doe",
     "acme-payments", "example.com", "project-alpha", "project-beta",
-    "Minder", "minder-ztn", "minder.host", "ZTN", "Zettelkasten",
+    "Minder", "Minder Memory", "Minder Mem", "minder-memory", "minder-mem",
+    "minder.host", "Zettelkasten",
 }
 _SAFE_TERMS_LOWER = {t.lower() for t in SAFE_TERMS}
 
@@ -779,7 +780,7 @@ def _read_frontmatter_fields(path: Path, fields: tuple[str, ...]) -> dict:
 
     Deliberately does not import `zettelkasten/_system/scripts/_common.py`
     (which has its own `read_frontmatter`) — this script ships standalone to
-    every friend's clone under `scripts/`, a different subsystem than the ZTN
+    every friend's clone under `scripts/`, a different subsystem than the Minder Memory
     pipeline package under `zettelkasten/_system/scripts/`, and stays
     independently distributable without that cross-package coupling.
     """

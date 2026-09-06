@@ -19,7 +19,7 @@ Four properties, all load-bearing:
 
 1. **Each value is encrypted independently**, so adding one credential never
    re-encrypts the rest and a diff shows exactly one changed line.
-2. **The key is one env var**, `ZTN_ROLES_KEY`, one per base — never in git,
+2. **The key is one env var**, `MINDER_MEMORY_ROLES_KEY`, one per base — never in git,
    never in a prompt body, never in a file this engine writes.
 3. **`cryptography` is imported lazily**, so a base with no secrets neither
    needs the package nor breaks without it. PyYAML stays the only hard
@@ -46,7 +46,7 @@ from pathlib import Path
 # owner pasting N values into a routine, and the isolation they would buy is
 # already absent — `secrets:` is a declaration, not a boundary, so any role
 # with a shell can read the whole store either way.
-KEY_ENV = "ZTN_ROLES_KEY"
+KEY_ENV = "MINDER_MEMORY_ROLES_KEY"
 
 # A credential name, the same shape as `secrets:` in role frontmatter and as
 # `KEY` in the decrypted file. One shape, three surfaces.
@@ -67,13 +67,18 @@ class SecretError(Exception):
 # the key
 # --------------------------------------------------------------------------
 
+def _key_from_env() -> str:
+    """The key from `MINDER_MEMORY_ROLES_KEY`; empty when it is not set."""
+    return os.environ.get(KEY_ENV, "").strip()
+
+
 def key_present() -> bool:
-    """True when `ZTN_ROLES_KEY` is set and non-empty."""
-    return bool(os.environ.get(KEY_ENV, "").strip())
+    """True when `MINDER_MEMORY_ROLES_KEY` is set and non-empty."""
+    return bool(_key_from_env())
 
 
 def _require_key() -> str:
-    key = os.environ.get(KEY_ENV, "").strip()
+    key = _key_from_env()
     if not key:
         raise SecretError(
             f"{KEY_ENV} is not set: the credential store is encrypted and the "

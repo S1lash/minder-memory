@@ -25,7 +25,7 @@ parsing and the lowercase-slug name shape do not carry over. The key handling,
 per-value independence, fail-closed decryption and blob I/O do, and the tests
 for them are adapted rather than rewritten.
 
-API NAMES: written before the module landed. `ZTN_ROLES_KEY` and the store
+API NAMES: written before the module landed. `MINDER_MEMORY_ROLES_KEY` and the store
 path are quoted verbatim from §6 and are not guesses; the function names
 follow the recovered module wherever it still applies, and use §6.4's own
 verbs (materialise / destroy) where it does not. Flagged for reconciliation.
@@ -811,7 +811,7 @@ class NoSecretsBaseTests(unittest.TestCase):
 
     def test_no_key_is_needed_when_there_is_no_store(self):
         """The accepts-sibling in one line: names, materialise and destroy all
-        work with `ZTN_ROLES_KEY` unset. Most owners will never hold a key."""
+        work with `MINDER_MEMORY_ROLES_KEY` unset. Most owners will never hold a key."""
         with tempfile.TemporaryDirectory() as tmp:
             base = make_base(Path(tmp))
             with key_env(None):

@@ -1,13 +1,13 @@
 # Communication baseline — how to present information
 
-Universal default for every ZTN session, loaded hot in every repo. This is
+Universal default for every Minder Memory session, loaded hot in every repo. This is
 the engine's stance on how an assistant presents information to its owner —
 true for any owner, shipped to every friend. Its sibling `advisory-baseline`
 governs how the answer is *reached* — objective, stance toward third parties,
 criteria, how chance and irreversibility are weighed. This file governs only
 how the result is *delivered*.
 
-The owner's **personal calibration** layers on top in their ZTN data:
+The owner's **personal calibration** layers on top in their Minder Memory data:
 general deltas in `SOUL.md → Context for Agents` + their `ai-interaction`
 principles, and the long-form recipe in the long-form playbook (see below).
 When the owner's calibration conflicts with this baseline, the owner's
@@ -75,9 +75,9 @@ inline in chat is a normal answer. The artifact intent triggers, never the word
 alone.
 
 **When (and only when) producing one**, load the owner's long-form playbook
-before writing — their ZTN `_system/long-form-playbook.md` (resolve the ZTN
-base from the loaded `ztn` rule, so this works from any session, not only
-inside the ZTN repo). The spine above still holds; the playbook adds the
+before writing — their Minder Memory `_system/long-form-playbook.md` (resolve the Minder Memory
+base from the loaded `minder-memory` rule, so this works from any session, not only
+inside the Minder Memory repo). The spine above still holds; the playbook adds the
 owner-specific recipe (density, chapter cadence, narrative devices, hard bans).
 
 Trigger:

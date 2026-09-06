@@ -34,8 +34,8 @@ is_sensitive: false
 > confidently (status), and on what evidence. It is **not a source of truth**:
 > the truth for each pattern lives in its principle (`0_constitution/`); this hub
 > only **links** (`[[principle-id]]`). It grows from your reflection through the
-> loop: `cognitive-model` lens → candidate → `/ztn:lint` F.5 → principle → this
-> hub. It updates automatically on `/ztn:maintain` — do not hand-edit the table
+> loop: `cognitive-model` lens → candidate → `/minder:mem:lint` F.5 → principle → this
+> hub. It updates automatically on `/minder:mem:maintain` — do not hand-edit the table
 > (the zone between the markers is overwritten). The «portrait» below is yours;
 > the engine never touches it.
 

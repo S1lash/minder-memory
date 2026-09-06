@@ -36,7 +36,7 @@ status: active
 - Records после decision-даты — для проверки исхода: `_records/observations/`, `_records/meetings/`, последующие knowledge-notes / knowledge-updates по теме.
 - **Hubs по теме decision'а** в `5_meta/mocs/` — обязательно. Резолви через `domains:` или `projects:` фронтматтера decision-ноты (например `project: learning-goal` → `5_meta/mocs/hub-learning-goal.md`). Хабы читаются ДО формулировки observation (см. hub-awareness echo guard ниже).
 - Свои прошлые outputs в `_system/agent-lens/decision-review/{date}.md` — как age-trail для self-history (см. ниже), не как evidence.
-- **Skill audit substrate**: `_system/state/check-decision-runs.jsonl` — append-only telemetry от `/ztn:check-decision`. Используется в sub-concern «Skill-telemetry» (см. ниже). Существующая работа линзы (assumption calibration) substrate **не использует** — это отдельный additive слой.
+- **Skill audit substrate**: `_system/state/check-decision-runs.jsonl` — append-only telemetry от `/minder:mem:check-decision`. Используется в sub-concern «Skill-telemetry» (см. ниже). Существующая работа линзы (assumption calibration) substrate **не использует** — это отдельный additive слой.
 
 **Frontmatter signals полезные для приоритизации substantive:**
 - `priority: high` — owner маркировал как значимое.
@@ -157,7 +157,7 @@ Surface как `hits: 0` в нескольких разных сценариях
 
 ## Skill-telemetry sub-concern (additive — НЕ замещает основную работу)
 
-Линза дополнительно читает audit substrate скилла `/ztn:check-decision`:
+Линза дополнительно читает audit substrate скилла `/minder:mem:check-decision`:
 файл `_system/state/check-decision-runs.jsonl`. Этот substrate собирается
 автоматически на каждый вызов скилла и содержит per-invocation записи
 (один JSON на строку, два `kind`'а: `run` и `followup`). Substrate

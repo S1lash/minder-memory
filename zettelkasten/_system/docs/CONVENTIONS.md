@@ -40,9 +40,9 @@
 
 ### 1. Version references
 
-- ❌ `ZTN v4.5`, `ZTN v4.6`, `v4.7 One-Shot Populator` в SKILL headers/descriptions
+- ❌ `Minder Memory v4.5`, `Minder Memory v4.6`, `v4.7 One-Shot Populator` в SKILL headers/descriptions
 - ❌ `**Version:** 4.7` в SYSTEM_CONFIG или других system files
-- ❌ `ztn:process v4.5` как processor identity
+- ❌ `minder:mem:process v4.5` как processor identity
 - ❌ `batch-format vN` в references (кроме самого `batch-format.md`, где spec version = content)
 
 **Правило:** SKILL describes itself by name, не by version. Если контракт между
@@ -58,11 +58,11 @@
 - ❌ `per PHASE-4-SDD §Q8` как justification
 - ❌ `§Q0 vocabulary`, `§Scan B.1 thresholds` как cross-ref
 - ❌ `Phase 2 matching limited к idea pattern...` as narrative about когда что произошло
-- ❌ `Phase 5+ /ztn:resolve-clarifications` — лучше просто `/ztn:resolve-clarifications`
+- ❌ `Phase 5+ /minder:mem:resolve-clarifications` — лучше просто `/minder:mem:resolve-clarifications`
 
 **Правило:** SKILL describes current behavior. Если need to reference another
-skill's responsibility — используй skill name (`/ztn:lint territory`,
-`/ztn:maintain responsibility`). Если cross-ref к contract — использу канонич.
+skill's responsibility — используй skill name (`/minder:mem:lint territory`,
+`/minder:mem:maintain responsibility`). Если cross-ref к contract — использу канонич.
 ссылку на SYSTEM_CONFIG или file path, не phase/section number.
 
 **Исключение:** файлы в scope «НЕ применяется» выше — в частности per-instance deployment journals, где фазы и есть содержимое.
@@ -102,7 +102,7 @@ territory.
 
 ### 6. Stage-of-evolution qualifiers
 
-- ❌ `ZTN v4.5 three-layer architecture`
+- ❌ `Minder Memory v4.5 three-layer architecture`
 - ❌ `post-Phase-4 items`
 - ❌ `pre-v4.5 notes`
 - ❌ «Phase 3 additions to thread struct»
@@ -122,13 +122,40 @@ territory.
 
 ---
 
+## Имя продукта — одна форма на каждый контекст
+
+Продукт называется **Minder Memory**; короткая форма — **Minder Mem**. В
+любом in-scope документе, коде и имени:
+
+- в прозе — `Minder Memory` (короткая форма — только там, где текст говорит о
+  ней как о короткой форме);
+- в слагах, путях, именах файлов, URL — `minder-memory`;
+- в переменных окружения и константах — `MINDER_MEMORY_`;
+- в идентификаторах python — `minder_memory`;
+- `mem` появляется ТОЛЬКО в пространстве слэш-команд `/minder:mem:<name>` и в
+  том, что из него выводится: директории скиллов `minder-mem-<name>`,
+  агент `minder-mem-role`, temp-префикс ролей `minder-mem-roles-`, значения
+  `processor` / `captured_by` вида `minder:mem:<pipeline>`;
+- инструменты MCP-коннектора `minder-memory` — `memory_<verb>`;
+- прежнее имя продукта не пишется нигде, кроме мест, где оно — сам предмет
+  строки: список разговорных алиасов в горячем правиле
+  `integrations/claude-code/rules/minder-memory.md`; `docs/CHANGELOG.md` (и его производная копия `5_meta/help/CHANGELOG.md`) и
+  `5_meta/DECISION_LOG.md` (история); миграции 031/032 и их тесты, чьи входы —
+  старая форма по определению; строки `retired:` манифеста и цепочка
+  переименования дашборда в `integrations/obsidian/seed.sh` (прежние имена файлов);
+  чек-лист `docs/upgrade-1.0.0.md` (называет прежние формы, чтобы их убрать);
+  `_sources/` (свидетельство сказанного) и дизайн-записи владельца в `platform/`.
+
+Смешение форм («здесь memory, там mem») — дефект имени, чинится до конца
+(`grep` старой формы = 0), как и любое неверное имя.
+
 ## Разрешено / нужно
 
 ### 1. Skill name references
 
-- ✓ `/ztn:lint territory`, `/ztn:maintain responsibility`
-- ✓ `Ownership: /ztn:process writes, /ztn:lint reads`
-- ✓ `Handled by /ztn:resolve-clarifications`
+- ✓ `/minder:mem:lint territory`, `/minder:mem:maintain responsibility`
+- ✓ `Ownership: /minder:mem:process writes, /minder:mem:lint reads`
+- ✓ `Handled by /minder:mem:resolve-clarifications`
 
 ### 2. Canonical contract references (by name, not section)
 

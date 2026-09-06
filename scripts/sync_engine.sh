@@ -15,7 +15,7 @@
 # declared kind.
 #
 # This script is the CI / power-user entry point. The default owner path is
-# the `/ztn:update` skill, which does the same work with a preview and a
+# the `/minder:mem:update` skill, which does the same work with a preview and a
 # plain-language digest — and which repairs THIS script from upstream before
 # reading it, so a clone stuck on an old broken copy can always recover.
 #
@@ -53,6 +53,8 @@ while [ $# -gt 0 ]; do
     --self-heal) SELF_HEAL=1 ;;
     --remote) REMOTE="$2"; shift ;;
     --branch) BRANCH="$2"; shift ;;
+    --branch=*) BRANCH="${1#--branch=}" ;;
+    --remote=*) REMOTE="${1#--remote=}" ;;
     -h|--help)
       sed -n '2,31p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
@@ -65,7 +67,7 @@ cd "$REPO_ROOT"
 
 if ! git remote get-url "$REMOTE" >/dev/null 2>&1; then
   echo "error: remote '$REMOTE' not configured." >&2
-  echo "  add it: git remote add $REMOTE <url-to-minder-ztn-skeleton>" >&2
+  echo "  add it: git remote add $REMOTE <url-to-minder-memory-skeleton>" >&2
   exit 2
 fi
 
@@ -80,7 +82,7 @@ fi
 # The machinery ships THROUGH the update, so a clone carrying a broken copy can
 # never receive its own repair by the normal path. `git checkout <ref> -- <path>`
 # passes no `<ref>:<path>` argument, so it works even where the manifest reader
-# below does not. `/ztn:update` does this unconditionally; here it is opt-in,
+# below does not. `/minder:mem:update` does this unconditionally; here it is opt-in,
 # because a CI run wants the script it was invoked with.
 if [ $SELF_HEAL -eq 1 ]; then
   echo "[sync] self-heal: fetching $REMOTE/$BRANCH and restoring scripts/ ..."
@@ -94,7 +96,7 @@ fi
 if [ ! -f "$SCRIPT_DIR/lib/git.sh" ]; then
   echo "error: $SCRIPT_DIR/lib/git.sh is missing." >&2
   echo "  This clone predates the shared git helpers. Recover with either:" >&2
-  echo "      /ztn:update" >&2
+  echo "      /minder:mem:update" >&2
   echo "      bash scripts/sync_engine.sh --self-heal" >&2
   exit 2
 fi
@@ -104,8 +106,46 @@ VERSION_FILE="integrations/VERSION"
 version_before=""
 [ -f "$VERSION_FILE" ] && version_before="$(tr -d '\r\n' < "$VERSION_FILE")"
 
+# The migration chain starts at 031; a clone older than the floor takes the
+# two-step path `lib/version_floor.py` prints. Only a jump ACROSS the floor is
+# refused — updating to the floor release itself is that first step.
+FLOOR_BRANCH="$(python3 "$SCRIPT_DIR/lib/version_floor.py" --floor-branch)"
+if [ "$BRANCH" != "$FLOOR_BRANCH" ] && ! python3 "$SCRIPT_DIR/lib/version_floor.py" "$version_before"; then
+  # Leave the tree as it was found. A self-heal from the current branch has
+  # just added files under scripts/ that the floor release does not have; its
+  # own sync would refuse the tree as dirty because of them, and the two-step
+  # path the refusal prints would never get past its first step.
+  git diff --cached --name-only --diff-filter=A -z -- scripts/ | while IFS= read -r -d '' added; do
+    git rm -q --cached -- "$added" && rm -f -- "$added"
+  done
+  exit 2
+fi
+
+if ! git ls-remote --exit-code "$REMOTE" "refs/heads/$BRANCH" > /dev/null 2>&1; then
+  echo "error: $REMOTE has no branch '$BRANCH'." >&2
+  if [ "$BRANCH" = "$FLOOR_BRANCH" ]; then
+    echo "  The floor release is published on that branch by the engine maintainer; until it is," >&2
+    echo "  a clone below $(python3 "$SCRIPT_DIR/lib/version_floor.py" --min-version) cannot update. Ask them." >&2
+  fi
+  exit 2
+fi
 echo "[sync] fetching $REMOTE/$BRANCH ..."
 git fetch "$REMOTE" "$BRANCH"
+
+# The engine list comes from the manifest this sync is ABOUT TO APPLY — the
+# remote's — never from the clone's copy. The clone's manifest predates the
+# update by definition, so a path added upstream would not be walked here and
+# would never land, while `retire_paths.py` (which reads the manifest after
+# checkout) would already remove its predecessor. The remote copy is read into
+# a temp file so a dry run lists the right paths without touching the tree.
+UPSTREAM_MANIFEST="$(mktemp "${TMPDIR:-/tmp}/engine-manifest.XXXXXX")"
+trap 'rm -f "$UPSTREAM_MANIFEST"' EXIT
+if git_ref_read_path "$REMOTE/$BRANCH" "$MANIFEST" > "$UPSTREAM_MANIFEST" && [ -s "$UPSTREAM_MANIFEST" ]; then
+  MANIFEST_TO_READ="$UPSTREAM_MANIFEST"
+else
+  echo "[sync] warning: $MANIFEST not readable from $REMOTE/$BRANCH — using the local copy" >&2
+  MANIFEST_TO_READ="$MANIFEST"
+fi
 
 # Read engine paths from the manifest.
 #
@@ -117,7 +157,7 @@ git fetch "$REMOTE" "$BRANCH"
 ENGINE_PATHS=()
 while IFS= read -r _line; do
   [ -n "$_line" ] && ENGINE_PATHS+=("$_line")
-done < <(python3 "$SCRIPT_DIR/manifest_paths.py" --section engine)
+done < <(python3 "$SCRIPT_DIR/manifest_paths.py" --section engine --manifest "$MANIFEST_TO_READ")
 
 if [ ${#ENGINE_PATHS[@]} -eq 0 ]; then
   echo "error: no engine paths in $MANIFEST" >&2
@@ -164,7 +204,7 @@ fi
 # then aborts with "blocked by existing file" on the file→dir type change. These
 # paths carry no owner data, so removing the local copy before checkout is safe
 # and lets the real-file tree land cleanly. This is what heals a Windows clone's
-# broken `.claude/skills/` on `/ztn:update`.
+# broken `.claude/skills/` on `/minder:mem:update`.
 DEREF_CLEAN_PATHS=(".claude/skills")
 
 echo "[sync] checking out engine paths from $REMOTE/$BRANCH ..."
@@ -205,6 +245,12 @@ done
 # removed, and the helper refuses outright if any of it reaches owner space.
 # ---------------------------------------------------------------------------
 
+# A migration that has to reach the remote (031 converges engine paths the
+# clone's previous script could not fetch) follows the pair THIS sync was
+# invoked with, not a name it guessed.
+export ENGINE_SYNC_REMOTE="$REMOTE"
+export ENGINE_SYNC_BRANCH="$BRANCH"
+
 if ! python3 "$REPO_ROOT/scripts/retire_paths.py"; then
   echo >&2
   echo "error: retirement refused — see the paths above." >&2
@@ -215,7 +261,7 @@ fi
 # ---------------------------------------------------------------------------
 # Post-conditions. A sync that resolves nothing is a broken sync, not an
 # up-to-date one, and the two are indistinguishable without these checks —
-# which is precisely how a Windows clone ran `/ztn:update` for weeks while
+# which is precisely how a Windows clone ran `/minder:mem:update` for weeks while
 # applying nothing and exiting 0 every time.
 # ---------------------------------------------------------------------------
 
@@ -226,7 +272,7 @@ if [ "$RESOLVED" -eq 0 ]; then
   echo "  deleted the entire engine. Something mangled the paths before git saw them." >&2
   echo "  Most likely: a stale copy of this script whose manifest reader emitted CRLF," >&2
   echo "  or MSYS path conversion on Git Bash." >&2
-  echo "  Recover with:  /ztn:update                       (repairs this script first)" >&2
+  echo "  Recover with:  /minder:mem:update                       (repairs this script first)" >&2
   echo "             or:  bash scripts/sync_engine.sh --self-heal" >&2
   exit 2
 fi
@@ -267,7 +313,7 @@ echo "[sync] refreshing derived vault docs ..."
 # DERIVED: an update that rewrote their sources has to rewrite them too, or the
 # vault keeps showing whatever was current when this clone was installed.
 #
-# It lives HERE rather than in the /ztn:update skill because this script is what
+# It lives HERE rather than in the /minder:mem:update skill because this script is what
 # both update paths run — the skill is a wrapper around it, and a friend using
 # the CLI directly gets the same convergence. Putting it in the skill only would
 # have left the documented power-user path permanently frozen.

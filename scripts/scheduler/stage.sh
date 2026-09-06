@@ -13,7 +13,7 @@
 # left dirty, by writing them one per line (UTF-8, LF, repo-relative) to
 # `.scheduler-state/hold-back` before calling this script. A held-back path
 # is skipped and noted the same way engine drift is. Two cases it exists for,
-# both from `/ztn:roles`, both the same shape — a path the guard deliberately
+# both from `/minder:mem:roles`, both the same shape — a path the guard deliberately
 # left dirty, against a script whose default is to stage every dirty owner
 # path:
 #   1. a file a role wrote a credential into that the guard could not restore

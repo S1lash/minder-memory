@@ -18,7 +18,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "garmin"
 
 
 def _setup_base(tmp_path: Path) -> Path:
-    """Build a minimal ZTN base layout under tmp_path."""
+    """Build a minimal Minder Memory base layout under tmp_path."""
     base = tmp_path / "base"
     (base / "_records" / "biometric").mkdir(parents=True)
     (base / "_system" / "state" / "biometric").mkdir(parents=True)
@@ -256,7 +256,7 @@ def test_batch_manifest_emission(tmp_path):
     m = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert m["batch_id"] == "20240101-120000"
     assert m["format_version"] == "2.0"
-    assert m["processor"] == "ztn:process"
+    assert m["processor"] == "minder:mem:process"
     created = m["records"]["created"]
     assert len(created) == 1
     entry = created[0]
@@ -349,7 +349,7 @@ def test_batch_manifest_merges_existing(tmp_path):
     pre_manifest.write_text(json.dumps({
         "batch_id": "20240101-120000",
         "format_version": "2.0",
-        "processor": "ztn:process",
+        "processor": "minder:mem:process",
         "records": {"created": [{"path": "_records/meetings/foo.md", "primary_type": "meeting"}], "updated": []},
         "sources_processed": [{"path": "_sources/processed/plaud/foo/transcript.md", "source_type": "plaud", "source_id": "foo"}],
     }), encoding="utf-8")

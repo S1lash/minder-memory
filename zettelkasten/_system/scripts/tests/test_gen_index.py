@@ -10,7 +10,7 @@ from tests._fixture import (  # type: ignore
     VALID_NOTE,
     VALID_PERSONAL_NOTE,
     VALID_SENSITIVE_NOTE,
-    clear_ztn_env,
+    clear_minder_memory_env,
     make_fixture,
 )
 import gen_constitution_index as g  # type: ignore
@@ -22,7 +22,7 @@ class GenIndexTests(unittest.TestCase):
             make_fixture(Path(tmp))
             rc = g.main(["--dry-run"])
             self.assertEqual(rc, 0)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_all_three_types_render(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -44,7 +44,7 @@ class GenIndexTests(unittest.TestCase):
             self.assertIn("**total:** 3", text)
             self.assertIn("**axiom:** 1", text)
             self.assertIn("**core:** 1", text)  # only VALID_NOTE has core:true and status=active
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_deterministic_across_runs(self):
         """Two consecutive runs with same inputs must produce byte-identical
@@ -64,7 +64,7 @@ class GenIndexTests(unittest.TestCase):
                     if not line.startswith("_Generated:")
                 )
             self.assertEqual(strip_ts(first), strip_ts(second))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 if __name__ == "__main__":

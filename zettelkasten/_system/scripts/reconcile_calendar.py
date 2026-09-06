@@ -22,7 +22,7 @@ of a prose-only event is invisible here. This catches drops of ``📅``-anchored
 events only. The durable protection is the nightly lint scan surfacing what it
 CAN see; the in-process check is a best-effort assist, not a guarantee.
 
-Read-only: never writes. ``/ztn:process`` Step 4.2 and the weekly lint scan both
+Read-only: never writes. ``/minder:mem:process`` Step 4.2 and the weekly lint scan both
 call ``--report``; the update migration detects + nudges.
 
 CLI:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ZTN lint Scan A.7 + Step 1.D backfill — autonomous concept and
+"""Minder Memory lint Scan A.7 + Step 1.D backfill — autonomous concept and
 audience-tag autofix.
 
 Deterministic Python implementation of the autonomous-pipeline contract:
@@ -407,7 +407,7 @@ def fix_domains(
 
     Lint runs the deterministic substrate only. The LLM cascade
     (remap-or-CLARIFICATION for unmappable values) is documented in
-    DOMAINS.md and runs in `/ztn:process` Step 3.4.5
+    DOMAINS.md and runs in `/minder:mem:process` Step 3.4.5
     (concept-matcher subagent), in both inbox-scan and
     `--reprocess-corpus` modes. Lint never invokes LLM directly.
     """
@@ -533,7 +533,7 @@ def fix_privacy_trio(fm: dict, path: Path | None = None) -> tuple[dict, list[dic
 
     `origin` is derived from path when missing (see `derive_origin_from_path`).
     `audience_tags` defaults to `[]` (owner-only, conservative). `is_sensitive`
-    defaults to `False`. Owner reviews via `/ztn:lint` summary on first run
+    defaults to `False`. Owner reviews via `/minder:mem:lint` summary on first run
     and refines with intelligent assignment if the corpus has rich legacy
     content the path heuristic cannot resolve.
     """
@@ -644,7 +644,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--root", type=Path, default=None,
-        help="Zettelkasten root (default: from ZTN_BASE / "
+        help="Zettelkasten root (default: from MINDER_MEMORY_BASE / "
              "script-relative resolution). Pass an explicit path for "
              "tests or alternative roots.",
     )

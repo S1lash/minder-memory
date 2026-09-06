@@ -10,7 +10,7 @@ No skill-code changes required (same pattern as `SOURCES.md`).
 Agent lenses are **outside-view** observations the owner does not (yet)
 make themselves. Each lens has a narrow intent (stalled threads,
 stated-vs-lived gap, recurring reaction, etc.) and runs on its own
-cadence under `/ztn:agent-lens`.
+cadence under `/minder:mem:agent-lens`.
 
 - Outputs land in `_system/agent-lens/{id}/{YYYY-MM-DD}.md` — one file
   per run, snapshot, never aggregated into a unified summary
@@ -27,7 +27,7 @@ cadence under `/ztn:agent-lens`.
 | `id` | kebab-case slug | matches folder under `lenses/` and output dir |
 | `name` | human title | shown in navigator |
 | `type` | `mechanical` / `psyche` / `meta` | flavour — informs review cadence |
-| `input_type` | `records` / `lens-outputs` / `multi-source` | drives which frame variant wraps the prompt. `records` = primary-source input (lens reads the ZTN base directly — records, knowledge, hubs, constitution, system; the lens prompt scopes which layer is primary). `lens-outputs` = meta-lens reads other lenses' outputs (status-page shape, no body-citation). `multi-source` = synthesis lens reads BOTH primary owner-data AND lens outputs with permission to synthesize across them; anchoring constraint applies (every owner-claim resolves to primary data) |
+| `input_type` | `records` / `lens-outputs` / `multi-source` | drives which frame variant wraps the prompt. `records` = primary-source input (lens reads the Minder Memory base directly — records, knowledge, hubs, constitution, system; the lens prompt scopes which layer is primary). `lens-outputs` = meta-lens reads other lenses' outputs (status-page shape, no body-citation). `multi-source` = synthesis lens reads BOTH primary owner-data AND lens outputs with permission to synthesize across them; anchoring constraint applies (every owner-claim resolves to primary data) |
 | `output_schema` | `standard` (default) / `synthesis-custom` | `standard` — Stage 2 reformats thinker output to canonical `## Observation N` schema; validator enforces. `synthesis-custom` — Stage 2 skipped; thinker writes directly to schema described in lens prompt; validator checks frontmatter privacy trio + non-empty body only. Lens prompt owns internal compliance (default-silence per section, anti-eye-roll guards). Chosen by any lens whose output shape is its own — synthesis lenses and narrators alike; a lens declares it in its own `prompt.md` frontmatter, which is the authority on which lenses use it. |
 | `cadence` | `daily` / `weekly` / `biweekly` / `monthly` | scheduler runs it when due |
 | `cadence_anchor` | `monday` / `sunday` / `1` (day-of-month) / `daily` | calendar anchor — see Cadence semantics below |
@@ -43,7 +43,7 @@ first, the rest in alphabetical order. No fixed structure beyond
 The lens prompt itself (in natural language) describes what to read,
 what window to consider, and (if `self_history: lens-decides`) when to
 look at past outputs. The runner does NOT constrain inputs — full read
-access to the ZTN base is given.
+access to the Minder Memory base is given.
 
 ## Cadence semantics
 
@@ -94,7 +94,7 @@ Each active lens MUST have a summary block here — purpose / value / output for
 
 ### cognitive-model
 
-Runs every other Monday. Mines the owner's own reasoning and reflection (`_records/observations` primarily) for **undeclared** patterns of how they think and want to be communicated with — structure of thought, insight-vs-noise judgement, what praise/criticism lands — and proposes them as `ai-interaction` / `learning` / `meta` principle candidates. The proactive head of the adaptation loop: where `stated-vs-lived` checks drift on EXISTING declarations, this generates NEW candidates from reflection. Output: pattern + ≥2 quoted records + why-it-is-new (which existing principle/SOUL section does NOT already cover it) + alternative reading + confidence, plus `principle_candidate_add` Action Hints (append to the high-recall buffer; owner gates promotion via `/ztn:lint` F.5). Conservative by design — 0-3 high-quality candidates, never a thin list. «No new pattern; existing principles + SOUL cover it» is a valid result. Self-history: reads `5_meta/mocs/hub-cognitive-model.md` as the axis coverage-map (which axes are `blank` vs `promoted`) before the per-run archive. Each candidate carries a `dimension` axis slug so the hub can show the axis `evidenced` before promotion.
+Runs every other Monday. Mines the owner's own reasoning and reflection (`_records/observations` primarily) for **undeclared** patterns of how they think and want to be communicated with — structure of thought, insight-vs-noise judgement, what praise/criticism lands — and proposes them as `ai-interaction` / `learning` / `meta` principle candidates. The proactive head of the adaptation loop: where `stated-vs-lived` checks drift on EXISTING declarations, this generates NEW candidates from reflection. Output: pattern + ≥2 quoted records + why-it-is-new (which existing principle/SOUL section does NOT already cover it) + alternative reading + confidence, plus `principle_candidate_add` Action Hints (append to the high-recall buffer; owner gates promotion via `/minder:mem:lint` F.5). Conservative by design — 0-3 high-quality candidates, never a thin list. «No new pattern; existing principles + SOUL cover it» is a valid result. Self-history: reads `5_meta/mocs/hub-cognitive-model.md` as the axis coverage-map (which axes are `blank` vs `promoted`) before the per-run archive. Each candidate carries a `dimension` axis slug so the hub can show the axis `evidenced` before promotion.
 
 ### stalled-thread
 
@@ -106,11 +106,11 @@ Runs every other Monday. Compares what the owner declares (constitution + SOUL �
 
 ### cross-domain-bridge
 
-Runs weekly on Thursday. Searches for connections the owner thought about independently in different life domains without noticing the structural overlap — defends ZTN's flagship value (highest-value insights at domain boundaries) by surfacing what context-lock makes the owner himself miss. Output: one-sentence claim + two endpoint records (path + cited framing each) + which of 4 signals fired (relational match / matrix independence / cluster disjointness / nameable claim) + a falsifier («this would NOT be a bridge if…») + confidence. Action hints: `wikilink_add` for the endpoint pair, only when both endpoints are in the knowledge layer.
+Runs weekly on Thursday. Searches for connections the owner thought about independently in different life domains without noticing the structural overlap — defends Minder Memory's flagship value (highest-value insights at domain boundaries) by surfacing what context-lock makes the owner himself miss. Output: one-sentence claim + two endpoint records (path + cited framing each) + which of 4 signals fired (relational match / matrix independence / cluster disjointness / nameable claim) + a falsifier («this would NOT be a bridge if…») + confidence. Action hints: `wikilink_add` for the endpoint pair, only when both endpoints are in the knowledge layer.
 
 ### decision-review
 
-Runs monthly on the 1st. Primary concern: takes substantive decisions 90-180 days old, extracts the assumptions / alternatives / expected outcome (from explicit sections OR embedded prose / TENTATIVE flags / Открытые вопросы), and checks whether records after the decision date confirm or disconfirm each assumption. Output: decision (path + date + one-line subject) + per-assumption verdict (confirmed / disconfirmed / open with cited records) + net call (held / drifted / mixed) + alternative reading + confidence. Top-3 most material per run; assumption-level scoring only — owner judges decision-quality. Edge case `hits: 0` differentiated by reason: «base too young», «present but not extractable», «extractable but no records-evidence». **Additive sub-concern (Skill-telemetry):** reads `/ztn:check-decision` audit substrate (`_system/state/check-decision-runs.jsonl`) in two layers — Layer A enriches per-decision observations with skill-verdict at decision-time when `record_ref` exact-matches; Layer B adds 0-3 standalone observations on rolling 30-day telemetry (constitution coverage gap, principle utilization, skill stability anomaly). Sub-concern claims agent-usage patterns only, never about owner; skipped entirely when substrate is empty. Action hints: `decision_update_section` when a decision note with declared assumptions has accumulated fresh evidence since its last `## Update`.
+Runs monthly on the 1st. Primary concern: takes substantive decisions 90-180 days old, extracts the assumptions / alternatives / expected outcome (from explicit sections OR embedded prose / TENTATIVE flags / Открытые вопросы), and checks whether records after the decision date confirm or disconfirm each assumption. Output: decision (path + date + one-line subject) + per-assumption verdict (confirmed / disconfirmed / open with cited records) + net call (held / drifted / mixed) + alternative reading + confidence. Top-3 most material per run; assumption-level scoring only — owner judges decision-quality. Edge case `hits: 0` differentiated by reason: «base too young», «present but not extractable», «extractable but no records-evidence». **Additive sub-concern (Skill-telemetry):** reads `/minder:mem:check-decision` audit substrate (`_system/state/check-decision-runs.jsonl`) in two layers — Layer A enriches per-decision observations with skill-verdict at decision-time when `record_ref` exact-matches; Layer B adds 0-3 standalone observations on rolling 30-day telemetry (constitution coverage gap, principle utilization, skill stability anomaly). Sub-concern claims agent-usage patterns only, never about owner; skipped entirely when substrate is empty. Action hints: `decision_update_section` when a decision note with declared assumptions has accumulated fresh evidence since its last `## Update`.
 
 ### energy-pattern
 
@@ -126,7 +126,7 @@ Runs weekly on Saturday — primary input is the **knowledge layer** (`1_project
 
 ### global-navigator
 
-Runs weekly on Monday — short status page for the **whole engine** over a trailing 7-day window ending the prior day (Mon-Sun calendar week): agent-lens layer (every active lens auto-discovered from this registry, including new ones), `/ztn:process` activity (batches + BATCH_LOG sums), `/ztn:lint` activity (F-codes + gaps), `/ztn:maintain` runs, candidate buffers (principle + people append counts by origin), CLARIFICATIONS state (new + open + by type), OPEN_THREADS delta. Output sections: stuck/failing → outstanding observations (by age) → lint → process → maintenance → candidates → clarifications → open-threads → productive lenses → silent lenses (only if non-empty) → aggregate counter; verbatim short titles, F-codes, batch-ids, type labels, counts only — no claims about the owner's life, no recommendations, no body-citation of any second-order content (observation bodies, candidate bodies, clarification quotes). Action hints: any whitelisted type, when cross-lens convergence makes an engine-level proposal warranted; the body-citation rule is relaxed inside the trailer only.
+Runs weekly on Monday — short status page for the **whole engine** over a trailing 7-day window ending the prior day (Mon-Sun calendar week): agent-lens layer (every active lens auto-discovered from this registry, including new ones), `/minder:mem:process` activity (batches + BATCH_LOG sums), `/minder:mem:lint` activity (F-codes + gaps), `/minder:mem:maintain` runs, candidate buffers (principle + people append counts by origin), CLARIFICATIONS state (new + open + by type), OPEN_THREADS delta. Output sections: stuck/failing → outstanding observations (by age) → lint → process → maintenance → candidates → clarifications → open-threads → productive lenses → silent lenses (only if non-empty) → aggregate counter; verbatim short titles, F-codes, batch-ids, type labels, counts only — no claims about the owner's life, no recommendations, no body-citation of any second-order content (observation bodies, candidate bodies, clarification quotes). Action hints: any whitelisted type, when cross-lens convergence makes an engine-level proposal warranted; the body-citation rule is relaxed inside the trailer only.
 
 ### biometric-anomaly-narrator
 
@@ -154,7 +154,7 @@ Runs weekly on Friday — **new-first** opportunity lens with `input_type: multi
 
 ### content-synthesis
 
-Runs weekly on Monday — the **sole classifier of the content pipeline**. Reads the compact `CONTENT_MAP.md` (themes by ripeness — its primary input), the content ledger, sibling lens outputs (especially `cross-domain-bridge` for cross-theme post candidates and `knowledge-emergence` for post-ready clusters), POSTS.md (anti-repetition + cross-link), and the constitution/SOUL for voice, drilling into note bodies only for the top themes. Classifies each theme against the ledger by ripeness **change** — new / strengthened / stable / published-out — so a theme seeded months ago resurfaces the moment a new note lifts it (the long tail is preserved). Surfaces, with no cap, two equal kinds of candidate: single-theme posts and cross-theme bridges (taken from the `cross-domain-bridge` output, not mechanical pairing, each with an explicit falsifier). **Observation only** — never writes a draft, never publishes; the draft-maintainer (`/ztn:content --maintain`) reads this output directly the next day and is the sole actor. Output schema: `synthesis-custom`. Echo-loop guard (re-derive ripeness from the map each run) + apophenia falsifiability guard (cross-theme) carried from `knowledge-emergence` / `cross-domain-bridge`. No Action Hints — the maintainer is its dedicated consumer.
+Runs weekly on Monday — the **sole classifier of the content pipeline**. Reads the compact `CONTENT_MAP.md` (themes by ripeness — its primary input), the content ledger, sibling lens outputs (especially `cross-domain-bridge` for cross-theme post candidates and `knowledge-emergence` for post-ready clusters), POSTS.md (anti-repetition + cross-link), and the constitution/SOUL for voice, drilling into note bodies only for the top themes. Classifies each theme against the ledger by ripeness **change** — new / strengthened / stable / published-out — so a theme seeded months ago resurfaces the moment a new note lifts it (the long tail is preserved). Surfaces, with no cap, two equal kinds of candidate: single-theme posts and cross-theme bridges (taken from the `cross-domain-bridge` output, not mechanical pairing, each with an explicit falsifier). **Observation only** — never writes a draft, never publishes; the draft-maintainer (`/minder:mem:content --maintain`) reads this output directly the next day and is the sole actor. Output schema: `synthesis-custom`. Echo-loop guard (re-derive ripeness from the map each run) + apophenia falsifiability guard (cross-theme) carried from `knowledge-emergence` / `cross-domain-bridge`. No Action Hints — the maintainer is its dedicated consumer.
 
 ## Frameworks behind the calibration
 
@@ -173,15 +173,15 @@ Each lens prompt is calibrated against external frameworks (cited inline in the 
 
 ## Operating principles
 
-- Lenses are pure outside-view-of-life. System-health concerns (CLARIFICATIONS flow, lint context store, log audit) belong to `/ztn:lint` and `/ztn:maintain` and are deliberately not mixed in here.
+- Lenses are pure outside-view-of-life. System-health concerns (CLARIFICATIONS flow, lint context store, log audit) belong to `/minder:mem:lint` and `/minder:mem:maintain` and are deliberately not mixed in here.
 - Numeric thresholds inside prompts are starting points, not hard limits. The thinker LLM has full base read access and license to widen windows when the pattern asks.
 - Domain assumptions are owner-defined per `ENGINE_DOCTRINE.md` §1.5 — no hardcoded work/personal binary.
-- The active lenses cover several observation flavours (within-records / records-vs-declarations / across-domains / decision-feedback-loop / affect-distribution / system-meta). They are not exhaustive; owners grow their own set via `/ztn:agent-lens-add`.
-- Auto-pause safety net active: 3 consecutive validator rejections of any lens → runner flips status to `paused` (per `ztn-agent-lens/SKILL.md` §5.5).
+- The active lenses cover several observation flavours (within-records / records-vs-declarations / across-domains / decision-feedback-loop / affect-distribution / system-meta). They are not exhaustive; owners grow their own set via `/minder:mem:agent-lens-add`.
+- Auto-pause safety net active: 3 consecutive validator rejections of any lens → runner flips status to `paused` (per `minder-mem-agent-lens/SKILL.md` §5.5).
 
 ## Paused/Archived Lenses
 
-Lenses with `status: paused` or `status: archived`. Per Archive Contract Form B (`_system/docs/SYSTEM_CONFIG.md`), every row carries a `Reason` cell — free-form one-sentence rationale. Forward-only: lenses paused before contract adoption are not backfilled. Auto-pause writer (`/ztn:agent-lens` Step 5.5, after 3 consecutive validator rejections) populates Reason as `"auto-pause: 3 consecutive validator rejections"`.
+Lenses with `status: paused` or `status: archived`. Per Archive Contract Form B (`_system/docs/SYSTEM_CONFIG.md`), every row carries a `Reason` cell — free-form one-sentence rationale. Forward-only: lenses paused before contract adoption are not backfilled. Auto-pause writer (`/minder:mem:agent-lens` Step 5.5, after 3 consecutive validator rejections) populates Reason as `"auto-pause: 3 consecutive validator rejections"`.
 
 | ID | Name | Type | Input | Cadence | Self-history | Status | Paused | Reason |
 |---|---|---|---|---|---|---|---|---|
@@ -215,7 +215,7 @@ Lenses with `status: paused` or `status: archived`. Per Archive Contract Form B 
   structural changes (`wikilink_add`, `hub_stub_create`,
   `open_thread_add`, `decision_update_section`,
   `principle_candidate_add`). The trailer is
-  consumed by `/ztn:resolve-clarifications --auto-mode` (dispatched
+  consumed by `/minder:mem:resolve-clarifications --auto-mode` (dispatched
   inline by lint Step 7.5 at the nightly lint tick, ~2 h after
   agent-lens writes its outputs): the resolver judges every hint against full owner
   context and either auto-applies safe additive proposals or queues
@@ -257,10 +257,10 @@ One JSON object per line, append-only:
 
 All lens outputs are owner-local. They live under `_system/agent-lens/`
 and `_system/state/agent-lens-rejected/` and are committed to the same
-private repo as the rest of the ZTN base.
+private repo as the rest of the Minder Memory base.
 
 **Privacy trio on lens-observation entities** (per
-`/ztn:agent-lens` SKILL Step 5.9). Every observation file carries:
+`/minder:mem:agent-lens` SKILL Step 5.9). Every observation file carries:
 
 - `origin: personal` — lens runs internal to the owner; never `work`
   (would risk leaking to a future work-team sync) or `external`.
@@ -274,15 +274,15 @@ private repo as the rest of the ZTN base.
 
 If a lens output references concepts by name, the names are
 normalised through `_common.py::normalize_concept_name()` at write
-time — same autonomous-resolution contract as `/ztn:process` Q15
+time — same autonomous-resolution contract as `/minder:mem:process` Q15
 (silent autofix or silent drop; never raises CLARIFICATION).
 
 **Search isolation is deferred.** A future phase will set up a separate
 QMD index for lens outputs so they remain accessible to the owner via
-`/ztn-search` but do not contaminate other skill sessions (e.g.
-`/ztn:process` reading hypothesis-grade observations as if they were
+`/minder:mem:search` but do not contaminate other skill sessions (e.g.
+`/minder:mem:process` reading hypothesis-grade observations as if they were
 records). For now: no search-side exclusion. Other skills that perform
-content search (`/ztn:lint` Scan F.x, `/ztn:bootstrap`) MUST exclude
+content search (`/minder:mem:lint` Scan F.x, `/minder:mem:bootstrap`) MUST exclude
 `_system/agent-lens/` and `_system/state/agent-lens-rejected/` paths
 explicitly. This requirement is documented here and enforced by each
 skill's own scope rules.
@@ -291,15 +291,15 @@ skill's own scope rules.
 
 Doctrine for cross-skill lock matrix: `_system/docs/ENGINE_DOCTRINE.md`
 §3.4. Implementation (which locks to read, in what order, abort
-messages): `integrations/claude-code/skills/ztn-agent-lens/SKILL.md`
+messages): `integrations/claude-code/skills/minder-mem-agent-lens/SKILL.md`
 Step 0.2.
 
-Lock file: `_sources/.agent-lens.lock` (consistent with other ZTN
+Lock file: `_sources/.agent-lens.lock` (consistent with other Minder Memory
 skill locks).
 
 ## Registry validation
 
-Loaded by `/ztn:agent-lens` at the start of each tick. Each lens row
+Loaded by `/minder:mem:agent-lens` at the start of each tick. Each lens row
 must satisfy:
 
 - Folder `_system/registries/lenses/{id}/` exists and contains `prompt.md`
@@ -310,7 +310,7 @@ must satisfy:
   `weekly` requires day-of-week, `monthly` requires day-of-month)
 - `self_history` is one of three explicit values (no default)
 - `input_type` is one of two values (`records` = primary-source-input, the
-  lens reads the ZTN base directly with the lens prompt scoping which
+  lens reads the Minder Memory base directly with the lens prompt scoping which
   layer is primary; `lens-outputs` = meta-lens reading other lenses'
   outputs)
 
@@ -340,16 +340,16 @@ active-by-default is not a quality risk.
 - **archived** — permanently retired by owner; row lives under
   `## Paused/Archived Lenses` with populated `Reason`
 
-To activate a draft lens: dry-run via `/ztn:agent-lens --lens <id>
+To activate a draft lens: dry-run via `/minder:mem:agent-lens --lens <id>
 --dry-run` until output is satisfactory, then change status to `active`
 in this file.
 
 ## Adding a new lens
 
-**Recommended:** use `/ztn:agent-lens-add` — Socratic interview wizard that
+**Recommended:** use `/minder:mem:agent-lens-add` — Socratic interview wizard that
 generates a complete lens (prompt + registry row) with validation and
 push-back on vague intent / missing anti-examples / duplicate of
-existing. See `integrations/claude-code/skills/ztn-agent-lens-add/SKILL.md`.
+existing. See `integrations/claude-code/skills/minder-mem-agent-lens-add/SKILL.md`.
 
 **Manual (if you want to skip the wizard):**
 
@@ -361,7 +361,7 @@ existing. See `integrations/claude-code/skills/ztn-agent-lens-add/SKILL.md`.
    deliberately gated it in step 2)
 4. Add a 2-3 sentence summary block under `## Lens summaries` (purpose / value / output format) — required for every active lens
 5. Recommended before the next scheduled run: dry-run via
-   `/ztn:agent-lens --lens {new-id} --dry-run` and iterate the prompt until the
+   `/minder:mem:agent-lens --lens {new-id} --dry-run` and iterate the prompt until the
    output is good — an active lens that misfires self-pauses after 3 validator
    rejections, but a dry-run catches it sooner
 

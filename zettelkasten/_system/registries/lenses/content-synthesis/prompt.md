@@ -19,7 +19,7 @@ angle, the cross-theme posts, the cross-links to what's already published, and
 what's uncovered.
 
 **You OBSERVE; you never act.** You never write a draft, never touch
-`6_posts/`, never publish. The draft-maintainer (`/ztn:content --maintain`) is the
+`6_posts/`, never publish. The draft-maintainer (`/minder:mem:content --maintain`) is the
 sole actor and reads this output directly the next day. Your job is to make its
 job trivial: a clear, honest verdict per theme.
 

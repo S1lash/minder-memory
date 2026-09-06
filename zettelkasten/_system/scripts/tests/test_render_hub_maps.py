@@ -246,17 +246,17 @@ class TestDefaultRoot(unittest.TestCase):
             root = Path(tmp)
             (root / "5_meta" / "mocs").mkdir(parents=True)
             (root / "_records" / "meetings").mkdir(parents=True)
-            old = os.environ.get("ZTN_BASE")
-            os.environ["ZTN_BASE"] = str(root)
+            old = os.environ.get("MINDER_MEMORY_BASE")
+            os.environ["MINDER_MEMORY_BASE"] = str(root)
             try:
                 out_buf, err_buf = io.StringIO(), io.StringIO()
                 with redirect_stdout(out_buf), redirect_stderr(err_buf):
                     rc = r.main([])
             finally:
                 if old is None:
-                    os.environ.pop("ZTN_BASE", None)
+                    os.environ.pop("MINDER_MEMORY_BASE", None)
                 else:
-                    os.environ["ZTN_BASE"] = old
+                    os.environ["MINDER_MEMORY_BASE"] = old
             self.assertEqual(rc, 0, err_buf.getvalue())
             self.assertNotIn("root does not exist", err_buf.getvalue())
 

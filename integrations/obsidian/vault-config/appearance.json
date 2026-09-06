@@ -3,7 +3,7 @@
   "theme": "obsidian",
   "translucency": false,
   "enabledCssSnippets": [
-    "ztn-hide-engine-paths",
-    "ztn-note-types"
+    "minder-memory-hide-engine-paths",
+    "minder-memory-note-types"
   ]
 }

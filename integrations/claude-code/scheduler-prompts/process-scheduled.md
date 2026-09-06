@@ -1,10 +1,10 @@
-You are running an autonomous scheduled tick of `/ztn:process`. There is
+You are running an autonomous scheduled tick of `/minder:mem:process`. There is
 no human in this loop. The contract below is load-bearing.
 
 ## Invocation contract (read first)
 
-The ZTN skills in this prompt — `/ztn:sync-data`, `/ztn:process`,
-`/ztn:maintain` — are
+The Minder Memory skills in this prompt — `/minder:mem:sync-data`, `/minder:mem:process`,
+`/minder:mem:maintain` — are
 invoked **as slash commands in this same conversation**. Skills are
 committed to the cloned repo at `.claude/skills/<name>/SKILL.md`, so the
 runtime loads them automatically — write the slash command literally as
@@ -13,27 +13,27 @@ the clone before any slash invocation.
 
 **Single-commit guarantee.** This tick produces **exactly one git commit
 + one git push**, both from `bash scripts/scheduler/finalize-tick.sh` at
-Step 5. No other path in this prompt commits or pushes. `/ztn:save` is
+Step 5. No other path in this prompt commits or pushes. `/minder:mem:save` is
 **forbidden** in scheduler ticks — it is an owner-interactive tool. Any
 intermediate `git commit`, `git push`, or `git add` outside the helper
 scripts listed below is a contract violation.
 
 **Hard prohibitions:**
 
-- Do NOT invoke `/ztn:save` in any form. Use `finalize-tick.sh` at Step 5.
+- Do NOT invoke `/minder:mem:save` in any form. Use `finalize-tick.sh` at Step 5.
 - Do NOT call `git commit`, `git push`, `git add` directly. The only
   allowed git mutations come from the helper scripts listed in the
   steps, with one explicit exception: Step 5b (MCP delivery fallback,
   runs only when finalize-tick reports `gh CLI not found in PATH`) uses
   one direct `git push origin "HEAD:<sandbox>"` per its strict per-step
   instructions. No other direct git/gh calls are authorized.
-- Do NOT open `integrations/claude-code/skills/ztn-*/SKILL.md` and
+- Do NOT open `integrations/claude-code/skills/minder-mem-*/SKILL.md` and
   re-implement its steps yourself with Bash / Read / Edit. Skills are
   loaded by the runtime — invoke via slash, never re-execute.
 - Do NOT use the Agent / Task tool as a substitute for slash invocation.
-  Each ZTN skill must enter through its slash form in this same
+  Each Minder Memory skill must enter through its slash form in this same
   conversation. (The skill's own internal Task dispatch — specifically
-  `/ztn:process` Step 3 per-batch sub-agents — IS preserved; that fires
+  `/minder:mem:process` Step 3 per-batch sub-agents — IS preserved; that fires
   inside the skill invocation as the skill's own architecture.)
 - Do NOT run any history-rewriting or work-discarding git command directly:
   `git commit --amend`, `--reset-author`, `git reset` (any mode), `git checkout
@@ -50,7 +50,7 @@ scripts listed below is a contract violation.
 - Do NOT narrate or summarise between steps. After each step returns, the
   next action is the next step's command with no intermediate prose.
 - If the working tree looks "dirty across many categories" after Steps 4
-  and 4.5, that is NORMAL output of `/ztn:process` + `/ztn:maintain`. Do
+  and 4.5, that is NORMAL output of `/minder:mem:process` + `/minder:mem:maintain`. Do
   NOT try to "group by theme" or "save progress" — Step 5's
   `finalize-tick.sh` collapses every dirty owner path into one commit.
 
@@ -71,7 +71,7 @@ Then exit `partial` immediately. Do not retry.
 ## Steps
 
 0. `bash scripts/scheduler/ensure-skills.sh` — verify the project-level
-   ZTN skills resolve at `.claude/skills/<name>/SKILL.md` before any slash
+   Minder Memory skills resolve at `.claude/skills/<name>/SKILL.md` before any slash
    invocation. This is the #1 cause of a tick dying at its first step: a
    clone where git symlinks did not survive (e.g. a Windows commit with
    `core.symlinks=false` materialises them as text files). On non-zero
@@ -81,7 +81,7 @@ Then exit `partial` immediately. Do not retry.
    cannot persist. Run failure-handling with cause
    `"skills unresolvable in this clone — apply the CHANGELOG 0.41.0 recovery, then re-run"`
    and exit `partial`. The durable fix is real-file skills delivered via
-   the skeleton + `/ztn:update`, not an in-tick repair.
+   the skeleton + `/minder:mem:update`, not an in-tick repair.
 
 1. `bash scripts/scheduler/pin-main.sh` — get on fresh `origin/main`,
    capture the starting sandbox branch, and best-effort recover any
@@ -92,21 +92,21 @@ Then exit `partial` immediately. Do not retry.
    recent (<2h).
    Stale locks (>2h) are removed automatically.
 
-3. `/ztn:sync-data` — safe `git pull --rebase` with conflict-refuse
+3. `/minder:mem:sync-data` — safe `git pull --rebase` with conflict-refuse
    semantics, ensures the local clone has the latest owner data from
    any other device that pushed since this Routine started.
    - Returns "blocked" / non-zero on uncommitted local changes or
      unresolvable conflict → run failure-handling above with cause
      `"sync-data blocked, owner action needed"`, exit `sync-blocked`.
 
-4. `/ztn:process` — exactly ONE invocation. Per-batch sub-agent
+4. `/minder:mem:process` — exactly ONE invocation. Per-batch sub-agent
    dispatch fires inside the skill (Step 3) — that is the skill's own
    architecture and IS preserved. The skill ends at its own Step 6 report;
    integration of what it produced is Step 4.5 below, not part of this
    invocation.
 
    The skill caps its transcript queue per run by default (see
-   `/ztn:process` §Arguments `--limit`; metric-day / biometric files are
+   `/minder:mem:process` §Arguments `--limit`; metric-day / biometric files are
    never capped). That bound is what keeps a large backlog — e.g. after a
    paused scheduler — self-draining across successive ticks instead of
    exhausting one tick's cloud wall-clock and orphaning in-flight sub-agents.
@@ -116,17 +116,17 @@ Then exit `partial` immediately. Do not retry.
    - When the skill returns, the immediate next action is step 4.5 with
      no intermediate text.
 
-4.5. `/ztn:maintain --no-sync-check` — exactly ONE invocation, always,
+4.5. `/minder:mem:maintain --no-sync-check` — exactly ONE invocation, always,
    whatever Step 4 reported. This is the after-batch integrator, and it
    is the ONLY thing that runs it: threads, hub linkage, back-references,
    tier suggestions, `CURRENT_CONTEXT.md`, `CONCEPTS.md` and the weekly
    biometric / activity workers all live here, and none of them happens
-   inside `/ztn:process`. A tick that skips this step leaves its own
+   inside `/minder:mem:process`. A tick that skips this step leaves its own
    batch un-integrated and says nothing — the batch stays in the
    unprocessed set and the next tick's invocation drains it, which is the
    only reason a missed step is recoverable at all.
 
-   It runs as its own step rather than inside `/ztn:process` because the
+   It runs as its own step rather than inside `/minder:mem:process` because the
    two skills are mutually exclusive on the cross-skill lock: process
    deletes `.processing.lock` on completion, so maintain may take
    `.maintain.lock` only after the skill has returned.
@@ -231,12 +231,12 @@ Then exit `partial` immediately. Do not retry.
 
 ## Forbidden in this tick
 
-- `/ztn:lint`, `/ztn:agent-lens`, `/ztn:content`, `/ztn:roles` — separate schedules
-- `/ztn:resolve-clarifications` — owner-only interactive; auto-mode is
+- `/minder:mem:lint`, `/minder:mem:agent-lens`, `/minder:mem:content`, `/minder:mem:roles` — separate schedules
+- `/minder:mem:resolve-clarifications` — owner-only interactive; auto-mode is
   dispatched by lint Step 7.5, not from process
-- `/ztn:save` in any form (owner-interactive only — scheduler uses
+- `/minder:mem:save` in any form (owner-interactive only — scheduler uses
   `finalize-tick.sh`)
-- `/ztn:update` — engine sync is owner-only
+- `/minder:mem:update` — engine sync is owner-only
 - direct `git commit`, `git push`, `git add` outside helper scripts
 - `git push --force` of any kind
 - creating a feature branch, worktree, or PR

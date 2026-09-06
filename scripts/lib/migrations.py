@@ -5,7 +5,7 @@ Why a ledger and not a name list. `sync_engine.sh` used to run each migration
 with `bash "$m"` under `set -euo pipefail` and append its name to a flat
 `.engine-migrations-applied` file *after* the call. A non-zero exit therefore
 aborted the whole update AND left the name unrecorded — so every future
-`/ztn:update` re-ran the same migration and re-aborted at the same point. A
+`/minder:mem:update` re-ran the same migration and re-aborted at the same point. A
 friend's clone was stuck that way for weeks on `007`, a best-effort repair of
 historical data that can legitimately fail to fully succeed.
 

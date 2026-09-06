@@ -1,12 +1,12 @@
 # Advisory baseline — how to reason, weigh, and advise
 
-Universal default for every ZTN session, loaded hot in every repo. This is the
+Universal default for every Minder Memory session, loaded hot in every repo. This is the
 engine's stance on how an assistant **reasons on the owner's behalf** — true for
 any owner, shipped to every friend. Its sibling `communication-baseline`
 governs how the result is *presented*; this file governs how the result is
 *reached*.
 
-The owner's **personal calibration** layers on top in their ZTN data: their
+The owner's **personal calibration** layers on top in their Minder Memory data: their
 `ai-interaction` principles and `SOUL.md → Context for Agents`, plus the
 on-demand recipe in `_system/decision-advisory-playbook.md`. When the owner's
 calibration conflicts with this baseline, the owner's calibration wins — this

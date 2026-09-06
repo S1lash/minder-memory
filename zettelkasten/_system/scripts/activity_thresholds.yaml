@@ -1,7 +1,7 @@
 # Activity (computer-usage) thresholds — engine spec + universal defaults.
 #
 # Layered at runtime exactly like the biometric thresholds:
-#   1. this template — engine-shipped baseline (synced via /ztn:update)
+#   1. this template — engine-shipped baseline (synced via /minder:mem:update)
 #   2. activity_thresholds.yaml — live working file (one-time seed; not
 #      synced upstream-to-downstream)
 #   3. activity_thresholds.local.yaml — owner-only override (never shipped)
@@ -31,7 +31,7 @@ deviation_thresholds:
 
 baseline_windows:
   default:           28        # days
-  refresh_cadence:   daily     # recompute on each /ztn:process run
+  refresh_cadence:   daily     # recompute on each /minder:mem:process run
 
 # No categorical-transition flags for activity (the profile carries no
 # categorical pairs). Block kept for parity / future extension.

@@ -1,5 +1,5 @@
 # Per-clone overrides for the smart-resolve engine driven by
-# `/ztn:resolve-clarifications`. The defaults below match a fresh clone;
+# `/minder:mem:resolve-clarifications`. The defaults below match a fresh clone;
 # uncomment and edit any line to override. Engine reads this file at
 # the start of every resolve session — no restart needed.
 #
@@ -8,7 +8,7 @@
 # live file is missing).
 #
 # This file is OWNER DATA. After installation it stops syncing from
-# upstream — your edits survive `/ztn:update`.
+# upstream — your edits survive `/minder:mem:update`.
 
 # Per-class auto-apply overrides. Keys take the form
 # `{lens-id}__{action-type}__{confidence}` with `*` accepted as a
@@ -23,7 +23,7 @@ classes:
   # reflections). It may auto-append a candidate to the review buffer ONLY when
   # highly confident (low friction on the obvious cases); medium / low always
   # wait for your click — nothing about your mind is recorded uncertainly
-  # while you sleep. Promotion to the constitution stays gated by /ztn:lint F.5
+  # while you sleep. Promotion to the constitution stays gated by /minder:mem:lint F.5
   # regardless of these. Loosen to `*: auto` if you want all of it autonomous;
   # tighten `__high` to `never_auto` if you want to click every single one.
   cognitive-model__principle_candidate_add__high: auto
@@ -57,7 +57,7 @@ biometric:
   # win; rest defer to next week.
   biometric_max_hints_per_week: 3
 
-  # When true, /ztn:maintain Tier II calibration check runs and may
+  # When true, /minder:mem:maintain Tier II calibration check runs and may
   # surface `biometric-threshold-drift` CLARIFICATIONs.
   biometric_calibration_check_enabled: true
 

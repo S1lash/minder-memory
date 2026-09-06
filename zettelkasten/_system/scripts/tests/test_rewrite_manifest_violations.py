@@ -20,7 +20,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 import rewrite_manifest_violations as r  # type: ignore
-from tests._fixture import clear_ztn_env  # type: ignore
+from tests._fixture import clear_minder_memory_env  # type: ignore
 
 
 def _audiences_file(root: Path) -> Path:
@@ -55,7 +55,7 @@ def _broken_manifest() -> dict:
         "batch_id": "20260514-103200",
         "timestamp": "2026-05-14T10:32:00Z",
         "format_version": "2.1",
-        "processor": "ztn:process",
+        "processor": "minder:mem:process",
         # Bare strings + structured (mixed list).
         "sources_processed": [
             "_sources/processed/plaud/2026-05-14T10:00:00Z/transcript.md",
@@ -143,7 +143,7 @@ class RetrofitTests(unittest.TestCase):
             self.assertIn("hubs-empty-shape-autofix", event_ids)
             self.assertIn("tier1-bare-string-wrap-autofix", event_ids)
             self.assertIn("privacy-trio-inject-autofix", event_ids)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_idempotent_on_clean_input(self):
         with tempfile.TemporaryDirectory() as td:
@@ -157,7 +157,7 @@ class RetrofitTests(unittest.TestCase):
                 "batch_id": "20260514-103200",
                 "timestamp": "2026-05-14T10:32:00Z",
                 "format_version": "2.1",
-                "processor": "ztn:process",
+                "processor": "minder:mem:process",
                 "sources_processed": [],
                 "records": {"created": [], "updated": []},
                 "knowledge_notes": {"created": [], "updated": []},
@@ -172,7 +172,7 @@ class RetrofitTests(unittest.TestCase):
             after = json.dumps(data, sort_keys=True)
             self.assertEqual(before, after)
             self.assertEqual(events, [])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class CliDryRunTests(unittest.TestCase):
@@ -196,7 +196,7 @@ class CliDryRunTests(unittest.TestCase):
             self.assertIn("would change", out)
             # File on disk is unchanged.
             self.assertEqual(broken.read_text(encoding="utf-8"), original)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_apply_rewrites_file(self):
         with tempfile.TemporaryDirectory() as td:
@@ -228,7 +228,7 @@ class CliDryRunTests(unittest.TestCase):
             self.assertEqual(
                 written["records"]["created"][0]["origin"], "personal",
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_clean_file_reports_clean(self):
         with tempfile.TemporaryDirectory() as td:
@@ -242,7 +242,7 @@ class CliDryRunTests(unittest.TestCase):
                 "batch_id": "20260514-103200",
                 "timestamp": "2026-05-14T10:32:00Z",
                 "format_version": "2.1",
-                "processor": "ztn:process",
+                "processor": "minder:mem:process",
                 "sources_processed": [],
                 "records": {"created": [], "updated": []},
                 "knowledge_notes": {"created": [], "updated": []},
@@ -257,7 +257,7 @@ class CliDryRunTests(unittest.TestCase):
             ])
             self.assertEqual(rc, 0)
             self.assertIn("clean", out)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_single_file_mode(self):
         with tempfile.TemporaryDirectory() as td:
@@ -280,7 +280,7 @@ class CliDryRunTests(unittest.TestCase):
                 written["tier1_objects"]["projects"]["upserts"][0]["id"],
                 "minder",
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class RetrofitFullPipelineTests(unittest.TestCase):
@@ -295,7 +295,7 @@ class RetrofitFullPipelineTests(unittest.TestCase):
                 "batch_id": "20260514-103200",
                 "timestamp": "2026-05-14T10:32:00Z",
                 "format_version": "2.1",
-                "processor": "ztn:process",
+                "processor": "minder:mem:process",
                 "sources_processed": [],
                 "records": {"created": [], "updated": []},
                 "knowledge_notes": {"created": [], "updated": []},
@@ -318,7 +318,7 @@ class RetrofitFullPipelineTests(unittest.TestCase):
                 "sensitive-entities-note-id-coerce-autofix",
                 {ev["fix_id"] for ev in events},
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_retrofit_relocates_misplaced_tier2_tasks(self):
         with tempfile.TemporaryDirectory() as td:
@@ -331,7 +331,7 @@ class RetrofitFullPipelineTests(unittest.TestCase):
                 "batch_id": "20260514-103200",
                 "timestamp": "2026-05-14T10:32:00Z",
                 "format_version": "2.1",
-                "processor": "ztn:process",
+                "processor": "minder:mem:process",
                 "sources_processed": [],
                 "records": {"created": [], "updated": []},
                 "knowledge_notes": {"created": [], "updated": []},
@@ -366,7 +366,7 @@ class RetrofitFullPipelineTests(unittest.TestCase):
                 "tier2-tasks-relocated-to-tier1",
                 {ev["fix_id"] for ev in events},
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 if __name__ == "__main__":
@@ -579,7 +579,7 @@ class BatchIdRecoveryTests(unittest.TestCase):
                 "batch_id": "20260807-processtick",
                 "timestamp": "2026-08-07T15:12:38Z",
                 "format_version": "2.1",
-                "processor": "ztn:process",
+                "processor": "minder:mem:process",
             }, ensure_ascii=False), encoding="utf-8")
 
             data = json.loads(path.read_text(encoding="utf-8"))

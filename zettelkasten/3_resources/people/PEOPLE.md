@@ -3,11 +3,11 @@
 **Last Updated:** REPLACE_WITH_DATE
 
 All people mentioned in the system. New entries appear automatically when
-`/ztn:process` resolves a name during transcript processing.
+`/minder:mem:process` resolves a name during transcript processing.
 
 **Schema:**
 - `Tier` — 1 (has profile OR mentions ≥ 8), 2 (3–7 mentions), 3 (1–2), `stale` (0 mentions + no profile)
-- `Mentions` — 1-per-file count across `_records/` and PARA. Recomputed by `/ztn:bootstrap` and `/ztn:maintain`
+- `Mentions` — 1-per-file count across `_records/` and PARA. Recomputed by `/minder:mem:bootstrap` and `/minder:mem:maintain`
 - `Last` — latest `created` date where person appears in frontmatter
 - Tier `stale` → row MUST be moved to `## Stale People` (split-table) and populate `Reason` per Archive Contract Form B (`_system/docs/SYSTEM_CONFIG.md`).
 
@@ -20,11 +20,11 @@ The person this base belongs to. Kept in its own section, separate from the gene
 - **Identifier** — derived from `_system/SOUL.md → ## Identity → Name:` by the same `firstname-lastname` rule as every other row. It is the id used in `speaker:` on observation records.
 - **Always a valid identity.** Identity checks treat the owner identifier as registered by definition — it is never reported as an identifier missing from the registry.
 - **Registered, never auto-populated.** The owner is NOT added to the `people:` array of records and notes automatically. They are present by default almost everywhere; auto-population would inflate every count and carry no signal. Their *absence* from a record is what is significant.
-- **Profile** — `3_resources/people/{id}.md`, same shape as any other profile (`5_meta/templates/person-template.md`), assembled by `/ztn:bootstrap` from SOUL, the active constitution and the registry.
+- **Profile** — `3_resources/people/{id}.md`, same shape as any other profile (`5_meta/templates/person-template.md`), assembled by `/minder:mem:bootstrap` from SOUL, the active constitution and the registry.
 
 | ID | Name | Role | Profile |
 |---|---|---|---|
-| _(seeded by `/ztn:bootstrap`)_ | | | |
+| _(seeded by `/minder:mem:bootstrap`)_ | | | |
 
 ---
 

@@ -1,7 +1,7 @@
 # Engine migrations
 
 Migration scripts run by `scripts/run_migrations.py`, which both
-`scripts/sync_engine.sh` and the `/ztn:update` skill call after a successful
+`scripts/sync_engine.sh` and the `/minder:mem:update` skill call after a successful
 fetch + checkout. One file per breaking engine change.
 
 ## Convention
@@ -48,7 +48,7 @@ fetch + checkout. One file per breaking engine change.
      data the clone still holds, have the consumer rebuild it rather than trust
      a file written once. This removes the whole «written before we knew
      better» class rather than one instance, and needs no ledger entry at all
-     (`018`'s conversion plans, rebuilt by `/ztn:role:add --from-previous`).
+     (`018`'s conversion plans, rebuilt by `/minder:mem:role:add --from-previous`).
   2. **A new migration.** When the artifact is read by a person rather than by
      code, there is no read-time hook to hang the rebuild on, and a new ledger
      entry is the only mechanism. Delegate to the original's producers rather
@@ -59,14 +59,8 @@ fetch + checkout. One file per breaking engine change.
 
   | Migration | Kind | Why |
   |---|---|---|
-  | `008` skill rename | structural | a stale skill folder beside the new one leaves two skills answering one name |
-  | `009` biometric namespace | structural | it MOVES owner data, and the new pipeline reads only the new location — half-moved means reading the wrong place |
-  | `002` `Family` column | structural | a schema column `/ztn:process` branches on; conservative on schema, by default |
-  | `018` roles hand-off | heal | it also moves owner data, but nothing reads the old location — un-run means invisible, not wrong |
-  | `020` roles hand-off memory | heal | it only refreshes generated artifacts a clone already holds; un-run means a stale hand-off, not a wrong engine |
-  | `007` manifest retrofit | heal | historical data is repaired or it is not; the engine reads it either way |
-  | `023`, `024`, `025` identity | heal | they touch a registry, which reads structural — but un-run leaves it INCOMPLETE, not wrong: a missing owner row is a missing row, an un-migrated retirement table is read as unparsed rows that surface as questions, and `025` only reports. Nothing reads a wrong place |
-  | `016`, `004`, `005`, `015` | heal | they only print |
+  | `031` harness wiring | structural | after the sync the old skills are gone and the old hot rule dangles; a session that continues imports a dead rule and finds no skill under either name |
+  | `032` product rename over the clone | heal | un-run means the old name in files the engine still reads correctly — stale words, not a wrong place |
 
   The distinction is not stylistic. A repair of historical data used to abort
   the whole update and stay unrecorded, so every future update re-ran it and
@@ -75,7 +69,7 @@ fetch + checkout. One file per breaking engine change.
   engine update** — and neither may a notice.
 
   A detection-only migration still exits 0 and prints its recovery command to
-  stderr, which `/ztn:update` surfaces in its Post-update recovery list. It must
+  stderr, which `/minder:mem:update` surfaces in its Post-update recovery list. It must
   NOT coerce a failed detector run into a false "all clear" — if the detector
   produces no valid output, say so and point to a manual check.
 
@@ -102,38 +96,22 @@ A migration whose logic does not fit in portable bash keeps its python beside it
 named `_NNN_*.py` — the leading underscore is what keeps the runner from globbing
 it as a migration of its own (`pending()` globs `*.sh`).
 
-- `_018_handoff.py` · `_018_plan.py` · `_018_selfcheck.py` — the three producers
-  of migration `018`: the owner's hand-off, one conversion plan per parked role,
-  and the self-check that proves the move happened.
-- `_018_memory.py` — the single reader of «what a previous-shape role
-  accumulated and where it lives», shared by the hand-off and the plan so the two
-  can never disagree. It reports an inventory with paths, never a copy: the files
-  are the source of truth and sit beside the plan.
+- `_031_harness_wiring.py` — migration `031`'s producer: the Claude Code home
+  re-wired for Minder Memory (markers, links, the installer, the upstream
+  remote) and the digest that tells the owner what they hold outside the
+  repository.
+- `_032_minder_memory_rebrand.py` — the rename engine: the one token map and
+  path rule that turned the former product name into Minder Memory. Migration
+  `032` runs it over the clone; the maintainer ran it over the authoring base
+  and the sibling repositories.
 
-- `_027_starter_axiom_audit.py` — migration `027`'s detector: adopted starter
-  axioms still carrying `claude-code` while unedited. Reports to the owner's
-  clarification queue; never edits the constitution, which migrations may not
-  touch.
+## The floor
 
-- `_023_owner_persona.py` · `_024_retirement_schema.py` ·
-  `_025_identity_report.py` — the three identity migrations: the owner's
-  registry row and assembled profile, the retirement tables reaching the
-  declared schema, and the identity audit's findings reaching the owner's
-  clarification queue.
-- `_identity_migration_lib.py` — what those three share: resolving the base
-  whatever the owner named it, importing the engine's own registry parsers
-  rather than writing a second one, LF/UTF-8 file I/O, hash-guarded generated
-  blocks (refresh what we wrote, never touch what the owner edited), and
-  appending to the clarification queue without ever asking a question twice.
-  Not named `_NNN_` because it belongs to no single migration; the leading
-  underscore is what keeps it out of the `*.sh` glob either way.
-
-`020-roles-previous-shape-memory.sh` re-runs those producers for a clone where
-`018` already recorded `applied` and therefore never runs again. It is the
-`heal`-kind answer to «a migration improved after it succeeded» — the retry rule
-in this file says retry follows failure, never improvement, so reaching an
-already-migrated clone takes a new migration, not an edit to the old one.
-
+The chain starts at `031`. A clone older than engine `0.69.0` updates to
+`0.69.0` first (`scripts/sync_engine.sh --self-heal --branch release/0.69.0`), then to the
+current release; `sync_engine.sh` refuses the direct jump, because the
+migrations that shaped a base between those versions are not part of the
+current engine.
 
 ## When to author one
 

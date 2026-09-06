@@ -1,6 +1,6 @@
 # Batch Log
 
-> Append-only index of all `/ztn:process` batch operations.
+> Append-only index of all `/minder:mem:process` batch operations.
 > Full report for each batch lives in `batches/{batch_id}.md`.
 > Field schema — see `_system/docs/batch-format.md`.
 

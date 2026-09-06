@@ -2,7 +2,7 @@
 
 The miner lens (`cognitive-model`) emits this type. It appends one candidate
 to the high-recall `principle-candidates.jsonl` buffer (CAPTURE, not
-promotion — `/ztn:lint` F.5 gates the constitution downstream).
+promotion — `/minder:mem:lint` F.5 gates the constitution downstream).
 """
 
 from __future__ import annotations
@@ -148,7 +148,7 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(obj["suggested_domain"], "ai-interaction")
             self.assertEqual(obj["source_record_count"], 3)
             self.assertEqual(obj["origin"], "agent-lens")
-            self.assertEqual(obj["captured_by"], "ztn:agent-lens")
+            self.assertEqual(obj["captured_by"], "minder:mem:agent-lens")
             self.assertEqual(obj["session_id"], "agent-lens/cognitive-model/2026-06-27")
             self.assertEqual(obj["date"], date.today().isoformat())
             self.assertEqual(obj["applies_in_concepts"], [])

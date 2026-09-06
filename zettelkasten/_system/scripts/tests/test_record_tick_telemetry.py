@@ -83,17 +83,22 @@ def agent_call(tool_id: str) -> str:
     )
 
 
+def _write_lf(path, text: str) -> None:
+    with open(path, "w", encoding="utf-8", newline="") as handle:
+        handle.write(text)
+
+
 class Tree:
     """A throwaway `projects/` root holding one session."""
 
-    def __init__(self, tmp: Path, slug: str = "-home-user-minder-ztn"):
+    def __init__(self, tmp: Path, slug: str = "-home-user-minder-memory"):
         self.root = tmp / "projects"
         self.slug_dir = self.root / slug
         self.slug_dir.mkdir(parents=True)
         self.main = self.slug_dir / (SESSION + ".jsonl")
 
     def write_main(self, lines) -> None:
-        self.main.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="")
+        _write_lf(self.main, "\n".join(lines) + "\n")
 
     def add_subagent(self, name: str, lines, meta: dict, first_user: str | None = None):
         sub_dir = self.slug_dir / SESSION / "subagents"
@@ -104,12 +109,8 @@ class Tree:
                 0,
                 json.dumps({"type": "user", "message": {"content": first_user}}),
             )
-        (sub_dir / (name + ".jsonl")).write_text(
-            "\n".join(body) + "\n", encoding="utf-8", newline=""
-        )
-        (sub_dir / (name + ".meta.json")).write_text(
-            json.dumps(meta), encoding="utf-8", newline=""
-        )
+        _write_lf(sub_dir / (name + ".jsonl"), "\n".join(body) + "\n")
+        _write_lf(sub_dir / (name + ".meta.json"), json.dumps(meta))
 
 
 class ExtractUsageTest(unittest.TestCase):
@@ -186,8 +187,8 @@ class CollectTest(unittest.TestCase):
                 [assistant("s1", output=42)],
                 # Description is free prose the dispatching model wrote — it
                 # names a different role on purpose here.
-                {"agentType": "ztn-role", "description": "Second run of shturman"},
-                first_user="Your complete assignment is in this file:\n\n  /tmp/ztn-roles-abc/prompt-minder-pm.md\n\nRead it in full.",
+                {"agentType": "minder-mem-role", "description": "Second run of shturman"},
+                first_user="Your complete assignment is in this file:\n\n  /tmp/minder-mem-roles-abc/prompt-minder-pm.md\n\nRead it in full.",
             )
             got = rt.collect(SESSION, tree.root)
             labels = {b["agent"] for b in got["by_agent"]}
@@ -201,7 +202,7 @@ class CollectTest(unittest.TestCase):
             tree.add_subagent(
                 "agent-ccc",
                 [assistant("s1", output=9)],
-                {"agentType": "ztn-role", "description": "Run something"},
+                {"agentType": "minder-mem-role", "description": "Run something"},
                 first_user="No assignment path in this text at all.",
             )
             got = rt.collect(SESSION, tree.root)
@@ -259,7 +260,7 @@ class CollectTest(unittest.TestCase):
                 "agent-a",
                 [assistant("s1", model="claude-sonnet-5", output=1),
                  assistant("s2", model="claude-sonnet-5", output=1)],
-                {"agentType": "ztn-role"},
+                {"agentType": "minder-mem-role"},
                 first_user="assignment: /tmp/x/prompt-shturman.md",
             )
             got = rt.collect(SESSION, tree.root)
@@ -272,11 +273,7 @@ class CollectTest(unittest.TestCase):
     def test_truncated_final_line_is_skipped_and_the_rest_survives(self):
         with tempfile.TemporaryDirectory() as tmp:
             tree = Tree(Path(tmp))
-            tree.main.write_text(
-                assistant("m1", output=11) + "\n" + '{"type":"assistant","mess',
-                encoding="utf-8",
-                newline="",
-            )
+            _write_lf(tree.main, assistant("m1", output=11) + "\n" + '{"type":"assistant","mess')
             got = rt.collect(SESSION, tree.root)
             self.assertEqual(got["status"], "measured")
             self.assertEqual(got["totals"]["output"], 11)
@@ -446,7 +443,7 @@ class SoftFailureTest(unittest.TestCase):
     def test_unwritable_output_still_exits_zero(self):
         with tempfile.TemporaryDirectory() as tmp:
             blocker = Path(tmp) / "blocker"
-            blocker.write_text("not a directory", encoding="utf-8", newline="")
+            _write_lf(blocker, "not a directory")
             code = rt.main(
                 ["process", "--session-id", "", "--out", str(blocker / "tick-telemetry.jsonl")]
             )

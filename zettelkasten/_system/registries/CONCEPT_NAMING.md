@@ -29,7 +29,7 @@ node.
 
 This file is about the **format** of that identifier. Whether a
 particular thing in the world deserves to be a concept, and which
-concept it is, is editorial judgment exercised in `/ztn:process`.
+concept it is, is editorial judgment exercised in `/minder:mem:process`.
 Format rules apply uniformly once that judgment is made.
 
 ### A concept is more than just a name
@@ -75,9 +75,9 @@ A note can carry all three. They do not duplicate each other.
 One consistent surface for identifiers eliminates the dedup problem
 across languages. If "ежедневник" and "daily-planner" both became
 concept names, the same thing would split into two graph nodes and
-every cross-reference would have to know both forms. ZTN holds a
+every cross-reference would have to know both forms. Minder Memory holds a
 single language at the identifier layer; non-English content is
-translated upstream in `/ztn:process` before a name reaches a
+translated upstream in `/minder:mem:process` before a name reaches a
 manifest. A non-English string in `concepts:` is therefore a format
 error — translation didn't happen, fix the upstream extraction.
 
@@ -135,7 +135,7 @@ normaliser has no `type` field and no lexicon. Guessing would corrupt graph
 identity — the one thing the concept layer exists to protect — by
 collapsing `decision_making` into `making`. So the engine does not guess:
 rule 5 ("no type prefix in the name") is enforced **upstream at
-extraction**, in the `/ztn:process` prompt, where the model knows the
+extraction**, in the `/minder:mem:process` prompt, where the model knows the
 concept's type and meaning. If a weld nonetheless slips through, the name
 is preserved — a redundant prefix is cosmetic, safe, and recoverable;
 a wrong strip is silent identity loss.
@@ -171,7 +171,7 @@ Identity stays in the name; type lives in a field that can change
 freely.
 
 **This rule is enforced at extraction, not by the normaliser.** Whoever
-*assigns* the name (the `/ztn:process` model, which knows the type) keeps
+*assigns* the name (the `/minder:mem:process` model, which knows the type) keeps
 the type out of it. The mechanical normaliser does **not** strip type
 prefixes, because it cannot safely tell a redundant label from a compound:
 `skill_based`, `decision_making`, `value_chain`, `goal_setting`,
@@ -230,10 +230,10 @@ CLARIFICATION for owner action. The single source of truth is
 | Starts with a type word but is a compound (`decision_making`, `skill_based`, `value_chain`) | **No action — kept verbatim.** The normaliser never strips a type prefix (see "Type prefixes are NOT mechanically stripped"). Rule 5 is enforced at extraction, not here. |
 
 The normaliser is invoked at every emission point: capture-candidate
-helper (write-time), `/ztn:process` Step 3.4 Q15 + Step 3.6
-structural verification + Step 4.7 producer-side guard, `/ztn:lint`
+helper (write-time), `/minder:mem:process` Step 3.4 Q15 + Step 3.6
+structural verification + Step 4.7 producer-side guard, `/minder:mem:lint`
 Scan A.7 `lint_concept_audit.py` (post-write defence-in-depth),
-`/ztn:lint` F.5 promotion (`applies_in_concepts[]` propagation).
+`/minder:mem:lint` F.5 promotion (`applies_in_concepts[]` propagation).
 Across all paths, format violations resolve mechanically; owner
 sees no queue, takes no action.
 

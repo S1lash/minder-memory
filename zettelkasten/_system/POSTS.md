@@ -3,8 +3,8 @@
 **Last Updated:** REPLACE_WITH_DATE
 
 > Owner-maintained registry of public-facing content produced from this
-> ZTN base. `/ztn:maintain` projects content candidates into
-> `_system/views/CONTENT_MAP.md` and `/ztn:content` drafts from them; published
+> Minder Memory base. `/minder:mem:maintain` projects content candidates into
+> `_system/views/CONTENT_MAP.md` and `/minder:mem:content` drafts from them; published
 > items land here manually after the owner ships them. The `Source Notes` cell
 > is load-bearing: the draft-maintainer treats a draft as published when a row's
 > Source Notes overlap the draft's source notes.
@@ -22,7 +22,7 @@
 ## Content Strategy
 
 > Free-form section. Define your channels, voice, audience, cadence.
-> `/ztn:content` reads this when proposing content angles.
+> `/minder:mem:content` reads this when proposing content angles.
 
 ### Channels
 

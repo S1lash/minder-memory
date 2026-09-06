@@ -16,7 +16,7 @@ from tests._fixture import (  # type: ignore
     VALID_PERSONAL_NOTE,
     VALID_PLACEHOLDER_CORE,
     VALID_SENSITIVE_NOTE,
-    clear_ztn_env,
+    clear_minder_memory_env,
     make_fixture,
 )
 import gen_constitution_core as g  # type: ignore
@@ -50,7 +50,7 @@ class GenCoreTests(unittest.TestCase):
             self.assertIn("axiom-identity-001", text)
             self.assertIn("principle-tech-001", text)
             self.assertIn("rule-health-001", text)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_applies_to_claude_code_filter(self):
         """Principles whose applies_to does NOT include claude-code must not
@@ -67,7 +67,7 @@ class GenCoreTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             text = _read(out)
             self.assertNotIn("rule-health-001", text)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_placeholder_core_excluded(self):
         """Placeholder notes never ship (invariant #18)."""
@@ -78,7 +78,7 @@ class GenCoreTests(unittest.TestCase):
             rc = g.main(["--output", str(out)])
             self.assertEqual(rc, 0)
             self.assertNotIn("axiom-meta-001", _read(out))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_advisory_length_warns_but_does_not_fail(self):
         """Over-advisory output must still ship (content never truncated)."""
@@ -94,7 +94,7 @@ class GenCoreTests(unittest.TestCase):
             self.assertTrue(out.exists())
             self.assertIn("NOTE: view exceeds advisory", _read(out))
             self.assertIn("If it can be better", _read(out))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_default_output_is_single_file(self):
         """Single constitution-core.md, no context suffix."""
@@ -104,7 +104,7 @@ class GenCoreTests(unittest.TestCase):
             rc = g.main([])
             self.assertEqual(rc, 0)
             self.assertTrue((fx.system / "views" / "constitution-core.md").exists())
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 if __name__ == "__main__":

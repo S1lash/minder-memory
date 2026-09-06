@@ -30,7 +30,7 @@ from tests._fixture import (  # type: ignore
     VALID_PERSONAL_NOTE,
     VALID_PLACEHOLDER_CORE,
     VALID_SENSITIVE_NOTE,
-    clear_ztn_env,
+    clear_minder_memory_env,
     make_fixture,
 )
 import _common as c  # type: ignore
@@ -56,7 +56,7 @@ class SecurityInvariants(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertNotIn("axiom-meta-001", _read(out))
             self.assertNotIn("Placeholder content never ships.", _read(out))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_S2_applies_to_filter_excludes_non_claude_code_principles(self):
         """Consumer filter is load-bearing: a core principle without
@@ -76,7 +76,7 @@ class SecurityInvariants(unittest.TestCase):
             rc = g.main(["--output", str(out)])
             self.assertEqual(rc, 0)
             self.assertNotIn("rule-health-001", _read(out))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_S3_soul_values_filter_is_explicit_and_guarded(self):
         """SOUL.Values scope filter is a load-bearing constant. This test

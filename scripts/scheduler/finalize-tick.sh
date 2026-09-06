@@ -77,7 +77,7 @@ AUTHORED=""
 
 # A commit an earlier tick explicitly DISOWNED is never folded, by any tick,
 # whatever its subject says. Without this the refusal was single-tick only:
-# `/ztn:roles` correctly refuses to deliver a commit it did not author and
+# `/minder:mem:roles` correctly refuses to deliver a commit it did not author and
 # exits partial, leaving it in the local repo — and the next tick in the
 # nightly chain (lint at 05:00) runs this script with no authored list of its
 # own, falls through to subject matching, sees `[scheduled]`, and folds the

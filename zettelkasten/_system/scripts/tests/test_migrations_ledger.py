@@ -2,7 +2,7 @@
 
 The defect these pin: `sync_engine.sh` used to run each migration under
 `set -e` and record its name only AFTER success, so a failing migration both
-aborted the update AND stayed unrecorded — every future `/ztn:update` re-ran it
+aborted the update AND stayed unrecorded — every future `/minder:mem:update` re-ran it
 and re-aborted at the same point. A friend's clone was stuck that way for weeks
 on `007`, a best-effort repair of historical data that can legitimately fail.
 
@@ -34,7 +34,8 @@ UNDECLARED = "#!/usr/bin/env bash\nexit {rc}\n"
 def _write(d: Path, name: str, body: str, rc: int = 0) -> Path:
     d.mkdir(parents=True, exist_ok=True)
     p = d / name
-    p.write_text(body.format(rc=rc), encoding="utf-8", newline="")
+    with open(p, "w", encoding="utf-8", newline="") as handle:
+        handle.write(body.format(rc=rc))
     return p
 
 

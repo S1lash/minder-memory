@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Deterministic content hash of a draft body — the owner-edit guard for
-`/ztn:content --maintain`.
+`/minder:mem:content --maintain`.
 
 The draft-maintainer stores `last_auto_hash` in the content ledger after every
 write. On the next run it recomputes this hash for each `auto` draft; if it

@@ -91,7 +91,7 @@ peers in the validation set.
 |---|---|---|
 | `ai-interaction` | How to work with AI agents | Prompt patterns, agent design, what behaviour to ask for. Distinct from `tech` because it's about the *interaction*, not the implementation. |
 | `tech` | Technical knowledge not bound to current work | Languages, frameworks, tooling explored outside the immediate job. If a tech topic is bound to a current `work` project, tag both. |
-| `meta` | Reflection on the system itself — ZTN, second-brain practice | Notes about how the knowledge base or workflow itself works. Self-referential by nature. |
+| `meta` | Reflection on the system itself — Minder Memory, second-brain practice | Notes about how the knowledge base or workflow itself works. Self-referential by nature. |
 
 These thirteen are reserved keywords. Extensions cannot **be equal
 to** a canonical label (case-folded) and cannot differ only in
@@ -174,14 +174,14 @@ related principles, not one unscoped.
 The domain layer is autonomous on the deterministic substrate — the
 engine resolves format violations and unknown values via
 `_system/scripts/_common.py::normalize_domain()` plus the whitelist
-check (canonical 13 ∪ active Extensions) performed by `/ztn:lint`
+check (canonical 13 ∪ active Extensions) performed by `/minder:mem:lint`
 Scan A.7 (`lint_concept_audit.py::fix_domains`).
 
 | Condition | Engine action |
 |---|---|
 | Value in canonical 13 verbatim | Pass-through. |
 | Value normalises to a canonical or active extension entry | **Silent autofix** — rewrite to normalised form. Fix-id `domain-normalise-autofix`. (Catches `Work` → `work`, `ai_interaction` → `ai-interaction`.) |
-| Slash-syntax (`work/learning`, `personal/psychology`) | **Split-and-filter.** Each part normalised independently and filtered against the accept set. Both canonical → both kept (`work/learning` → `[work, learning]`). Suffix not in whitelist → silent drop of suffix only (`work/process` → `[work]`). Fix-id `domain-normalise-autofix` on the resulting set; `domain-drop-autofix` on each part that fails the filter. The rationale: slash is the owner's compact notation for multi-domain membership; the flat ZTN axis is multi-valued (`domains: [work, learning]`), so the substrate honours the intent rather than collapsing it. |
+| Slash-syntax (`work/learning`, `personal/psychology`) | **Split-and-filter.** Each part normalised independently and filtered against the accept set. Both canonical → both kept (`work/learning` → `[work, learning]`). Suffix not in whitelist → silent drop of suffix only (`work/process` → `[work]`). Fix-id `domain-normalise-autofix` on the resulting set; `domain-drop-autofix` on each part that fails the filter. The rationale: slash is the owner's compact notation for multi-domain membership; the flat Minder Memory axis is multi-valued (`domains: [work, learning]`), so the substrate honours the intent rather than collapsing it. |
 | Value well-formed but NOT in canonical or extension list | **Silent drop** — entity loses that single value (other valid entries kept). Fix-id `domain-drop-autofix` with reason `not-in-whitelist`. |
 | Value fails kebab-case ASCII / length 2–32 / contains non-ASCII | **Silent drop**. Fix-id `domain-drop-autofix` with reason `format-unfixable`. |
 
@@ -194,7 +194,7 @@ owner-curated outside the pipeline.
 **LLM cascade.** Residual values that survive deterministic
 normalisation but miss the whitelist are not silently dropped at the
 substrate level — they enter the concept-matcher subagent in
-`/ztn:process` Step 3.4.5 (same matcher for inbox-scan and
+`/minder:mem:process` Step 3.4.5 (same matcher for inbox-scan and
 `--reprocess-corpus` modes), which receives them alongside unmatched
 concept candidates and emits `domain_resolutions[]` per value:
 
@@ -277,7 +277,7 @@ to `deprecated:{YYYY-MM-DD}`; do not delete.
 | Personal budget review | `[money]` | Personal-side; work budget would be `[work]`. |
 | Calendar redesign for the quarter | `[time]` | Meta-practice of running one's day. |
 | Prompt-engineering pattern for an agent | `[ai-interaction]` | About interaction, not stack implementation. |
-| ZTN engine spec edit | `[meta]` | Self-referential to the system. |
+| Minder Memory engine spec edit | `[meta]` | Self-referential to the system. |
 | Generic life reflection | `[personal]` | When more specific doesn't fit. |
 | Pure code-snippet reference | `[]` | Not a life-area question. |
 
@@ -285,18 +285,18 @@ to `deprecated:{YYYY-MM-DD}`; do not delete.
 
 ## Relationship to Minder downstream
 
-ZTN emits `domains: [...]` arrays as-is; downstream Minder consumer
+Minder Memory emits `domains: [...]` arrays as-is; downstream Minder consumer
 derives its per-concept-mention scope (`ConceptDomain` enum: WORK /
 PERSONAL / MIXED / UNKNOWN) internally from the containing entity's
-`domains:` + `origin`. ZTN does NOT emit ConceptDomain values
-directly. The two axes are kept structurally separate: ZTN's
+`domains:` + `origin`. Minder Memory does NOT emit ConceptDomain values
+directly. The two axes are kept structurally separate: Minder Memory's
 fine-grained life-area axis is richer than Minder's per-mention
 scope, and collapsing one into the other would lose information at
 the boundary.
 
 The Minder enum is mirrored as `_common.py::MINDER_CONCEPT_DOMAIN`
 for documentation and downstream consumer reference; it does NOT
-participate in ZTN-side validation of `domains:` values.
+participate in Minder Memory-side validation of `domains:` values.
 
 ---
 

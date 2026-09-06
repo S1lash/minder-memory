@@ -1,7 +1,7 @@
-# Obsidian — graph and search presets for ZTN
+# Obsidian — graph and search presets for Minder Memory
 
 A curated set of filters that turn Obsidian's graph and search into
-specific lenses on your ZTN base. Each preset is a copy-paste query.
+specific lenses on your Minder Memory base. Each preset is a copy-paste query.
 
 ## How to apply a graph preset
 

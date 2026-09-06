@@ -57,7 +57,7 @@ WEST = timezone(timedelta(hours=-5))
 NOW = datetime(2026, 7, 28, 7, 0, tzinfo=WEST)
 
 MINDER_MISSING = "[_minder.md missing — base conventions unavailable]"
-CONSTITUTION_MISSING = "[constitution-core.md missing — run /ztn:regen-constitution]"
+CONSTITUTION_MISSING = "[constitution-core.md missing — run /minder:mem:regen-constitution]"
 PREV_NONE = "[previous run: none]"
 
 LAST_RUN_LINE = {

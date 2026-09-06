@@ -1,20 +1,20 @@
-# ZTN engine output contract
+# Minder Memory engine output contract
 
 `v2.json` (this directory) is the canonical **JSON Schema** that every
-manifest written by a ZTN engine skill MUST validate against. Any
-process that wants to consume ZTN output — Minder's ingest worker, a
+manifest written by a Minder Memory engine skill MUST validate against. Any
+process that wants to consume Minder Memory output — Minder's ingest worker, a
 fork running on someone's laptop, an experimental GraphRAG layer, a
 notebook — reads this contract and nothing more.
 
-This README is consumer-agnostic on purpose. ZTN is a standalone
+This README is consumer-agnostic on purpose. Minder Memory is a standalone
 engine; downstream is an open set.
 
 ---
 
 ## What is a manifest
 
-After every persistent-state-changing run of `/ztn:process`,
-`/ztn:maintain`, `/ztn:lint`, or `/ztn:agent-lens`, the engine writes
+After every persistent-state-changing run of `/minder:mem:process`,
+`/minder:mem:maintain`, `/minder:mem:lint`, or `/minder:mem:agent-lens`, the engine writes
 a single JSON file under `_system/state/batches/`:
 
 ```
@@ -35,7 +35,7 @@ All four skills emit into one shape distinguished by the top-level
 ## Schema location and version evolution
 
 - **Active schema:** `v2.json` in this directory. `$id` =
-  `urn:ztn:manifest-schema:v2` (URN — no URL resolution, no domain
+  `urn:minder-memory:manifest-schema:v2.3` (URN — no URL resolution, no domain
   commitment, consumer-agnostic). Draft 2020-12.
 - **Past schemas** stay in this directory unchanged
   (`v2.json` → `v2.1.json` → `v3.json` …). Old batches keep
@@ -71,6 +71,7 @@ whether to update.
 | Version | Change | Rationale |
 |---|---|---|
 | 2.2 | Add `technical` to `concepts.upserts[].type` enum (additive). | Producer-emitted category observed in real batches (e.g. `20260514-103200-process`); owner-approved trade-off 2a in resolve-clarifications session 2026-05-18. |
+| 2.3 | `processor` and `captured_by` name the product's namespace `minder:mem:<pipeline>`; the schema `$id` moves to `urn:minder-memory:…`. The former spelling is rejected; batches written before engine 1.0.0 validate after migration 032 has rewritten them. | Product rename (ADR-029). Not additive by the letter of the rules, shipped as MINOR because no consumer of the former spelling exists and the on-disk batches are rewritten in the same update. |
 
 ---
 
@@ -166,7 +167,7 @@ python3 _system/scripts/lint_manifest_schema.py --batches-dir _system/state/batc
 | Top-level key | What it carries |
 |---|---|
 | `batch_id` / `timestamp` / `format_version` / `processor` | Identity. Always present. |
-| `sources_processed` | Files consumed (transcripts under `_sources/processed/`). `/ztn:process` only. |
+| `sources_processed` | Files consumed (transcripts under `_sources/processed/`). `/minder:mem:process` only. |
 | `records` | Records created/updated under `_records/{meetings,observations}/`. |
 | `knowledge_notes` | PARA notes created/updated under `1_projects/`…`4_archive/`. |
 | `hubs` | Hub files created/updated under `5_meta/mocs/`. |
@@ -198,10 +199,10 @@ presence + type only.
 
 | Skill | Role | What it emits |
 |---|---|---|
-| `/ztn:process` | Creator. Turns transcripts into records / knowledge / hubs / concepts / Tier 1 typed objects. | All sections; the densest manifest. |
-| `/ztn:maintain` | Integrator. Reconciles drift, completes graph linkage, suggests tier shifts. | Diff-shaped: `hubs.updated[]`, `tier1_objects.people.upserts[]` with `tier_suggested`, etc. Suggests; never silently mutates ownership semantics. |
-| `/ztn:lint` | Cleaner / promoter. Auto-fixes (concept names, audience tags, privacy-trio backfill), promotes principle candidates to Tier 0, surfaces dedup pairs as CLARIFICATIONs (does not auto-merge). | Stats + checksum updates for autofixed files; `constitution.principles.upserts[]` on F.5 promotion. |
-| `/ztn:agent-lens` | Outside-view hypothesiser. Generates lens observations about owner state from accumulated content. | `tier2_objects.lens_observation.upserts[]` with `is_hypothesis: true`; references existing concepts (never creates new ones). |
+| `/minder:mem:process` | Creator. Turns transcripts into records / knowledge / hubs / concepts / Tier 1 typed objects. | All sections; the densest manifest. |
+| `/minder:mem:maintain` | Integrator. Reconciles drift, completes graph linkage, suggests tier shifts. | Diff-shaped: `hubs.updated[]`, `tier1_objects.people.upserts[]` with `tier_suggested`, etc. Suggests; never silently mutates ownership semantics. |
+| `/minder:mem:lint` | Cleaner / promoter. Auto-fixes (concept names, audience tags, privacy-trio backfill), promotes principle candidates to Tier 0, surfaces dedup pairs as CLARIFICATIONs (does not auto-merge). | Stats + checksum updates for autofixed files; `constitution.principles.upserts[]` on F.5 promotion. |
+| `/minder:mem:agent-lens` | Outside-view hypothesiser. Generates lens observations about owner state from accumulated content. | `tier2_objects.lens_observation.upserts[]` with `is_hypothesis: true`; references existing concepts (never creates new ones). |
 
 Per-section field detail: the `$defs` in `v2.json`.
 
@@ -214,7 +215,7 @@ reach a consumer:
 
 - **Candidate buffers** — `principle-candidates.jsonl`,
   `people-candidates.jsonl`. Pre-resolution staging; promotion gates
-  on `/ztn:lint` F.5 (principles) or `/ztn:resolve-clarifications`
+  on `/minder:mem:lint` F.5 (principles) or `/minder:mem:resolve-clarifications`
   (people).
 - **Working memory** — `OPEN_THREADS.md`. Until the focus engine arrives.
 - **HITL queues** — `_system/state/CLARIFICATIONS.md`. Owner-facing only.
@@ -327,8 +328,8 @@ else:
 EOF
 ```
 
-The same logic runs nightly inside `/ztn:lint` Scan H — see
-`integrations/claude-code/skills/ztn-lint/SKILL.md`. Validator failures
+The same logic runs nightly inside `/minder:mem:lint` Scan H — see
+`integrations/claude-code/skills/minder-mem-lint/SKILL.md`. Validator failures
 surface as `manifest-schema-violation: <batch_id>` CLARIFICATIONs in
 the engine, never silently.
 

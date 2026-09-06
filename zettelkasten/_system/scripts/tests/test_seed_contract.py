@@ -67,7 +67,7 @@ class TestScanSkeleton(unittest.TestCase):
         _write(sk / "zettelkasten/_system/state/content-pipeline-state.template.json", "{}\n")
         _write(sk / "zettelkasten/_system/scripts/biometric_thresholds.template.yaml", "a: 1\n")
         _write(sk / "zettelkasten/_system/scripts/biometric_thresholds.yaml", "a: 1\n")
-        _write(sk / "integrations/obsidian/minder-ztn.template.md")  # whitelist
+        _write(sk / "integrations/obsidian/minder-memory.template.md")  # whitelist
         return sk
 
     def _manifest(self) -> dict:

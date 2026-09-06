@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests._fixture import clear_ztn_env, make_fixture  # type: ignore
+from tests._fixture import clear_minder_memory_env, make_fixture  # type: ignore
 import render_tags as r  # type: ignore
 
 
@@ -67,7 +67,7 @@ class RenderTagsTest(unittest.TestCase):
         self.tags_path = self.registries / "TAGS.md"
 
     def tearDown(self) -> None:
-        clear_ztn_env()
+        clear_minder_memory_env()
         self._tmp.cleanup()
 
     # -- helpers ---------------------------------------------------------
@@ -94,7 +94,7 @@ class RenderTagsTest(unittest.TestCase):
         self.write("3_resources/c.md", note("c", ["type/idea"]))
         self.write("4_archive/d.md", note("d", ["domain/work"]))
         self.write("5_meta/mocs/hub-x.md", note("hub-x", ["hub"]))
-        self.write("5_skills/ztn-process.md", note("s", ["type/skill"]))
+        self.write("5_skills/minder-mem-process.md", note("s", ["type/skill"]))
 
         counts, notes = r.collect_tags(self.base)
         self.assertEqual(notes, 6)

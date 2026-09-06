@@ -8,8 +8,8 @@
 # `_sources/.{name}.lock` (the inbox dir doubles as the lock home for
 # every pipeline skill — process / maintain / lint / agent-lens / content /
 # roles — plus the resolve session). Each skill reads them all at Step 0 and aborts
-# on any present. `.content.lock` matters because `/ztn:content --maintain`
-# reads CONTENT_MAP.md while `/ztn:maintain` (Step 7.8) rewrites it.
+# on any present. `.content.lock` matters because `/minder:mem:content --maintain`
+# reads CONTENT_MAP.md while `/minder:mem:maintain` (Step 7.8) rewrites it.
 #
 # Usage:
 #   bash scripts/scheduler/lock-check.sh

@@ -3,8 +3,8 @@
     {
       "type": "file",
       "ctime": 1714838400000,
-      "path": "minder-ztn.md",
-      "title": "🏠 minder-ztn"
+      "path": "minder-memory.md",
+      "title": "🏠 minder-memory"
     },
     {
       "type": "group",
@@ -139,7 +139,7 @@
           "type": "file",
           "ctime": 1714838400022,
           "path": "5_meta/help/guide.md",
-          "title": "Obsidian guide for ZTN"
+          "title": "Obsidian guide for Minder Memory"
         },
         {
           "type": "file",

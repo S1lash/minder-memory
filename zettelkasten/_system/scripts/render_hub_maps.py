@@ -157,7 +157,7 @@ def _render_block(members: list[tuple[Path, dict]],
     lines.append("")
     lines.append(f"_Auto-generated from {len(visible)} member records — "
                  f"do not hand-edit between markers. "
-                 f"Re-run `/ztn:maintain` to refresh._")
+                 f"Re-run `/minder:mem:maintain` to refresh._")
     lines.append("")
     if not visible:
         lines.append("_(no member records yet — nothing to derive)_")
@@ -268,14 +268,14 @@ def main(argv: list[str] | None = None) -> int:
     configure_std_streams()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=None,
-                        help="ZTN base path (defaults to repo_root(), the zettelkasten base).")
+                        help="Minder Memory base path (defaults to repo_root(), the zettelkasten base).")
     parser.add_argument("--apply", action="store_true",
                         help="Write changes to disk. Without this flag, only diff is printed.")
     parser.add_argument("--hub", type=str, default=None,
                         help="Process a single hub by name (with or without .md). Default: all derived hubs.")
     args = parser.parse_args(argv)
 
-    # `repo_root()` already resolves to the zettelkasten base (or `ZTN_BASE`).
+    # `repo_root()` already resolves to the zettelkasten base (or `MINDER_MEMORY_BASE`).
     root = args.root or repo_root()
     if not root.exists():
         print(f"ERROR: root does not exist: {root}", file=sys.stderr)

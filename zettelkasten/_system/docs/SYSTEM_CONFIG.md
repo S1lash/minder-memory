@@ -10,7 +10,7 @@
 
 ## Overview
 
-Это персональная система управления знаниями. Claude Code автоматически обрабатывает source-файлы из `_sources/inbox/` (whitelist живёт в `_system/registries/SOURCES.md` — voice-recorder transcripts, hand-written notes, Claude session recaps, и любые источники, которые owner добавил через `/ztn:source-add`), создавая структурированные Zettelkasten-заметки с богатыми метаданными для автоматизаций. После обработки исходные файлы перемещаются в `_sources/processed/`. Reference-материал, который не должен попадать в очередь обработки (raw payloads, escape-hatch данные), живёт в подкаталогах, помеченных колонкой `Skip Subdirs` в SOURCES.md. Self-descriptions / identity-материал — отдельный source `describe-me`: его читает и `/ztn:bootstrap` (как primary seed для SOUL.md, через свой контракт), и `/ztn:process` (как обычный контент). Файлы `*.template.md` не обрабатываются нигде — engine-wide правило (`/ztn:process` §2.2).
+Это персональная система управления знаниями. Claude Code автоматически обрабатывает source-файлы из `_sources/inbox/` (whitelist живёт в `_system/registries/SOURCES.md` — voice-recorder transcripts, hand-written notes, Claude session recaps, и любые источники, которые owner добавил через `/minder:mem:source-add`), создавая структурированные Zettelkasten-заметки с богатыми метаданными для автоматизаций. После обработки исходные файлы перемещаются в `_sources/processed/`. Reference-материал, который не должен попадать в очередь обработки (raw payloads, escape-hatch данные), живёт в подкаталогах, помеченных колонкой `Skip Subdirs` в SOURCES.md. Self-descriptions / identity-материал — отдельный source `describe-me`: его читает и `/minder:mem:bootstrap` (как primary seed для SOUL.md, через свой контракт), и `/minder:mem:process` (как обычный контент). Файлы `*.template.md` не обрабатываются нигде — engine-wide правило (`/minder:mem:process` §2.2).
 
 ### Будущие автоматизации (контекст)
 - Психолог / эдвайзер по жизни
@@ -20,12 +20,12 @@
 
 ### Document Ownership
 
-This file is the **runtime configuration** loaded by `/ztn:process` at Step 1.
+This file is the **runtime configuration** loaded by `/minder:mem:process` at Step 1.
 It defines note formats, routing rules, entity types, naming conventions.
 
 For philosophy and architecture: see `5_meta/CONCEPT.md`.
 For processing principles: see `5_meta/PROCESSING_PRINCIPLES.md`.
-For pipeline algorithm: see SKILL.md (`/ztn:process`).
+For pipeline algorithm: see SKILL.md (`/minder:mem:process`).
 For batch output format: see `_system/docs/batch-format.md` (markdown
 report + JSON manifest emission per `emit_batch_manifest.py`).
 
@@ -40,10 +40,10 @@ report + JSON manifest emission per `emit_batch_manifest.py`).
 
 | Скилл | Типичный trigger для CLARIFICATIONS |
 |---|---|
-| `/ztn:bootstrap` | Неоднозначный tier человека, неясный thread closure, двусмысленный current focus, person identity collision |
-| `/ztn:process` | Роль упомянутого неясна, splitting решение неоднозначно, cross-domain mapping сомнителен, domain value не resolved cascade'ом (`domain-resolution`) |
-| `/ztn:maintain` | Thread вероятно закрылся, но confidence < 90% |
-| `/ztn:lint` | Вероятный дубль с similarity < 95%, Evidence Trail backfill — какая трактовка |
+| `/minder:mem:bootstrap` | Неоднозначный tier человека, неясный thread closure, двусмысленный current focus, person identity collision |
+| `/minder:mem:process` | Роль упомянутого неясна, splitting решение неоднозначно, cross-domain mapping сомнителен, domain value не resolved cascade'ом (`domain-resolution`) |
+| `/minder:mem:maintain` | Thread вероятно закрылся, но confidence < 90% |
+| `/minder:mem:lint` | Вероятный дубль с similarity < 95%, Evidence Trail backfill — какая трактовка |
 
 Цель: система автономна + аудитируема. Owner раз в неделю отвечает на вопросы,
 скиллы применяют ответы при следующем прогоне. Никаких молчаливых compromise.
@@ -57,52 +57,52 @@ migrating existing open items.
 
 | Type | Raised by | Trigger | Conservative default |
 |---|---|---|---|
-| `thread-hub-ambiguous` | `/ztn:maintain` | 2+ hubs pass topic filter with score ≥ 2 for the same thread | Skip linkage; thread stays without `hub:` |
-| `tier-promote-suggested` | `/ztn:maintain` | Person mentions cross a tier-up threshold | No tier change applied |
-| `principle-drift` | `/ztn:process` | `/ztn:check-decision` verdict violated at confidence ≥ 0.8 on a record from the current batch (typed `decision`, or `observation` with `tradeoff_framing` flag set by the subagent per §3.7.5) | Capture in trail; behaviour unchanged this batch |
-| `principle-drift-retro` | `/ztn:lint` Scan F.2 | Same verdict + threshold as `principle-drift`, but on a historical decision-record re-checked against the current constitution tree. Trigger: explicit `--rescan-drift --days N` OR auto path on detecting `git log --since="${f2_last_ran_at}" -- 0_constitution/{axiom,principle,rule}/` non-empty | Capture in trail; owner reviews whether the principle edit was intentional |
-| `people-bare-name` | `/ztn:process` (Step 3.7 escape hatch), `/ztn:lint` Scan C.5 (on aggregation), `/ztn:bootstrap` | A transcript mention whose name resolves to nobody in `PEOPLE.md`. Routine one-off mentions go to `people-candidates.jsonl` instead; this type is raised only when the high-importance escape hatch or C.5 promotion fires | Surface only. No profile is created and no `PEOPLE.md` row is written — per doctrine §3.6 there is no silent profile creation. Owner resolves via `/ztn:resolve-clarifications` (`resolve-bare-name` / `create-profile` / `dismiss`) |
-| `person-identity` | `/ztn:process` (Step 3.7 escape hatch), `/ztn:bootstrap` | A mention that needs an identity decided — a new person, or a choice between existing candidates in `PEOPLE.md` | Surface only, same contract as `people-bare-name`. On `create-profile` the resolve skill writes `3_resources/people/{id}.md` + the `PEOPLE.md` row |
-| `domain-resolution` | `/ztn:process` (Step 3.4.5) | Domain value cannot be resolved by the cascade `normalize_domain` → whitelist → LLM remap → trivial-vs-material | Drop the unmatched value; remaining `domains:` entries kept (possibly `[]`) |
+| `thread-hub-ambiguous` | `/minder:mem:maintain` | 2+ hubs pass topic filter with score ≥ 2 for the same thread | Skip linkage; thread stays without `hub:` |
+| `tier-promote-suggested` | `/minder:mem:maintain` | Person mentions cross a tier-up threshold | No tier change applied |
+| `principle-drift` | `/minder:mem:process` | `/minder:mem:check-decision` verdict violated at confidence ≥ 0.8 on a record from the current batch (typed `decision`, or `observation` with `tradeoff_framing` flag set by the subagent per §3.7.5) | Capture in trail; behaviour unchanged this batch |
+| `principle-drift-retro` | `/minder:mem:lint` Scan F.2 | Same verdict + threshold as `principle-drift`, but on a historical decision-record re-checked against the current constitution tree. Trigger: explicit `--rescan-drift --days N` OR auto path on detecting `git log --since="${f2_last_ran_at}" -- 0_constitution/{axiom,principle,rule}/` non-empty | Capture in trail; owner reviews whether the principle edit was intentional |
+| `people-bare-name` | `/minder:mem:process` (Step 3.7 escape hatch), `/minder:mem:lint` Scan C.5 (on aggregation), `/minder:mem:bootstrap` | A transcript mention whose name resolves to nobody in `PEOPLE.md`. Routine one-off mentions go to `people-candidates.jsonl` instead; this type is raised only when the high-importance escape hatch or C.5 promotion fires | Surface only. No profile is created and no `PEOPLE.md` row is written — per doctrine §3.6 there is no silent profile creation. Owner resolves via `/minder:mem:resolve-clarifications` (`resolve-bare-name` / `create-profile` / `dismiss`) |
+| `person-identity` | `/minder:mem:process` (Step 3.7 escape hatch), `/minder:mem:bootstrap` | A mention that needs an identity decided — a new person, or a choice between existing candidates in `PEOPLE.md` | Surface only, same contract as `people-bare-name`. On `create-profile` the resolve skill writes `3_resources/people/{id}.md` + the `PEOPLE.md` row |
+| `domain-resolution` | `/minder:mem:process` (Step 3.4.5) | Domain value cannot be resolved by the cascade `normalize_domain` → whitelist → LLM remap → trivial-vs-material | Drop the unmatched value; remaining `domains:` entries kept (possibly `[]`) |
 | `process-compatibility` | every skill writing manifests | Schema deviation that would break the manifest contract with downstream consumers | Suspend that section's manifest emission until owner resolves |
-| `concept-drift-on-reprocess` | `/ztn:process --reprocess-corpus` (Step 3.5) | Matcher's new `concepts:` set differs from prior set by > 50 % of the union (symmetric-difference / union ratio) | Apply the new (matcher-canonical) set; surface for owner audit, do not gate the write |
-| `archive-note-missing` | `/ztn:lint` | File-based entity in archived state without `## Archive Note` block (per Archive Contract Form A); forward-only — pre-contract archives ignored | Surface for owner to fill `reason` / `triggered_by`; do not auto-write |
-| `archive-reason-missing` | `/ztn:lint` | Registry-row in archived section with empty `Reason` cell, OR queue-archival action without required reason field (per Archive Contract Forms B and C) | Surface for owner to populate; do not auto-write |
-| `batch-not-integrated` | `/ztn:lint` Scan A.12 | A `BATCH_LOG.md` batch older than 26 h has no `log_maintenance.md` entry — `/ztn:maintain` never consumed it. Its only trigger is Step 4.5 of the process tick, so a tick that skipped the step leaves a batch nobody integrates and still reports success | Surface as one aggregate naming every stale batch id; never autofix and never invoke maintain from lint — the two hold mutually exclusive locks, and a pipeline that quietly repairs another's omission hides it |
-| `identity-orphan` | `/ztn:lint` Scan A.8, `/ztn:process` final gate | A tag `{namespace}/{id}` whose namespace a registry claims and whose identifier that registry never declared — live or retired. It is the one defect the identity procedure cannot reach by its own method: every other check reasons outward from a declared identity, so an identifier that was never declared is examined by nothing | Surface only, one item per tag and note. Never autofixed: registering the identity, retagging the note and dropping the tag are three different decisions and the scan cannot tell which is meant. Resolving one removes its row from `_system/state/identity-orphan-baseline.txt` |
-| `telemetry-missing` | `/ztn:lint` Scan A.13 | A `[scheduled]` commit from the last 26 h whose diff never touched `_system/state/tick-telemetry.jsonl`, or a telemetry line with `status: unmeasured` — the tick ran and its Step 4.9 either did not run or found no transcript. The helper exits 0 unconditionally so the tick survives a broken odometer, which is exactly why nothing but this scan can see the failure | Surface as one aggregate naming the tick tags and SHAs; never autofix — the run's transcript lived in an ephemeral sandbox and is gone, so the measurement cannot be recomputed and must not be reconstructed |
-| `telemetry-layout-drift` | `/ztn:lint` Scan A.13 | A telemetry line carries `layout_check: drift` — the tick recorded more `Agent` dispatches in its own transcript than sub-agent transcript files it could find, meaning the runtime moved where sub-agent sessions are written and every tick is now undercounting | Surface with the line's `agent_dispatches` / `subagent_files`; the fix is teaching `record_tick_telemetry.py` the new location, never adjusting the recorded numbers |
-| `manifest-schema-violation` | `/ztn:lint` Scan H | A batch JSON manifest under `_system/state/batches/` fails validation against `_system/docs/manifest-schema/v{N}.json` for its declared `format_version` major | Do not rewrite the manifest (append-only); surface so owner can fix the producer or the schema |
-| `manifest-schema-unknown-version` | `/ztn:lint` Scan H | Manifest's `format_version` major has no matching schema file in `manifest-schema/` | Surface; resolve by shipping the missing schema file or rolling back the producer |
-| `validator-internal-error` | `/ztn:lint` Scan H | The schema validator raised an unexpected exception on a specific batch (json parse error, validator bug) | Lint continues other scans; owner reviews stack trace |
-| `validator-helper-failed` | `/ztn:lint` Scan H | The `lint_manifest_schema.py` helper itself exited non-zero (jsonschema not installed, schemas-dir or batches-dir missing) | Lint continues other scans; owner restores the helper environment |
-| `lens-action-proposed` | `/ztn:resolve-clarifications` (`--auto-mode` Step A.3) | Smart-resolve sweep judged a lens-emitted Action Hint as `queue` (not safe to auto-apply, not constitution-vetoed); the row carries `**Smart_resolve reasoning:**` + `**Action type:**` + `**Action params:**` for owner Class C review (apply / reject / modify / defer) | Queue stays as-is; auto-apply requires owner click |
-| `lens-action-veto` | `/ztn:resolve-clarifications` (`--auto-mode` Step A.3) | Smart-resolve judged a lens-emitted Action Hint as `block-veto` against constitution / SOUL focus; row carries `**Smart_resolve reasoning:**` + `**Veto reason:**` naming the principle / SOUL element triggered. Step A.3.5 also routes here when an escalation `/ztn:check-decision` call returned `violated` at confidence ≥ 0.7 on a `queue` candidate; the row additionally carries `**Escalation-resolved by check-decision:**` annotation with the cited principle id | Owner reviews; can override per-class via `_system/state/insights-config.yaml::classes` |
-| `lens-action-apply-failed` | `/ztn:resolve-clarifications` (`--auto-mode` Step A.3) | Handler validation failed inside apply (TOCTOU drift between Step A.1 stale-check and apply — e.g. another process created the hub target, or a cited note was renamed mid-tick) | Action is queued instead; owner reviews proposal + handler error reason |
-| `biometric-baseline-cold-start` | `/ztn:process` metric-day branch | First metric-day file for a source processed AND `_system/state/biometric/<source>/baselines.json` does not exist | Initialize empty baselines for that source; emit informational CLARIFICATION (one-time per source, expected). Resolution: dismiss as resolved with note "expected cold-start". No further action needed |
-| `biometric-threshold-drift` | `/ztn:maintain` Tier II calibration check | ≥3 consecutive weeks observed/expected fire-rate ratio outside [0.5, 2.0] for a metric × severity pair | Skip auto-tune; surface proposal with current vs proposed σ; owner approves via resolve action `threshold_tune_proposal` (Class C) |
-| `biometric-affect-lexicon-empty` | `/ztn:maintain` Tier II Phase 2 | Lexicon overlay loaded successfully but produces zero affect tags across the entire 56-day window | Skip Phase 2; surface so owner can audit lexicon entries (may indicate non-RU/EN owner needs lexicon localisation via `affect_lexicon.local.yaml`) |
-| `portable-name-collision` | `/ztn:process` §0.0b, `/ztn:save` Step 0.5, `/ztn:lint` A.10 | Non-portable (Windows-illegal) inbox name whose `normalize_portable_name()` form already exists in the same directory, or normalisation returned None | Skip the item this run (process) / exclude from staging (save); never guess a suffix |
-| `portable-name-escape` | `/ztn:lint` A.10 | Non-portable tracked path outside `_sources/inbox/` and not grandfathered via PROCESSED.md — slipped past both ingestion gates | Surface only; rename + reference rewrite happens as an owner-reviewed resolve action, never autonomously |
-| `source-layout-split-name` | `/ztn:process` §0.0a, `/ztn:lint` A.10a | An inbox directory carrying no item marker of its own but containing subdirectories, in a shape too ambiguous to rejoin — a producer's `/` in the recording title split one name into two folders | Leave the item in place and surface; the unambiguous single-child case is rejoined autonomously, everything else is never guessed |
-| `content-type-canon-reviewed` | `/ztn:lint` A.11 | Judgment-row `content_type` drift mapped to its default canonical (weak × high) | Applied with the default; CLARIFICATION asks owner to validate (resolve action `canonicalize-content-type`) |
-| `content-type-canon-surfaced` | `/ztn:lint` A.11 | Judgment-row `content_type` drift ambiguous between 2+ canonical types (weak × confident/unsure) | No apply; owner picks the canonical type with note excerpt in Context |
-| `content-type-unknown` | `/ztn:lint` A.11 | `content_type` drift value not in `CANON_MAP` | No apply; owner picks a canonical mapping (optionally extends `CANON_MAP`) |
-| `content-type-missing` | `/ztn:lint` A.11 | Note has `content_potential` but no `content_type` | No apply; owner sets the canonical type |
-| `content-angle-missing` | `/ztn:lint` A.11 | Note has `content_potential` but empty/absent `content_angle` | Informational; the draft-maintainer proposes the hook on its next run |
-| `frontmatter-unfixable-schema` | `/ztn:lint` A.2 | Frontmatter YAML does not parse and is not a repairable misplaced-fence case | Surface; owner fixes the schema by hand |
-| `frontmatter-fence-misplaced` | `/ztn:lint` A.2, `/ztn:process` Step 4.5 | A `## ` body heading sits inside the YAML fence and `_common.repair_misplaced_fence` refused as ambiguous (multiple `---` in the displaced region) | Surface; owner relocates the closing `---` above the body |
-| `task-aggregation-orphans` | `/ztn:lint` A.6.1 | `reconcile_tasks.py` finds open `- [ ]` task-ids in notes absent from every active/Stale section of TASKS.md | Surface count; owner runs `/ztn:process --reconcile-tasks` to classify + file them (read-only detection, no auto-write) |
-| `hub-index-incomplete` | `/ztn:lint` A.6.2 | An on-disk `5_meta/mocs/hub-*.md` file is absent from HUB_INDEX.md | Surface missing ids; owner regenerates the index via `/ztn:maintain` |
-| `calendar-aggregation-orphans` | `/ztn:lint` A.6.3 | `reconcile_calendar.py` finds a note with a future `📅` event whose link is absent from every forward-facing CALENDAR section | Surface count; owner runs `/ztn:process --reconcile-calendar` (read-only detection, no auto-write) |
-| `role-secret-leak` | `/ztn:roles` | A credential surfaced in something the run produced. **The scan is store-wide, not limited to what the role declared** — otherwise a role could launder a sibling's credential by simply not naming it. What it looks at: an **in-zone** file's contents or its filename, the committed diff when HEAD moved, or the run line's own `note`. Matched in raw, base64, hex and percent-encoded form. Two stated limits — a credential shorter than 12 characters is never scanned (a short value false-positives on the owner's prose), and encodings are unbounded, so the scan raises the cost of an in-zone leak rather than closing the channel. Reverted when nothing of the owner's was at risk; left on disk when it was already dirty before that role started | Excluded from the role's commit either way, and named in `.scheduler-state/hold-back` so a scheduler tail cannot stage it afterwards — the credential never reaches history. Suggested action `rotate-credential`. Which credential leaked is deliberately not named: the tick never reads the secrets file |
-| `role-head-moved` | `/ztn:roles` | `HEAD` moved between a role's snapshot and its check — the role committed, which the run frame forbids | No mutation at all: nothing reverted (a reset could destroy owner work committed alongside), out-of-zone paths reported. Run logged `error`. Suggested action `review-commit` |
-| `role-unrestorable-write` | `/ztn:roles` | A role wrote outside its `writes:` to a path that was **already dirty when that role started**, so restoring it would destroy content the role did not author. Each reported entry carries `held_by`: `owner` (dirty since the tick baseline — the owner's uncommitted work) or `earlier-role` (dirtied during this tick). Not raised alongside `role-head-moved` — a moved HEAD means the guard mutated nothing, so «left alone» there does not mean «someone else's work was in the way» | Reported, never reverted — `git checkout --` there would erase that content. Suggested action `review-and-save`. A reported hole is recoverable; destroyed work is not |
-| `role-guard-evaded` | `/ztn:roles` | The run changed something the guard cannot account for: git's own configuration (a remote's URL, `core.hooksPath`, an index flag, `.git/config`) differed between the snapshots, or the working tree kept changing after the role finished. An ignore change is NOT one of these — what it hid is attributed instead (see `role-ignore-changed`); it reaches this item only when a snapshot predates the ignored-path listing, so nothing could be attributed and the strict verdict stood. Both mean the role acted on the check itself rather than within it — the guard's whole model is that the repository is what `git status` prints, and these move that ground | Surfaced on the FIRST occurrence, never deferred to a repeat: the run is `error`, the tick stops dispatching further roles (every later check and push would stand on the changed ground), and nothing is repaired — reverting would mean writing inside `.git/`. Names the exact field with its before and after, or the paths that moved after the run. Suggested action `inspect-git-state` |
-| `role-ignore-changed` | `/ztn:roles` | Git's ignore rules differed between the snapshots. An ignore rule hides a path from `git status`, which is what attribution reads — so the guard names every path that went invisible during the run and attributes it: digested, credential-scanned, and reported under the `ignored` label. Hiding therefore buys a role nothing, which is why this is not an evasion finding. The ordinary author is whatever hosts the tick, writing its own runtime files and rules into `.git/info/exclude` mid-run — a file the guard may not write to | The run is `ok` and the tick keeps dispatching — the danger was answered by looking, and an abort that fires on an ordinary night stops being read while taking the roles queued behind it down with it. Names the ignore files that differ, both digests, and every hidden path, stating that each was reported and deliberately **not** restored (for a path in no commit, «restore» means delete, and this is the path whose author the guard does not know). Carries NO credential-compromise warning — a hidden path that really carried one comes through `role-secret-leak`. Raised on the first occurrence and not again while an equivalent item is open. Stated limit: a path inside a directory that was already wholly ignored before the run is not covered — porcelain collapses it to one entry, so no comparison is possible. Suggested action `acknowledge` |
-| `role-secrets-unavailable` | `/ztn:roles` | A credential store exists on this base but could not be opened for the tick: `ZTN_ROLES_KEY` is unset or wrong, or `cryptography` is not installed. Distinct from a declared name missing from the store, which preflight names at role-creation time — this is the whole store being unreadable at run time | Raised **once per tick**, not once per role: the condition is the key, not the roles. Roles declaring no credentials run untouched; every due role declaring one is skipped with an `error` run line naming the cause, because the file it would source does not exist and a half-reached outward call is worse than none. The tick never generates, repairs or guesses a key — a wrong one produces garbage silently and a new one orphans every stored credential. Suggested action `restore-secrets-key` |
-| `role-repeated-degradation` | `/ztn:roles` | A role's two most recent run lines both ended `degraded` — it ran and delivered both times, but part of its job could not be done (a quota exhausted, a service refusing partway, a source unreachable), so some of what it reported is unverified | Role stays active. Suggested action `fix-role`. Raised only on the SECOND consecutive one: a single degraded run is a hiccup the next run covers, two is a standing limit that will keep hollowing out the role's work while every run line still reads as a success |
-| `role-repeated-error` | `/ztn:roles` | A role's two most recent run lines both ended `error` | Role stays active and is attempted again next tick. Suggested action `fix-role` — owner repairs it or sets `status: paused` via `/ztn:role:edit`. A failing role never aborts a tick; only a changed git configuration or a broken guard stops further dispatch |
+| `concept-drift-on-reprocess` | `/minder:mem:process --reprocess-corpus` (Step 3.5) | Matcher's new `concepts:` set differs from prior set by > 50 % of the union (symmetric-difference / union ratio) | Apply the new (matcher-canonical) set; surface for owner audit, do not gate the write |
+| `archive-note-missing` | `/minder:mem:lint` | File-based entity in archived state without `## Archive Note` block (per Archive Contract Form A); forward-only — pre-contract archives ignored | Surface for owner to fill `reason` / `triggered_by`; do not auto-write |
+| `archive-reason-missing` | `/minder:mem:lint` | Registry-row in archived section with empty `Reason` cell, OR queue-archival action without required reason field (per Archive Contract Forms B and C) | Surface for owner to populate; do not auto-write |
+| `batch-not-integrated` | `/minder:mem:lint` Scan A.12 | A `BATCH_LOG.md` batch older than 26 h has no `log_maintenance.md` entry — `/minder:mem:maintain` never consumed it. Its only trigger is Step 4.5 of the process tick, so a tick that skipped the step leaves a batch nobody integrates and still reports success | Surface as one aggregate naming every stale batch id; never autofix and never invoke maintain from lint — the two hold mutually exclusive locks, and a pipeline that quietly repairs another's omission hides it |
+| `identity-orphan` | `/minder:mem:lint` Scan A.8, `/minder:mem:process` final gate | A tag `{namespace}/{id}` whose namespace a registry claims and whose identifier that registry never declared — live or retired. It is the one defect the identity procedure cannot reach by its own method: every other check reasons outward from a declared identity, so an identifier that was never declared is examined by nothing | Surface only, one item per tag and note. Never autofixed: registering the identity, retagging the note and dropping the tag are three different decisions and the scan cannot tell which is meant. Resolving one removes its row from `_system/state/identity-orphan-baseline.txt` |
+| `telemetry-missing` | `/minder:mem:lint` Scan A.13 | A `[scheduled]` commit from the last 26 h whose diff never touched `_system/state/tick-telemetry.jsonl`, or a telemetry line with `status: unmeasured` — the tick ran and its Step 4.9 either did not run or found no transcript. The helper exits 0 unconditionally so the tick survives a broken odometer, which is exactly why nothing but this scan can see the failure | Surface as one aggregate naming the tick tags and SHAs; never autofix — the run's transcript lived in an ephemeral sandbox and is gone, so the measurement cannot be recomputed and must not be reconstructed |
+| `telemetry-layout-drift` | `/minder:mem:lint` Scan A.13 | A telemetry line carries `layout_check: drift` — the tick recorded more `Agent` dispatches in its own transcript than sub-agent transcript files it could find, meaning the runtime moved where sub-agent sessions are written and every tick is now undercounting | Surface with the line's `agent_dispatches` / `subagent_files`; the fix is teaching `record_tick_telemetry.py` the new location, never adjusting the recorded numbers |
+| `manifest-schema-violation` | `/minder:mem:lint` Scan H | A batch JSON manifest under `_system/state/batches/` fails validation against `_system/docs/manifest-schema/v{N}.json` for its declared `format_version` major | Do not rewrite the manifest (append-only); surface so owner can fix the producer or the schema |
+| `manifest-schema-unknown-version` | `/minder:mem:lint` Scan H | Manifest's `format_version` major has no matching schema file in `manifest-schema/` | Surface; resolve by shipping the missing schema file or rolling back the producer |
+| `validator-internal-error` | `/minder:mem:lint` Scan H | The schema validator raised an unexpected exception on a specific batch (json parse error, validator bug) | Lint continues other scans; owner reviews stack trace |
+| `validator-helper-failed` | `/minder:mem:lint` Scan H | The `lint_manifest_schema.py` helper itself exited non-zero (jsonschema not installed, schemas-dir or batches-dir missing) | Lint continues other scans; owner restores the helper environment |
+| `lens-action-proposed` | `/minder:mem:resolve-clarifications` (`--auto-mode` Step A.3) | Smart-resolve sweep judged a lens-emitted Action Hint as `queue` (not safe to auto-apply, not constitution-vetoed); the row carries `**Smart_resolve reasoning:**` + `**Action type:**` + `**Action params:**` for owner Class C review (apply / reject / modify / defer) | Queue stays as-is; auto-apply requires owner click |
+| `lens-action-veto` | `/minder:mem:resolve-clarifications` (`--auto-mode` Step A.3) | Smart-resolve judged a lens-emitted Action Hint as `block-veto` against constitution / SOUL focus; row carries `**Smart_resolve reasoning:**` + `**Veto reason:**` naming the principle / SOUL element triggered. Step A.3.5 also routes here when an escalation `/minder:mem:check-decision` call returned `violated` at confidence ≥ 0.7 on a `queue` candidate; the row additionally carries `**Escalation-resolved by check-decision:**` annotation with the cited principle id | Owner reviews; can override per-class via `_system/state/insights-config.yaml::classes` |
+| `lens-action-apply-failed` | `/minder:mem:resolve-clarifications` (`--auto-mode` Step A.3) | Handler validation failed inside apply (TOCTOU drift between Step A.1 stale-check and apply — e.g. another process created the hub target, or a cited note was renamed mid-tick) | Action is queued instead; owner reviews proposal + handler error reason |
+| `biometric-baseline-cold-start` | `/minder:mem:process` metric-day branch | First metric-day file for a source processed AND `_system/state/biometric/<source>/baselines.json` does not exist | Initialize empty baselines for that source; emit informational CLARIFICATION (one-time per source, expected). Resolution: dismiss as resolved with note "expected cold-start". No further action needed |
+| `biometric-threshold-drift` | `/minder:mem:maintain` Tier II calibration check | ≥3 consecutive weeks observed/expected fire-rate ratio outside [0.5, 2.0] for a metric × severity pair | Skip auto-tune; surface proposal with current vs proposed σ; owner approves via resolve action `threshold_tune_proposal` (Class C) |
+| `biometric-affect-lexicon-empty` | `/minder:mem:maintain` Tier II Phase 2 | Lexicon overlay loaded successfully but produces zero affect tags across the entire 56-day window | Skip Phase 2; surface so owner can audit lexicon entries (may indicate non-RU/EN owner needs lexicon localisation via `affect_lexicon.local.yaml`) |
+| `portable-name-collision` | `/minder:mem:process` §0.0b, `/minder:mem:save` Step 0.5, `/minder:mem:lint` A.10 | Non-portable (Windows-illegal) inbox name whose `normalize_portable_name()` form already exists in the same directory, or normalisation returned None | Skip the item this run (process) / exclude from staging (save); never guess a suffix |
+| `portable-name-escape` | `/minder:mem:lint` A.10 | Non-portable tracked path outside `_sources/inbox/` and not grandfathered via PROCESSED.md — slipped past both ingestion gates | Surface only; rename + reference rewrite happens as an owner-reviewed resolve action, never autonomously |
+| `source-layout-split-name` | `/minder:mem:process` §0.0a, `/minder:mem:lint` A.10a | An inbox directory carrying no item marker of its own but containing subdirectories, in a shape too ambiguous to rejoin — a producer's `/` in the recording title split one name into two folders | Leave the item in place and surface; the unambiguous single-child case is rejoined autonomously, everything else is never guessed |
+| `content-type-canon-reviewed` | `/minder:mem:lint` A.11 | Judgment-row `content_type` drift mapped to its default canonical (weak × high) | Applied with the default; CLARIFICATION asks owner to validate (resolve action `canonicalize-content-type`) |
+| `content-type-canon-surfaced` | `/minder:mem:lint` A.11 | Judgment-row `content_type` drift ambiguous between 2+ canonical types (weak × confident/unsure) | No apply; owner picks the canonical type with note excerpt in Context |
+| `content-type-unknown` | `/minder:mem:lint` A.11 | `content_type` drift value not in `CANON_MAP` | No apply; owner picks a canonical mapping (optionally extends `CANON_MAP`) |
+| `content-type-missing` | `/minder:mem:lint` A.11 | Note has `content_potential` but no `content_type` | No apply; owner sets the canonical type |
+| `content-angle-missing` | `/minder:mem:lint` A.11 | Note has `content_potential` but empty/absent `content_angle` | Informational; the draft-maintainer proposes the hook on its next run |
+| `frontmatter-unfixable-schema` | `/minder:mem:lint` A.2 | Frontmatter YAML does not parse and is not a repairable misplaced-fence case | Surface; owner fixes the schema by hand |
+| `frontmatter-fence-misplaced` | `/minder:mem:lint` A.2, `/minder:mem:process` Step 4.5 | A `## ` body heading sits inside the YAML fence and `_common.repair_misplaced_fence` refused as ambiguous (multiple `---` in the displaced region) | Surface; owner relocates the closing `---` above the body |
+| `task-aggregation-orphans` | `/minder:mem:lint` A.6.1 | `reconcile_tasks.py` finds open `- [ ]` task-ids in notes absent from every active/Stale section of TASKS.md | Surface count; owner runs `/minder:mem:process --reconcile-tasks` to classify + file them (read-only detection, no auto-write) |
+| `hub-index-incomplete` | `/minder:mem:lint` A.6.2 | An on-disk `5_meta/mocs/hub-*.md` file is absent from HUB_INDEX.md | Surface missing ids; owner regenerates the index via `/minder:mem:maintain` |
+| `calendar-aggregation-orphans` | `/minder:mem:lint` A.6.3 | `reconcile_calendar.py` finds a note with a future `📅` event whose link is absent from every forward-facing CALENDAR section | Surface count; owner runs `/minder:mem:process --reconcile-calendar` (read-only detection, no auto-write) |
+| `role-secret-leak` | `/minder:mem:roles` | A credential surfaced in something the run produced. **The scan is store-wide, not limited to what the role declared** — otherwise a role could launder a sibling's credential by simply not naming it. What it looks at: an **in-zone** file's contents or its filename, the committed diff when HEAD moved, or the run line's own `note`. Matched in raw, base64, hex and percent-encoded form. Two stated limits — a credential shorter than 12 characters is never scanned (a short value false-positives on the owner's prose), and encodings are unbounded, so the scan raises the cost of an in-zone leak rather than closing the channel. Reverted when nothing of the owner's was at risk; left on disk when it was already dirty before that role started | Excluded from the role's commit either way, and named in `.scheduler-state/hold-back` so a scheduler tail cannot stage it afterwards — the credential never reaches history. Suggested action `rotate-credential`. Which credential leaked is deliberately not named: the tick never reads the secrets file |
+| `role-head-moved` | `/minder:mem:roles` | `HEAD` moved between a role's snapshot and its check — the role committed, which the run frame forbids | No mutation at all: nothing reverted (a reset could destroy owner work committed alongside), out-of-zone paths reported. Run logged `error`. Suggested action `review-commit` |
+| `role-unrestorable-write` | `/minder:mem:roles` | A role wrote outside its `writes:` to a path that was **already dirty when that role started**, so restoring it would destroy content the role did not author. Each reported entry carries `held_by`: `owner` (dirty since the tick baseline — the owner's uncommitted work) or `earlier-role` (dirtied during this tick). Not raised alongside `role-head-moved` — a moved HEAD means the guard mutated nothing, so «left alone» there does not mean «someone else's work was in the way» | Reported, never reverted — `git checkout --` there would erase that content. Suggested action `review-and-save`. A reported hole is recoverable; destroyed work is not |
+| `role-guard-evaded` | `/minder:mem:roles` | The run changed something the guard cannot account for: git's own configuration (a remote's URL, `core.hooksPath`, an index flag, `.git/config`) differed between the snapshots, or the working tree kept changing after the role finished. An ignore change is NOT one of these — what it hid is attributed instead (see `role-ignore-changed`); it reaches this item only when a snapshot predates the ignored-path listing, so nothing could be attributed and the strict verdict stood. Both mean the role acted on the check itself rather than within it — the guard's whole model is that the repository is what `git status` prints, and these move that ground | Surfaced on the FIRST occurrence, never deferred to a repeat: the run is `error`, the tick stops dispatching further roles (every later check and push would stand on the changed ground), and nothing is repaired — reverting would mean writing inside `.git/`. Names the exact field with its before and after, or the paths that moved after the run. Suggested action `inspect-git-state` |
+| `role-ignore-changed` | `/minder:mem:roles` | Git's ignore rules differed between the snapshots. An ignore rule hides a path from `git status`, which is what attribution reads — so the guard names every path that went invisible during the run and attributes it: digested, credential-scanned, and reported under the `ignored` label. Hiding therefore buys a role nothing, which is why this is not an evasion finding. The ordinary author is whatever hosts the tick, writing its own runtime files and rules into `.git/info/exclude` mid-run — a file the guard may not write to | The run is `ok` and the tick keeps dispatching — the danger was answered by looking, and an abort that fires on an ordinary night stops being read while taking the roles queued behind it down with it. Names the ignore files that differ, both digests, and every hidden path, stating that each was reported and deliberately **not** restored (for a path in no commit, «restore» means delete, and this is the path whose author the guard does not know). Carries NO credential-compromise warning — a hidden path that really carried one comes through `role-secret-leak`. Raised on the first occurrence and not again while an equivalent item is open. Stated limit: a path inside a directory that was already wholly ignored before the run is not covered — porcelain collapses it to one entry, so no comparison is possible. Suggested action `acknowledge` |
+| `role-secrets-unavailable` | `/minder:mem:roles` | A credential store exists on this base but could not be opened for the tick: `MINDER_MEMORY_ROLES_KEY` is unset or wrong, or `cryptography` is not installed. Distinct from a declared name missing from the store, which preflight names at role-creation time — this is the whole store being unreadable at run time | Raised **once per tick**, not once per role: the condition is the key, not the roles. Roles declaring no credentials run untouched; every due role declaring one is skipped with an `error` run line naming the cause, because the file it would source does not exist and a half-reached outward call is worse than none. The tick never generates, repairs or guesses a key — a wrong one produces garbage silently and a new one orphans every stored credential. Suggested action `restore-secrets-key` |
+| `role-repeated-degradation` | `/minder:mem:roles` | A role's two most recent run lines both ended `degraded` — it ran and delivered both times, but part of its job could not be done (a quota exhausted, a service refusing partway, a source unreachable), so some of what it reported is unverified | Role stays active. Suggested action `fix-role`. Raised only on the SECOND consecutive one: a single degraded run is a hiccup the next run covers, two is a standing limit that will keep hollowing out the role's work while every run line still reads as a success |
+| `role-repeated-error` | `/minder:mem:roles` | A role's two most recent run lines both ended `error` | Role stays active and is attempted again next tick. Suggested action `fix-role` — owner repairs it or sets `status: paused` via `/minder:mem:role:edit`. A failing role never aborts a tick; only a changed git configuration or a broken guard stops further dispatch |
 
 Per-skill SKILL.md may add narrower types for skill-internal flows;
 this table covers the cross-skill canonical set referenced in
@@ -126,45 +126,45 @@ hardcode `/` or `C:\`; run scripts via `bash`/`python3` (no exec-bit); keep
 
 Canonical rules, разделяемые между скиллами. Single source of truth.
 
-### Mention counting (применяется в `/ztn:process`, `/ztn:maintain`, `/ztn:bootstrap`)
+### Mention counting (применяется в `/minder:mem:process`, `/minder:mem:maintain`, `/minder:mem:bootstrap`)
 
 - **1 mention = 1 file**, где person появляется в `people:` frontmatter array OR является subject of record/note
 - Не per-utterance, не per-topic. Длинная встреча с 6 упоминаниями человека = +1 mention, не +6
-- Monotonic — counts только растут при `/ztn:process`. Decrements только при удалении нот (редкий случай, делается manually или `/ztn:lint` при dedup)
+- Monotonic — counts только растут при `/minder:mem:process`. Decrements только при удалении нот (редкий случай, делается manually или `/minder:mem:lint` при dedup)
 - `last_mention` date = latest `created` date across files referencing person
 
-### People inclusion in `people:` frontmatter (применяется в `/ztn:process`)
+### People inclusion in `people:` frontmatter (применяется в `/minder:mem:process`)
 
 - **Inclusion-biased**: если person resolved и упомянут в content (не noise) — добавлять в `people:` array
 - Не применять эвристику "central to note" — это subjective и source of gaps
-- **Bare first name** (без фамилии, не резолвится в full ID) → **append в `_system/state/people-candidates.jsonl`** (buffer) через `python3 _system/scripts/append_person_candidate.py`. **НЕ добавлять** в `people:`, **НЕ** raise CLARIFICATION per mention. `/ztn:lint` Scan C.5 еженедельно агрегирует buffer и promotes только recurring/information-rich candidates в CLARIFICATIONS. Rationale: снижает friction для one-off mentions (redesigned 2026-04-24).
-- **Escape hatch** — raise CLARIFICATION immediately только при одном из явных сигналов: (a) external/client meeting, (b) full surname присутствует elsewhere в transcript но не сматчился из-за STT artifact, (c) user tag `@resolve-now`, (d) role+context полностью specified в mention. Подробности — `/ztn:process` Step 3.8.
+- **Bare first name** (без фамилии, не резолвится в full ID) → **append в `_system/state/people-candidates.jsonl`** (buffer) через `python3 _system/scripts/append_person_candidate.py`. **НЕ добавлять** в `people:`, **НЕ** raise CLARIFICATION per mention. `/minder:mem:lint` Scan C.5 еженедельно агрегирует buffer и promotes только recurring/information-rich candidates в CLARIFICATIONS. Rationale: снижает friction для one-off mentions (redesigned 2026-04-24).
+- **Escape hatch** — raise CLARIFICATION immediately только при одном из явных сигналов: (a) external/client meeting, (b) full surname присутствует elsewhere в transcript но не сматчился из-за STT artifact, (c) user tag `@resolve-now`, (d) role+context полностью specified в mention. Подробности — `/minder:mem:process` Step 3.8.
 
-### OPEN_THREADS grain (применяется в `/ztn:bootstrap`, `/ztn:maintain`)
+### OPEN_THREADS grain (применяется в `/minder:mem:bootstrap`, `/minder:mem:maintain`)
 
 - **Strategic grain only**: один thread = umbrella topic покрывающий несколько related TASKS.md Waiting items
 - НЕ делать 1:1 mapping с TASKS.md Waiting — это operational layer
 - Каждый thread должен иметь поле `## Related Tasks` со ссылками на TASKS.md tasks (для auto-closure tracking)
 - Auto-closure: если все related tasks done/stale → thread → Resolved
 
-### Thread ↔ Hub linkage (применяется в `/ztn:maintain` + `/ztn:lint`)
+### Thread ↔ Hub linkage (применяется в `/minder:mem:maintain` + `/minder:mem:lint`)
 
 - При создании/обновлении thread: искать hub по теме (match по people + keyword signals). Если найден — thread field `hub: [[hub-id]]`
 - При apparence thread — добавить bullet в hub's `## Открытые вопросы`
 - При closure thread — убрать из hub's Open Questions, добавить resolution в hub's `## Ключевые выводы`
-- `/ztn:lint` nightly verifies consistency: для каждого thread с `hub:` проверить существование hub и отсутствие drift между thread state и hub content
+- `/minder:mem:lint` nightly verifies consistency: для каждого thread с `hub:` проверить существование hub и отсутствие drift между thread state и hub content
 
-### Tier assignment (применяется в `/ztn:bootstrap`, `/ztn:maintain`, `/ztn:lint`)
+### Tier assignment (применяется в `/minder:mem:bootstrap`, `/minder:mem:maintain`, `/minder:mem:lint`)
 
 - **Tier 1** — profile существует в `3_resources/people/{id}.md` OR mentions ≥ 8
 - **Tier 2** — mentions 3-7 (no profile)
 - **Tier 3** — mentions 1-2 (no profile)
 - **stale** — 0 mentions, no profile (candidate для archival, но не автоматически)
-- `/ztn:process` при добавлении нового человека: если creates profile → Tier 1, else Tier 3. Не пересчитывает existing entries
-- `/ztn:maintain` при incremental update: **предлагает** promote Tier (3→2, 2→1) через CLARIFICATION `tier-promote-suggested`. **Никогда не применяет автоматически** — apply через `/ztn:resolve-clarifications` (owner confirms, skill diffs PEOPLE.md tier column). Никогда не demote (это `/ztn:lint` territory)
-- Profile creation: для new person — inline в `/ztn:process` при достаточном контексте. Для existing person crossing Tier 1 threshold без profile — `/ztn:lint` generates profile skeleton при reviewed tier
+- `/minder:mem:process` при добавлении нового человека: если creates profile → Tier 1, else Tier 3. Не пересчитывает existing entries
+- `/minder:mem:maintain` при incremental update: **предлагает** promote Tier (3→2, 2→1) через CLARIFICATION `tier-promote-suggested`. **Никогда не применяет автоматически** — apply через `/minder:mem:resolve-clarifications` (owner confirms, skill diffs PEOPLE.md tier column). Никогда не demote (это `/minder:mem:lint` territory)
+- Profile creation: для new person — inline в `/minder:mem:process` при достаточном контексте. Для existing person crossing Tier 1 threshold без profile — `/minder:mem:lint` generates profile skeleton при reviewed tier
 
-### Profile template (canonical — applied by `/ztn:process`, `/ztn:lint`)
+### Profile template (canonical — applied by `/minder:mem:process`, `/minder:mem:lint`)
 
 Все profiles (existing + auto-generated) match canonical template:
 
@@ -201,16 +201,16 @@ Order mandatory: frontmatter → `# Name` → `**Role:**` → `## Контекс
 
 ### Log file ownership
 
-- `log_lint.md` — written ONLY by `/ztn:lint`
-- `log_maintenance.md` — written ONLY by `/ztn:maintain` + `/ztn:bootstrap`
-- `log_process.md` — written ONLY by `/ztn:process`
-- `log_agent_lens.md` — written ONLY by `/ztn:agent-lens`
-- `agent-lens-runs.jsonl` — written ONLY by `/ztn:agent-lens` (append-only machine index)
-- `tick-telemetry.jsonl` — written ONLY by `scripts/scheduler/record_tick_telemetry.py`, invoked at Step 4.9 of each scheduler tick (append-only, one line per tick, measured from the run's own transcript). Ticks only: a manual skill run writes nothing here, by design. The writer always exits 0, so `/ztn:lint` Scan A.13 is the only thing that can notice it stopped
-- `resolve-sessions/{date}-{sid}.md` — written ONLY by `/ztn:resolve-clarifications` (one file per session, owner-readable narrative; `is_sensitive: true` by default)
-- `lens-resolution-history.jsonl` — written ONLY by `/ztn:resolve-clarifications` interactive owner clicks (append-only precedent index; auto-mode applies do NOT write here — engine never trains on engine)
-- `identity-gate.jsonl` — written ONLY by `identity_gate.py`, invoked from `/ztn:resolve-clarifications` Class I.5 (append-only per-identity scan record: command, exit code, residue count, HEAD). Created on first write; a base that has never retired an identity has no such file, and that is not a defect. `/ztn:lint` A.8 (9) reads it to corroborate an archived resolution's `gate` block — the reason it exists is that a payload alone is the writer's account of its own work
-- `last-resolve-tick.txt` — written ONLY by `/ztn:resolve-clarifications` (high-water marker for «modified since» lens-output scan)
+- `log_lint.md` — written ONLY by `/minder:mem:lint`
+- `log_maintenance.md` — written ONLY by `/minder:mem:maintain` + `/minder:mem:bootstrap`
+- `log_process.md` — written ONLY by `/minder:mem:process`
+- `log_agent_lens.md` — written ONLY by `/minder:mem:agent-lens`
+- `agent-lens-runs.jsonl` — written ONLY by `/minder:mem:agent-lens` (append-only machine index)
+- `tick-telemetry.jsonl` — written ONLY by `scripts/scheduler/record_tick_telemetry.py`, invoked at Step 4.9 of each scheduler tick (append-only, one line per tick, measured from the run's own transcript). Ticks only: a manual skill run writes nothing here, by design. The writer always exits 0, so `/minder:mem:lint` Scan A.13 is the only thing that can notice it stopped
+- `resolve-sessions/{date}-{sid}.md` — written ONLY by `/minder:mem:resolve-clarifications` (one file per session, owner-readable narrative; `is_sensitive: true` by default)
+- `lens-resolution-history.jsonl` — written ONLY by `/minder:mem:resolve-clarifications` interactive owner clicks (append-only precedent index; auto-mode applies do NOT write here — engine never trains on engine)
+- `identity-gate.jsonl` — written ONLY by `identity_gate.py`, invoked from `/minder:mem:resolve-clarifications` Class I.5 (append-only per-identity scan record: command, exit code, residue count, HEAD). Created on first write; a base that has never retired an identity has no such file, and that is not a defect. `/minder:mem:lint` A.8 (9) reads it to corroborate an archived resolution's `gate` block — the reason it exists is that a payload alone is the writer's account of its own work
+- `last-resolve-tick.txt` — written ONLY by `/minder:mem:resolve-clarifications` (high-water marker for «modified since» lens-output scan)
 - `insights-config.yaml` — owner-mutable; engine creates from `.template` on first resolve run when missing, never rewrites
 - Cross-reads OK (activity detection, context sourcing)
 
@@ -227,45 +227,45 @@ restating it.
 
 | Operation | Authorised skill | Rationale |
 |---|---|---|
-| Create new records / notes / tasks / events | `/ztn:process` only | Extraction from sources is the process domain |
-| Aggregate note `- [ ]` tasks → `TASKS.md`; note `📅` events → `CALENDAR.md` | `/ztn:process` only | Derived aggregates (views over note items), NOT owner-authored files. Owner owns only the `## Stale` task section (preserved across regens). Completeness is guaranteed by `reconcile_tasks.py` / `reconcile_calendar.py` (Step 4.1/4.2 gate), not a full re-walk each run |
-| Create a **full** hub (3+ note threshold) / update hub content (`Текущее понимание`, chronological map, changelog) in `5_meta/mocs/` | `/ztn:process` (additive, non-destructive) | Process records a batch's contribution; it MUST NOT full-rewrite `Текущее понимание` (single-batch view would destroy cross-batch synthesis). From-scratch re-synthesis is surfaced by `/ztn:lint` D.4 (`hub-stale-vs-material`), applied by owner — the synthesis layer is never auto-rewritten. (A lens-proposed **stub** hub is the separate lane below — `/ztn:resolve-clarifications`.) |
-| Regenerate `HUB_INDEX.md` | `/ztn:maintain` (full rebuild) + `/ztn:process` (additive: append a newly-created hub) | Derived index of hub files. Drift (index behind on-disk hubs) is caught deterministically by `/ztn:lint` A.6.2 (`hub-index-incomplete`) → owner regens via `/ztn:maintain` |
-| Increment PEOPLE.md `Mentions` column | `/ztn:process` only | Per-file counting happens inline at batch write |
-| Modify body of existing records/notes | `/ztn:process` (initial) + `/ztn:lint` (dedup merge only) | No other skill touches content |
-| Append `threads:` back-ref to record/note frontmatter | `/ztn:maintain` only | Structural metadata — body never touched |
-| Tier change in PEOPLE.md (promote or demote) | **via `/ztn:resolve-clarifications` only** | Never auto-applied — surfaces CLARIFICATION |
-| Thread closure (Active → Resolved in OPEN_THREADS.md) | **via `/ztn:resolve-clarifications` only** | Never auto-applied regardless of signal strength |
-| Append row to OPEN_THREADS.md `## Active` | `/ztn:maintain` (strategic-grain thread opening) + `/ztn:resolve-clarifications` (auto-mode or owner click on `open_thread_add` lens hint) | Two write-modes, one owner each: maintain opens threads it detects at strategic grain; resolve applies lens/owner additions. Both additive; provenance via inline `from_lens` comment. `/ztn:process` never writes here (context-only) |
-| Create new hub stub in `5_meta/mocs/` | `/ztn:resolve-clarifications` (`hub_stub_create` lens hint) OR owner-curated | New hub carries `from_lens:` in frontmatter; lint_hub_integrity passes the stub |
-| Add wikilink to `## Связи (auto)` section in a knowledge note | `/ztn:resolve-clarifications` (`wikilink_add` lens hint) | Distinct section from manually curated `## Связи` so owner edits and auto edits don't collide |
-| Append `## Update {today}` section to a decision note | `/ztn:resolve-clarifications` (`decision_update_section` lens hint) | Scaffold only — owner fills the body |
+| Create new records / notes / tasks / events | `/minder:mem:process` only | Extraction from sources is the process domain |
+| Aggregate note `- [ ]` tasks → `TASKS.md`; note `📅` events → `CALENDAR.md` | `/minder:mem:process` only | Derived aggregates (views over note items), NOT owner-authored files. Owner owns only the `## Stale` task section (preserved across regens). Completeness is guaranteed by `reconcile_tasks.py` / `reconcile_calendar.py` (Step 4.1/4.2 gate), not a full re-walk each run |
+| Create a **full** hub (3+ note threshold) / update hub content (`Текущее понимание`, chronological map, changelog) in `5_meta/mocs/` | `/minder:mem:process` (additive, non-destructive) | Process records a batch's contribution; it MUST NOT full-rewrite `Текущее понимание` (single-batch view would destroy cross-batch synthesis). From-scratch re-synthesis is surfaced by `/minder:mem:lint` D.4 (`hub-stale-vs-material`), applied by owner — the synthesis layer is never auto-rewritten. (A lens-proposed **stub** hub is the separate lane below — `/minder:mem:resolve-clarifications`.) |
+| Regenerate `HUB_INDEX.md` | `/minder:mem:maintain` (full rebuild) + `/minder:mem:process` (additive: append a newly-created hub) | Derived index of hub files. Drift (index behind on-disk hubs) is caught deterministically by `/minder:mem:lint` A.6.2 (`hub-index-incomplete`) → owner regens via `/minder:mem:maintain` |
+| Increment PEOPLE.md `Mentions` column | `/minder:mem:process` only | Per-file counting happens inline at batch write |
+| Modify body of existing records/notes | `/minder:mem:process` (initial) + `/minder:mem:lint` (dedup merge only) | No other skill touches content |
+| Append `threads:` back-ref to record/note frontmatter | `/minder:mem:maintain` only | Structural metadata — body never touched |
+| Tier change in PEOPLE.md (promote or demote) | **via `/minder:mem:resolve-clarifications` only** | Never auto-applied — surfaces CLARIFICATION |
+| Thread closure (Active → Resolved in OPEN_THREADS.md) | **via `/minder:mem:resolve-clarifications` only** | Never auto-applied regardless of signal strength |
+| Append row to OPEN_THREADS.md `## Active` | `/minder:mem:maintain` (strategic-grain thread opening) + `/minder:mem:resolve-clarifications` (auto-mode or owner click on `open_thread_add` lens hint) | Two write-modes, one owner each: maintain opens threads it detects at strategic grain; resolve applies lens/owner additions. Both additive; provenance via inline `from_lens` comment. `/minder:mem:process` never writes here (context-only) |
+| Create new hub stub in `5_meta/mocs/` | `/minder:mem:resolve-clarifications` (`hub_stub_create` lens hint) OR owner-curated | New hub carries `from_lens:` in frontmatter; lint_hub_integrity passes the stub |
+| Add wikilink to `## Связи (auto)` section in a knowledge note | `/minder:mem:resolve-clarifications` (`wikilink_add` lens hint) | Distinct section from manually curated `## Связи` so owner edits and auto edits don't collide |
+| Append `## Update {today}` section to a decision note | `/minder:mem:resolve-clarifications` (`decision_update_section` lens hint) | Scaffold only — owner fills the body |
 | SOUL.md edits (Identity / Focus / Working Style — outside auto-zone) | **manual only** | Identity file; auto-zone is a separate write-lane |
 | SOUL.md auto-zone (Values between markers) | `render_soul_values.py` only | Deterministic render from `0_constitution/` |
-| Write `_system/state/batches/{batch-id}-process.{md,json}` + `BATCH_LOG.md` row | `/ztn:process` only | One run = one batch; every other emitting skill writes only its own `-{skill}` pair |
-| Hub linkage back-write (`hub:` field on thread, bullet in hub Open Questions) | `/ztn:maintain` only | Both sides updated atomically; lint verifies |
+| Write `_system/state/batches/{batch-id}-process.{md,json}` + `BATCH_LOG.md` row | `/minder:mem:process` only | One run = one batch; every other emitting skill writes only its own `-{skill}` pair |
+| Hub linkage back-write (`hub:` field on thread, bullet in hub Open Questions) | `/minder:mem:maintain` only | Both sides updated atomically; lint verifies |
 | Regenerate views (CONSTITUTION_INDEX, constitution-core, INDEX, HUB_INDEX, CURRENT_CONTEXT) | Scripts via `regen_all.py` / relevant skill | Views are derived — source is `0_constitution/` / knowledge notes / hubs |
-| Create `_records/<family>/<source>/<date>.md` + update `_system/state/<family>/<source>/{baselines,streaks}.json` | `/ztn:process` metric-day branch only | Per-day deterministic emission from `_sources/inbox/<source>/<date>.md`, profile-driven (`<family>` = `biometric` for garmin/oura, `activity` for activitywatch). One source file → one record; records + baselines namespaced per source. Idempotent on re-run; content-hash drift auto-resolves by richness (richer-or-equal re-collect absorbed + baselines recomputed forward; poorer/empty keeps the existing record — no CLARIFICATION). |
-| Write `_system/state/biometric/<source>/{correlations-{week}.json, calibration-history.json, last_weekly_run.txt}` + `_system/views/biometric/<source>/weekly-{week}.md` | `/ztn:maintain` only (biometric Tier II weekly worker, after-batch with weekly idempotency gate, run once per active biometric source) | Derived state — recomputable from `_records/biometric/<source>/`. Weekly-gated per source by `<source>/last_weekly_run.txt` ISO-week comparison; runs at most once per ISO week per source per first /ztn:maintain invocation. |
-| Write `_system/state/activity/<source>/{weekly-{week}.json, last_weekly_run.txt}` + `_system/views/activity/<source>/weekly-{week}.md` | `/ztn:maintain` only (activity weekly worker, Step 6.8 — symmetric to biometric, after-batch with weekly idempotency gate) | Derived state — recomputable from `_records/activity/<source>/`. Activity has no σ-correlations/calibration layer (the heavy aggregation is upstream in the collector); the worker produces a weekly Focus-Engineering rollup (median scores, category/rhythm/switching trend, top death loops). Weekly-gated per source by `<source>/last_weekly_run.txt`. |
-| Write `_system/roles/{id}/state/**` (the role's own tracked files) | the role itself, running inside `/ztn:roles` | The role's working memory — arbitrary files whose shape its own «Завершение» section defines. The engine never parses them; it only bounds where they land. `roles_guard.py` reverts out-of-zone writes after the run — except on a path already dirty when that role started, which it reports instead, because restoring it would destroy content the role did not author |
-| Write `_system/roles/{id}/log.jsonl` | `/ztn:roles` only | One line per **executed** run (not per tick — a role whose cadence has not elapsed writes nothing). The role is explicitly barred from writing its own log; the tick appends it from the guard's verdict + the role's two-line return |
-| Drop a note in `_sources/inbox/roles/` | a role with `inbox` in its `writes:` | The only path from a role back into the base. Flat file, `source: role:{id}` frontmatter, shape spec in `_system/roles/_minder.md`; `/ztn:process` then treats it as any other source |
-| Write `## Health Snapshot` block in CURRENT_CONTEXT.md | `/ztn:maintain` only (via `render_health_snapshot.py`, integrated into CURRENT_CONTEXT regen chain) | Extension of existing CURRENT_CONTEXT regen — derived view, not new content. ≤15 lines, life-connection focused. |
-| Write rows in `1_projects/PROJECTS.md` (create, retire, reclassify) | `/ztn:resolve-clarifications` (identity changes — already the writer for `project-identity` items) + owner direct edit + `/ztn:bootstrap` (candidate seeding) | Identity is an owner decision, and resolve is the engine's one owner-driven write path. A retirement row names kind and successor per Identity Contract; without a named writer the contract has no obligee |
-| Write the retirement section of `3_resources/people/PEOPLE.md` (`## Removed`) | `/ztn:resolve-clarifications` (identity changes) + owner direct edit + `/ztn:bootstrap` (candidate seeding) | Same lane and same reason as the projects registry. Distinct from `## Stale People`, which is a tier drop (archival), not an identity change |
-| Append to `_system/state/identity-gate.jsonl` | `identity_gate.py` only, invoked from `/ztn:resolve-clarifications` Class I.5 | Append-only, never rewritten, never pruned. The writer is the script rather than the skill on purpose: the record has to be a side effect of the scan actually running, not something the run composes about itself afterwards. A skill that writes this line by hand has produced a claim, not a proof |
-| Write AUTO-GENERATED zone of `5_meta/mocs/hub-cognitive-model.md` | `/ztn:maintain` only (via `render_cognitive_model_hub.py`, Step 7.9 — post-loop, after Step 7.8) | Pure projection of constitution `cognitive_axes` fields + candidate buffer; only the zone between the `<!-- AUTO-GENERATED: cognitive-model-hub -->` markers, never the owner's «portrait» above them. |
+| Create `_records/<family>/<source>/<date>.md` + update `_system/state/<family>/<source>/{baselines,streaks}.json` | `/minder:mem:process` metric-day branch only | Per-day deterministic emission from `_sources/inbox/<source>/<date>.md`, profile-driven (`<family>` = `biometric` for garmin/oura, `activity` for activitywatch). One source file → one record; records + baselines namespaced per source. Idempotent on re-run; content-hash drift auto-resolves by richness (richer-or-equal re-collect absorbed + baselines recomputed forward; poorer/empty keeps the existing record — no CLARIFICATION). |
+| Write `_system/state/biometric/<source>/{correlations-{week}.json, calibration-history.json, last_weekly_run.txt}` + `_system/views/biometric/<source>/weekly-{week}.md` | `/minder:mem:maintain` only (biometric Tier II weekly worker, after-batch with weekly idempotency gate, run once per active biometric source) | Derived state — recomputable from `_records/biometric/<source>/`. Weekly-gated per source by `<source>/last_weekly_run.txt` ISO-week comparison; runs at most once per ISO week per source per first /minder:mem:maintain invocation. |
+| Write `_system/state/activity/<source>/{weekly-{week}.json, last_weekly_run.txt}` + `_system/views/activity/<source>/weekly-{week}.md` | `/minder:mem:maintain` only (activity weekly worker, Step 6.8 — symmetric to biometric, after-batch with weekly idempotency gate) | Derived state — recomputable from `_records/activity/<source>/`. Activity has no σ-correlations/calibration layer (the heavy aggregation is upstream in the collector); the worker produces a weekly Focus-Engineering rollup (median scores, category/rhythm/switching trend, top death loops). Weekly-gated per source by `<source>/last_weekly_run.txt`. |
+| Write `_system/roles/{id}/state/**` (the role's own tracked files) | the role itself, running inside `/minder:mem:roles` | The role's working memory — arbitrary files whose shape its own «Завершение» section defines. The engine never parses them; it only bounds where they land. `roles_guard.py` reverts out-of-zone writes after the run — except on a path already dirty when that role started, which it reports instead, because restoring it would destroy content the role did not author |
+| Write `_system/roles/{id}/log.jsonl` | `/minder:mem:roles` only | One line per **executed** run (not per tick — a role whose cadence has not elapsed writes nothing). The role is explicitly barred from writing its own log; the tick appends it from the guard's verdict + the role's two-line return |
+| Drop a note in `_sources/inbox/roles/` | a role with `inbox` in its `writes:` | The only path from a role back into the base. Flat file, `source: role:{id}` frontmatter, shape spec in `_system/roles/_minder.md`; `/minder:mem:process` then treats it as any other source |
+| Write `## Health Snapshot` block in CURRENT_CONTEXT.md | `/minder:mem:maintain` only (via `render_health_snapshot.py`, integrated into CURRENT_CONTEXT regen chain) | Extension of existing CURRENT_CONTEXT regen — derived view, not new content. ≤15 lines, life-connection focused. |
+| Write rows in `1_projects/PROJECTS.md` (create, retire, reclassify) | `/minder:mem:resolve-clarifications` (identity changes — already the writer for `project-identity` items) + owner direct edit + `/minder:mem:bootstrap` (candidate seeding) | Identity is an owner decision, and resolve is the engine's one owner-driven write path. A retirement row names kind and successor per Identity Contract; without a named writer the contract has no obligee |
+| Write the retirement section of `3_resources/people/PEOPLE.md` (`## Removed`) | `/minder:mem:resolve-clarifications` (identity changes) + owner direct edit + `/minder:mem:bootstrap` (candidate seeding) | Same lane and same reason as the projects registry. Distinct from `## Stale People`, which is a tier drop (archival), not an identity change |
+| Append to `_system/state/identity-gate.jsonl` | `identity_gate.py` only, invoked from `/minder:mem:resolve-clarifications` Class I.5 | Append-only, never rewritten, never pruned. The writer is the script rather than the skill on purpose: the record has to be a side effect of the scan actually running, not something the run composes about itself afterwards. A skill that writes this line by hand has produced a claim, not a proof |
+| Write AUTO-GENERATED zone of `5_meta/mocs/hub-cognitive-model.md` | `/minder:mem:maintain` only (via `render_cognitive_model_hub.py`, Step 7.9 — post-loop, after Step 7.8) | Pure projection of constitution `cognitive_axes` fields + candidate buffer; only the zone between the `<!-- AUTO-GENERATED: cognitive-model-hub -->` markers, never the owner's «portrait» above them. |
 
 **Supporting invariants:**
-1. `/ztn:maintain` NEVER creates knowledge content — no records, notes, or hub
+1. `/minder:mem:maintain` NEVER creates knowledge content — no records, notes, or hub
    synthesis prose. It writes only structural state: back-references and
    strategic-grain thread opening in `OPEN_THREADS.md ## Active` (a tracking
    entry, not synthesis). Hub `Текущее понимание` synthesis is explicitly NOT
    maintain's — that stays with process (additive) + owner via lint D.4.
-2. `/ztn:lint` NEVER applies closure or tier changes — only surfaces CLARIFICATIONS.
+2. `/minder:mem:lint` NEVER applies closure or tier changes — only surfaces CLARIFICATIONS.
 3. Hub `topic_relevance ≥ 1` required for hub ↔ thread linkage — pure people-overlap never links (prevents hub bloat).
-4. Dedup (similarity ≥ 95%) is the ONLY body-edit `/ztn:lint` performs — it merges, never deletes unilaterally.
+4. Dedup (similarity ≥ 95%) is the ONLY body-edit `/minder:mem:lint` performs — it merges, never deletes unilaterally.
 5. CLARIFICATIONS are the universal human-in-the-loop gate — any ambiguity at skill confidence below threshold writes a question, not a decision.
 
 ### CLARIFICATIONS format
@@ -275,17 +275,17 @@ All CLARIFICATION items MUST include:
 - `**Quote:**` field — verbatim fragment when source = транскрипт
 - Parsable fields: `Type`, `Subject`, `Source`, `Suggested action`, `Confidence tier`
 
-Optional fields (added by specific producers; loose-parsed by `/ztn:resolve-clarifications`):
-- `**Smart_resolve reasoning:**` — written by `/ztn:resolve-clarifications --auto-mode` when an item passes through the auto-resolve sweep but lands in the queue (not auto-applied). 1-3 sentences referencing constitution / past sessions / SOUL focus. Renders in resolve interactive Step 5 «Procedural context» block. Append-only — never rewritten on subsequent sweeps (latest sweep adds a new line if reasoning evolves)
+Optional fields (added by specific producers; loose-parsed by `/minder:mem:resolve-clarifications`):
+- `**Smart_resolve reasoning:**` — written by `/minder:mem:resolve-clarifications --auto-mode` when an item passes through the auto-resolve sweep but lands in the queue (not auto-applied). 1-3 sentences referencing constitution / past sessions / SOUL focus. Renders in resolve interactive Step 5 «Procedural context» block. Append-only — never rewritten on subsequent sweeps (latest sweep adds a new line if reasoning evolves)
 - `**Action type:**` + `**Action params:**` (YAML inline) — written for `lens-action-proposed` items only. Carry the structured proposal that Class C apply / reject / modify operate on
 - `**Veto reason:**` — written for `lens-action-veto` items only. Names the specific axiom / principle / rule ID or SOUL-section that triggered the veto
 - `**Precedent:**` — optional list of `_system/state/resolve-sessions/{date}-{sid}.md` links with one-line summaries of how owner decided substantively-similar past proposals. Resolver renders these in Step 5 to ground owner judgement
 
 Resolved items use structured format with `**Applied:** no|yes` field + `**Context:**` + `**Rationale:**` + canonical `Resolution-action` vocabulary. Single format — `## Open Items` + `## Resolved Items` sections only.
 
-Owner-facing review path: `/ztn:resolve-clarifications` — interactive walker that clusters items by theme, reminds context inline, pre-forms hypotheses against constitution, applies confirmed resolutions, and archives closed items.
+Owner-facing review path: `/minder:mem:resolve-clarifications` — interactive walker that clusters items by theme, reminds context inline, pre-forms hypotheses against constitution, applies confirmed resolutions, and archives closed items.
 
-**Canonical `Resolution-action` vocabulary** (append-only evolution — stable contract for `/ztn:resolve-clarifications` and any future automated consumer):
+**Canonical `Resolution-action` vocabulary** (append-only evolution — stable contract for `/minder:mem:resolve-clarifications` and any future automated consumer):
 
 | Action | Target | Payload example |
 |---|---|---|
@@ -296,7 +296,7 @@ Owner-facing review path: `/ztn:resolve-clarifications` — interactive walker t
 | `demote-tier` | person-id | `from: 1, to: 2, reason: "inactive"` |
 | `merge-notes` | kept-note-id | `deleted: [ids], merge_strategy: "A superset of B"` |
 | `dismiss-duplicate` | note-id | `(none)` |
-| `entity-retire` | entity-id | `kind: "merge \| rename \| split \| void", successor: "{id}" (merge and rename) \| successors: [{id}, ...] (split, ≥ 2) \| omitted (void), registry: "{path}", gate: {ts, command, exit_code: 0, residue_count: 0}` — an identity leaves circulation per Identity Contract; the `gate` block is the recorded per-identity scan that Obligation 4 requires, copied verbatim from the JSON line `identity_gate.py` printed; `ts` is what lets `/ztn:lint` A.8 (9) match the row against the gate's own log rather than against a number the row wrote about itself, and an archived row without the block is unproven. Interactive only, never `--auto-mode` |
+| `entity-retire` | entity-id | `kind: "merge \| rename \| split \| void", successor: "{id}" (merge and rename) \| successors: [{id}, ...] (split, ≥ 2) \| omitted (void), registry: "{path}", gate: {ts, command, exit_code: 0, residue_count: 0}` — an identity leaves circulation per Identity Contract; the `gate` block is the recorded per-identity scan that Obligation 4 requires, copied verbatim from the JSON line `identity_gate.py` printed; `ts` is what lets `/minder:mem:lint` A.8 (9) match the row against the gate's own log rather than against a number the row wrote about itself, and an archived row without the block is unproven. Interactive only, never `--auto-mode` |
 | `entity-reclassify` | entity-id | `from_category: "project", to_category: "trajectory", registry: "{path}", gate: {ts, command, exit_code: 0, residue_count: 0}` — the identity stays alive and changes category; no successor. Interactive only |
 | `backfill-evidence-trail` | note-id | `entries: [{date, source, action}]` |
 | `resolve-bare-name` | subject-string | `person: person-id` OR `ignore: true` |
@@ -315,40 +315,40 @@ Owner-facing review path: `/ztn:resolve-clarifications` — interactive walker t
 | `archive-hub` | hub-id | `target_path: "4_archive/...", reason: "..."` — owner archived a hub whose theme is no longer active |
 | `apply-lens-proposal` | `lens-action-proposed` item | `action_type: "wikilink_add | hub_stub_create | open_thread_add | decision_update_section", targets: [paths], from_lens: "{lens-id}/{date}", owner_modified: bool` — owner approved (and optionally modified) a queued lens-action proposal; resolver invokes `lens_action_handlers.APPLIERS[type]` and writes a row to `lens-resolution-history.jsonl` |
 | `dismiss-lens-proposal` | `lens-action-proposed` / `lens-action-veto` item | `reason: "constitution-conflict | not-actionable | wrong-target | low-quality"` — owner rejected the proposal; row in history.jsonl marks the class_key as `reject` for future precedent grounding |
-| `rotate-credential` | secret name (owner supplies — the tick does not know it) | `role: "{role-id}", rotated: bool` — a `role-secret-leak` item; owner treats the value as compromised, rotates it at the service, re-stores it through `/ztn:role:edit` (which re-encrypts that one value), and fixes what wrote it |
+| `rotate-credential` | secret name (owner supplies — the tick does not know it) | `role: "{role-id}", rotated: bool` — a `role-secret-leak` item; owner treats the value as compromised, rotates it at the service, re-stores it through `/minder:mem:role:edit` (which re-encrypts that one value), and fixes what wrote it |
 | `review-commit` | `{role-id}` | `before: sha, after: sha, kept: bool` — a `role-head-moved` item; owner inspects the commit the role made and keeps or reverts it by hand |
 | `review-and-save` | `{role-id}` | `paths: [{path, held_by}]` — a `role-unrestorable-write` item; owner reviews paths the guard left alone because they were already dirty when the role started (`held_by: owner | earlier-role`), then keeps or discards |
 | `inspect-git-state` | `{role-id}` | `field: "...", before: "...", after: "..."` or `paths: [...]` — a `role-guard-evaded` item; owner inspects git's configuration and the named paths by hand, because the engine deliberately does not write inside `.git/`. Treat any credential the role could reach as compromised |
-| `restore-secrets-key` | tick timestamp | `resolved: bool, cause: "key-missing | key-wrong | package-missing"` — a `role-secrets-unavailable` item; owner puts the correct `ZTN_ROLES_KEY` into the scheduler routine's environment, or installs `cryptography`. The key itself is never recorded in the resolution |
+| `restore-secrets-key` | tick timestamp | `resolved: bool, cause: "key-missing | key-wrong | package-missing"` — a `role-secrets-unavailable` item; owner puts the correct `MINDER_MEMORY_ROLES_KEY` into the scheduler routine's environment, or installs `cryptography`. The key itself is never recorded in the resolution |
 | `acknowledge` | `{role-id}` | `note: "..."` — a finding the owner only needs to have seen. No repair, no external step: the engine reports it because it happened, not because it asks anything. Today's only user is `role-ignore-changed` |
-| `fix-role` | `{role-id}` | `action: "edited | paused", note: "..."` — a `role-repeated-error` or `role-repeated-degradation` item; owner repairs the assignment via `/ztn:role:edit`, pauses it, or lifts whatever limit the role keeps hitting |
+| `fix-role` | `{role-id}` | `action: "edited | paused", note: "..."` — a `role-repeated-error` or `role-repeated-degradation` item; owner repairs the assignment via `/minder:mem:role:edit`, pauses it, or lifts whatever limit the role keeps hitting |
 
 **Vocabulary governance:**
-- Reason codes ending `-suggested` / `-resolved` / `-drift-warn` / `-promote-*` MUST use canonical vocabulary — feed `/ztn:resolve-clarifications` execution
+- Reason codes ending `-suggested` / `-resolved` / `-drift-warn` / `-promote-*` MUST use canonical vocabulary — feed `/minder:mem:resolve-clarifications` execution
 - Reason codes ending `-reminder` / `-surfaced (policy-decision)` / `-advice` MAY use free-form Suggested action — conversational triggers, not executable operations
 - New canonical verbs: append-only addition к this table. Removed / renamed verbs = breaking change requires migration of existing Resolved Items
 
 ### Cross-skill exclusion
 
-All six pipeline skills (`/ztn:process`, `/ztn:maintain`, `/ztn:lint`, `/ztn:agent-lens`, `/ztn:content`, `/ztn:roles`) mutually exclusive. Each reads all seven `.{skill}.lock` files в `_sources/` (the six pipelines + `.resolve.lock`) on start. Any other skill's lock exists → abort. `/ztn:content` acquires `.content.lock` when it writes (`--maintain` / `--draft`); its read-only status mode needs no lock. `.content.lock` matters because the maintainer reads `CONTENT_MAP.md` while `/ztn:maintain` Step 7.8 rewrites it.
+All six pipeline skills (`/minder:mem:process`, `/minder:mem:maintain`, `/minder:mem:lint`, `/minder:mem:agent-lens`, `/minder:mem:content`, `/minder:mem:roles`) mutually exclusive. Each reads all seven `.{skill}.lock` files в `_sources/` (the six pipelines + `.resolve.lock`) on start. Any other skill's lock exists → abort. `/minder:mem:content` acquires `.content.lock` when it writes (`--maintain` / `--draft`); its read-only status mode needs no lock. `.content.lock` matters because the maintainer reads `CONTENT_MAP.md` while `/minder:mem:maintain` Step 7.8 rewrites it.
 
-`/ztn:roles` acquires `.roles.lock` for the whole tick, held across every due role's run. It belongs in the matrix because roles write into the base like any pipeline: without the lock a concurrent `/ztn:lint` autofix lands inside a running role's diff window, is attributed to that role by `roles_guard.py`, and is **reverted** — the roles engine would silently destroy another pipeline's work. The consequence points the other way too: a role must not invoke a pipeline skill from inside its own run, since every one of them aborts on the lock its runner holds (`_system/roles/_minder.md` states this to the role).
+`/minder:mem:roles` acquires `.roles.lock` for the whole tick, held across every due role's run. It belongs in the matrix because roles write into the base like any pipeline: without the lock a concurrent `/minder:mem:lint` autofix lands inside a running role's diff window, is attributed to that role by `roles_guard.py`, and is **reverted** — the roles engine would silently destroy another pipeline's work. The consequence points the other way too: a role must not invoke a pipeline skill from inside its own run, since every one of them aborts on the lock its runner holds (`_system/roles/_minder.md` states this to the role).
 
-The owner-driven role skills sit outside the matrix, each for its own reason. `/ztn:role:list` and `/ztn:role:ask` are read-only — no lock, nothing written, the role never run. `/ztn:role:add` and `/ztn:role:edit` take `.roles.lock` **narrowly and release it in a `finally`** — `edit` around the live write (a tick reads `role.md` while assembling a prompt, so an edit landing mid-tick would hand a role half of one version and half of another), `add` around its **Step 9 write** — the same reason as `edit`, and NOT around its trial run: the trial is `/ztn:roles --role {id}`, which acquires `.roles.lock` itself, so a caller holding it would deadlock the skill against its own gate and no role could ever be created. Neither holds the lock for the length of an owner conversation; both abort rather than wait if a tick already holds it.
+The owner-driven role skills sit outside the matrix, each for its own reason. `/minder:mem:role:list` and `/minder:mem:role:ask` are read-only — no lock, nothing written, the role never run. `/minder:mem:role:add` and `/minder:mem:role:edit` take `.roles.lock` **narrowly and release it in a `finally`** — `edit` around the live write (a tick reads `role.md` while assembling a prompt, so an edit landing mid-tick would hand a role half of one version and half of another), `add` around its **Step 9 write** — the same reason as `edit`, and NOT around its trial run: the trial is `/minder:mem:roles --role {id}`, which acquires `.roles.lock` itself, so a caller holding it would deadlock the skill against its own gate and no role could ever be created. Neither holds the lock for the length of an owner conversation; both abort rather than wait if a tick already holds it.
 
-`/ztn:resolve-clarifications` acquires `.resolve.lock` for both interactive and `--auto-mode` runs. Interactive mode reads all six pipeline locks (process / maintain / lint / agent-lens / content / roles) and aborts on any; it also pre-syncs via `/ztn:sync-data` (Step 0) so multi-device queues stay current. `/ztn:sync-data` and `/ztn:save` read **all seven** pipeline locks (process / maintain / lint / agent-lens / content / resolve / roles) and refuse while any is held — a rebase or a commit is equally unsafe under any running tick, and under `/ztn:roles` it is worse: `roles_guard.py` attributes every write in its diff window to the running role and reverts what falls outside that role's zone. Neither skill takes a lock of its own. The resolve skill's Step 9.1 releases `.resolve.lock` before reminding the owner to run save. **`--auto-mode` exception for `.lint.lock`:** auto-mode is dispatched by `/ztn:lint` Step 7.5 (lint holds its own lock during dispatch); treating that lock as competitor would deadlock the nightly chain. Auto-mode therefore proceeds when `.lint.lock` exists (it is the dispatcher's signature), aborts silently on any other pipeline lock (those should have cleared at lint's own Step 0.1; presence here means something genuinely went wrong — let the next nightly tick retry). Auto-mode also skips the Step 0 pre-sync (the dispatcher already synced, and lint's autofixes leave the working tree dirty) and never writes `lens-resolution-history.jsonl`.
+`/minder:mem:resolve-clarifications` acquires `.resolve.lock` for both interactive and `--auto-mode` runs. Interactive mode reads all six pipeline locks (process / maintain / lint / agent-lens / content / roles) and aborts on any; it also pre-syncs via `/minder:mem:sync-data` (Step 0) so multi-device queues stay current. `/minder:mem:sync-data` and `/minder:mem:save` read **all seven** pipeline locks (process / maintain / lint / agent-lens / content / resolve / roles) and refuse while any is held — a rebase or a commit is equally unsafe under any running tick, and under `/minder:mem:roles` it is worse: `roles_guard.py` attributes every write in its diff window to the running role and reverts what falls outside that role's zone. Neither skill takes a lock of its own. The resolve skill's Step 9.1 releases `.resolve.lock` before reminding the owner to run save. **`--auto-mode` exception for `.lint.lock`:** auto-mode is dispatched by `/minder:mem:lint` Step 7.5 (lint holds its own lock during dispatch); treating that lock as competitor would deadlock the nightly chain. Auto-mode therefore proceeds when `.lint.lock` exists (it is the dispatcher's signature), aborts silently on any other pipeline lock (those should have cleared at lint's own Step 0.1; presence here means something genuinely went wrong — let the next nightly tick retry). Auto-mode also skips the Step 0 pre-sync (the dispatcher already synced, and lint's autofixes leave the working tree dirty) and never writes `lens-resolution-history.jsonl`.
 
 **Nightly cadence:** three scheduler ticks. Agent-lens at 03:00 (lens production isolated), lint at 05:00 (invariant scans → Step 7.5 dispatches resolve --auto-mode inline → consumes fresh lens hints + new clarifications), roles at 07:00 (every due role, sequentially). Roles runs last of the three and ahead of the day's first process tick, so an inbox note a role leaves is folded in the same morning; its 07:00 slot is also the floor for any role cadence anchor, since an anchor later in the day is never reached at tick time. The two-hour gap separates lens emission from resolve consumption at the scheduler-agent-context level — the agent that judges proposals in Step A.2/A.3 has not just produced lens body output, which prevents confirmation bias on its own emissions. Lint and resolve in one tick is acceptable because their reasoning shapes are ortogonal (invariant pattern-match vs experienced-owner judgement) — minor contextual bleed in exchange for operational simplicity (one tick consumes the CLARIFICATIONS lint just emitted).
 
-`/ztn:agent-lens-add` (lens creation wizard) is owner-driven, not in the lock matrix. It respects `/ztn:agent-lens`'s lock at pre-flight (would race on registry writes) but does not acquire its own — uses concurrent-edit detection (snapshot at Step 0, re-validate at write) to defend against rare parallel owner invocations.
+`/minder:mem:agent-lens-add` (lens creation wizard) is owner-driven, not in the lock matrix. It respects `/minder:mem:agent-lens`'s lock at pre-flight (would race on registry writes) but does not acquire its own — uses concurrent-edit detection (snapshot at Step 0, re-validate at write) to defend against rare parallel owner invocations.
 
-**`/ztn:bootstrap` не входит в lock matrix** — disposable one-shot skill (запускается при системной инициализации, disaster recovery, onboarding'е друга). User ensures system idle before running bootstrap (runs <1 раз в год после initial setup).
+**`/minder:mem:bootstrap` не входит в lock matrix** — disposable one-shot skill (запускается при системной инициализации, disaster recovery, onboarding'е друга). User ensures system idle before running bootstrap (runs <1 раз в год после initial setup).
 
 ---
 
 ## Architecture — Three Layers
 
-ZTN v4 использует три слоя обработки знаний:
+Minder Memory v4 использует три слоя обработки знаний:
 
 | Слой | Путь | Назначение | Формат |
 |------|------|-----------|--------|
@@ -358,7 +358,7 @@ ZTN v4 использует три слоя обработки знаний:
 
 **Принципы обработки:** `5_meta/PROCESSING_PRINCIPLES.md` (source of truth для LLM-суждений)
 **Архитектура:** `5_meta/CONCEPT.md` (философия, ADR, примеры)
-**Pipeline:** SKILL.md (`/ztn:process`) — полный алгоритм обработки
+**Pipeline:** SKILL.md (`/minder:mem:process`) — полный алгоритм обработки
 
 ---
 
@@ -397,21 +397,21 @@ zettelkasten/
 │   │   ├── HUB_INDEX.md              # Индекс всех hub-заметок
 │   │   ├── INDEX.md                  # Surface catalog (knowledge + archive + constitution + hubs, faceted)
 │   │   ├── CURRENT_CONTEXT.md        # Live state snapshot
-│   │   └── CONTENT_MAP.md            # Content pipeline interface — view over hubs (writer: /ztn:maintain)
+│   │   └── CONTENT_MAP.md            # Content pipeline interface — view over hubs (writer: /minder:mem:maintain)
 │   ├── state/                        # Pipeline state (write-heavy)
-│   │   ├── content-pipeline-state.json  # Content ledger (drafts) — writer: /ztn:content --maintain
+│   │   ├── content-pipeline-state.json  # Content ledger (drafts) — writer: /minder:mem:content --maintain
 │   │   ├── BATCH_LOG.md              # Index всех batch-операций
 │   │   ├── PROCESSED.md              # Source → Note маппинг
 │   │   ├── CLARIFICATIONS.md         # Human-in-the-loop вопросы от скиллов
 │   │   ├── OPEN_THREADS.md           # Незакрытые темы и ожидания
 │   │   ├── principle-candidates.jsonl  # Append-only candidate buffer
-│   │   ├── log_process.md            # Хронологический лог /ztn:process
-│   │   ├── log_maintenance.md        # Append-only лог /ztn:maintain + /ztn:bootstrap
-│   │   ├── log_lint.md               # Append-only лог /ztn:lint runs
+│   │   ├── log_process.md            # Хронологический лог /minder:mem:process
+│   │   ├── log_maintenance.md        # Append-only лог /minder:mem:maintain + /minder:mem:bootstrap
+│   │   ├── log_lint.md               # Append-only лог /minder:mem:lint runs
 │   │   ├── batches/                  # Полные batch-отчёты
 │   │   └── lint-context/             # Lint Context Store: daily/ (30d rolling) + monthly/ (forever)
 │   ├── scripts/                      # Python pipeline (см. scripts/README.md)
-│   ├── roles/                        # Standing roles run by the /ztn:roles tick
+│   ├── roles/                        # Standing roles run by the /minder:mem:roles tick
 │   │   ├── _run-frame.md             # Engine: per-run mechanics handed to every role
 │   │   ├── _minder.md                # Engine: how to use the base, handed to every role
 │   │   └── {role-id}/                # Owner data: role.md + state/ + log.jsonl
@@ -509,7 +509,7 @@ category/specific-tag
 
 ## Note Formats
 
-ZTN v4 использует два формата: Record (лёгкий) и Knowledge Note (полный).
+Minder Memory v4 использует два формата: Record (лёгкий) и Knowledge Note (полный).
 Шаблоны: `5_meta/templates/record-template.md`, `5_meta/templates/note-template.md`
 
 ### Record Frontmatter (layer: record)
@@ -580,7 +580,7 @@ Body: `## Summary`, `## Ключевые пункты`, `## Контекст / �
 
 ### Biometric Record (kind: biometric)
 
-Auto-emitted by `/ztn:process` metric-day branch from
+Auto-emitted by `/minder:mem:process` metric-day branch from
 `_sources/inbox/{source-id}/<date>.md` (e.g. `garmin`). One file per
 calendar day. NO LLM in the emission path — pure deterministic Python
 (`process_metric_day.py`). Owner never hand-edits.
@@ -624,7 +624,7 @@ Body sections (only emit when non-empty):
 `is_sensitive: true`, `audience_tags: []`, `origin: personal`. Per-record
 override is NOT a normal path — biometric data is owner-only by design.
 
-**Idempotency.** Re-running `/ztn:process` on an already-processed source
+**Idempotency.** Re-running `/minder:mem:process` on an already-processed source
 is a no-op log line. Content-hash drift between source and existing record
 is resolved autonomously by richness — a richer-or-equal re-collect (a
 healed device→cloud sync gap, a provider backfill) is absorbed and baselines
@@ -635,13 +635,13 @@ projections with no owner edits to protect (doctrine §3.1).
 ### Activity Record (kind: activity)
 
 The behavioural sibling of the biometric record — same metric-day pipeline,
-the **activity** profile. Auto-emitted by `/ztn:process` from
+the **activity** profile. Auto-emitted by `/minder:mem:process` from
 `_sources/inbox/activitywatch/<date>.md`. One file per calendar day, pure
 deterministic Python, owner never hand-edits. Computer-usage / attention
 telemetry, NOT physiology — so a distinct `kind` and namespace
 (`_records/activity/<source>/`), never under `biometric/`. The heavy
 aggregation (Focus-Engineering metrics) runs upstream in the collector
-(`minder-activity-collector`); ZTN ingests clean facts and σ-tracks them.
+(`minder-activity-collector`); Minder Memory ingests clean facts and σ-tracks them.
 
 ```yaml
 ---
@@ -761,7 +761,7 @@ projects: []
 people: []
 
 # Rendering policy for `## Хронологическая карта` — derived | curated.
-# Absent → curated. `derived` means `/ztn:maintain` regenerates the map
+# Absent → curated. `derived` means `/minder:mem:maintain` regenerates the map
 # block via `_system/scripts/render_hub_maps.py`, and the body must carry
 # the AUTO-GENERATED markers; `curated` means the owner maintains it.
 # `excluded_from_map` holds record-ids the derived map skips;
@@ -887,7 +887,7 @@ For knowledge notes, hubs, principles (axiom / principle / rule), and any other 
 
 - date: YYYY-MM-DD
 - reason: "<one-sentence rationale in owner's natural language>"
-- triggered_by: owner | /ztn:lint F.3 | /ztn:resolve-clarifications | <skill-id>
+- triggered_by: owner | /minder:mem:lint F.3 | /minder:mem:resolve-clarifications | <skill-id>
 - superseded_by: [[wikilink]]   # REQUIRED when the reason is a merge or a rename; otherwise omit
 ```
 
@@ -898,9 +898,9 @@ status: archived
 archived_at: YYYY-MM-DD
 ```
 
-Frontmatter `archived_at` MUST equal `## Archive Note` `date`. Skill enforcement: any writer that flips `status: archived` MUST append `## Archive Note` in the same atomic write. Writing one without the other = contract violation; surfaces as `archive-note-missing` CLARIFICATION on next `/ztn:lint`.
+Frontmatter `archived_at` MUST equal `## Archive Note` `date`. Skill enforcement: any writer that flips `status: archived` MUST append `## Archive Note` in the same atomic write. Writing one without the other = contract violation; surfaces as `archive-note-missing` CLARIFICATION on next `/minder:mem:lint`.
 
-`triggered_by` value is the agent of the archival event — `owner` for direct hand-edits, the skill id (`/ztn:lint`, `/ztn:resolve-clarifications`, etc.) for engine-driven archivals. When a skill applies a CLARIFICATION resolution, the skill id wins (not `owner`); the resolution text is what carries the owner's reasoning into `reason`.
+`triggered_by` value is the agent of the archival event — `owner` for direct hand-edits, the skill id (`/minder:mem:lint`, `/minder:mem:resolve-clarifications`, etc.) for engine-driven archivals. When a skill applies a CLARIFICATION resolution, the skill id wins (not `owner`); the resolution text is what carries the owner's reasoning into `reason`.
 
 **Constitution-principle exception (single-source-of-truth guard).** Files under `0_constitution/{axiom,principle,rule}/` already use the Evidence Trail pattern. Per `0_constitution/CONSTITUTION.md` §9, archiving a principle appends a `deprecated` entry of the form `deprecated — reason: {reason}; status: archived` to the Evidence Trail. **That entry IS the Form A storage for principles** — do not also append a `## Archive Note` block. The `deprecated` Evidence Trail entry is the contract-required reason for principles; frontmatter `status: archived` is the machine flag (no `archived_at` — Evidence Trail entry date is the authoritative date).
 
@@ -922,7 +922,7 @@ Where the archived sub-table lives per registry:
 
 **Bullet-list variant for `_system/TASKS.md`.** Tasks live in bullet lists, not tables. The Stale section MUST carry a trailing `*(reason)*` italic suffix on every bullet — this is the bullet-list equivalent of the `Reason` column. Example: `- [ ] Подготовить презентацию для встречи в Баку — [[20260114-baku-presentation]] ^task-prepare-baku-presentation *(Баку прошло)*`.
 
-Skill enforcement: any writer that moves a row into an archived sub-table (or a bullet into TASKS Stale) MUST populate `Reason` / `*(reason)*`. Empty cell or missing italic surfaces as `archive-reason-missing` CLARIFICATION on next `/ztn:lint`.
+Skill enforcement: any writer that moves a row into an archived sub-table (or a bullet into TASKS Stale) MUST populate `Reason` / `*(reason)*`. Empty cell or missing italic surfaces as `archive-reason-missing` CLARIFICATION on next `/minder:mem:lint`.
 
 #### Form C — Existing structured field (queue-based archival)
 
@@ -943,7 +943,7 @@ Skill enforcement: any resolution that triggers archival without populating the 
 - **Atomic write.** The archival flag (`status: archived` / row move / tier change) and the reason (`## Archive Note` / `Reason` column / required field) MUST land in the same write. No two-stage archival.
 - **Append-only.** Archive Notes and Reason cells are written once at archival time. Owner can later edit free-form text but never deletes the structure. Re-archival of an already-archived entity is a no-op (idempotency); a second `## Archive Note` block is forbidden.
 - **No parallel log.** There is no `log_archival.md`. Cross-entity «what was archived in period X» is a derived view, generated on demand by reading the entities themselves.
-- **Lint enforcement.** `/ztn:lint` adds an Archive-contract scan that emits `archive-note-missing` / `archive-reason-missing` CLARIFICATIONs for entities found in archived state without the required reason. Forward-only: pre-contract archived entities are not flagged.
+- **Lint enforcement.** `/minder:mem:lint` adds an Archive-contract scan that emits `archive-note-missing` / `archive-reason-missing` CLARIFICATIONs for entities found in archived state without the required reason. Forward-only: pre-contract archived entities are not flagged.
 - **Suggested-action vocabulary stays unchanged.** The canonical `Resolution-action` table above already carries `reason` payload examples (`dismiss`, `demote-tier`, `archive-hub`); this contract elevates them from documented-payload to enforced-required for the archival subset.
 
 ---
@@ -958,7 +958,7 @@ Skill enforcement: any resolution that triggers archival without populating the 
 
 | Kind | How its identity change is carried | Detector |
 |---|---|---|
-| project, trajectory, person | this contract, in full | `identity_audit.py`, blocking at the `/ztn:process` final gate and re-run nightly by `/ztn:lint` A.8 |
+| project, trajectory, person | this contract, in full | `identity_audit.py`, blocking at the `/minder:mem:process` final gate and re-run nightly by `/minder:mem:lint` A.8 |
 | concept | `CONCEPTS.md` is a regenerated census, not a declaration: a rename is carried by the `aliases` column, which lint applies, and the census is rebuilt from the corpus | the alias application itself; no residue scan |
 | source | `SOURCES.md → ## Deprecated Sources` | none |
 | hub without a registry identity (`hub_kind: domain`) | Archive Contract Form A, with the `superseded_by` pointer the resolver reads | none |
@@ -1038,7 +1038,7 @@ Two kinds leave references without one identifier to migrate to, and they resolv
 - **void** — the identity never existed, so its references are frozen where they stand and excluded from the residue check.
 - **split** — the identity became several, and which successor a given reference means is decided by what that reference says, not by anything the registry holds. References neither freeze nor migrate: every live surface of a split identity surfaces as an owner decision among the declared successors, and residue is cleared one surface at a time by that decision. The completion rule is unchanged — zero live residue — only the route to it is manual.
 
-**Enforcement.** Write path: `/ztn:resolve-clarifications` Class I, the declared writer of both registries' retirement sections — it refuses a row its kind's successor rule forbids, and finalises only against a clean per-identity scan. Read path: `_system/scripts/identity_audit.py`, run nightly by `/ztn:lint` A.8, which recomputes residue from the base itself and re-raises whatever a write path let through.
+**Enforcement.** Write path: `/minder:mem:resolve-clarifications` Class I, the declared writer of both registries' retirement sections — it refuses a row its kind's successor rule forbids, and finalises only against a clean per-identity scan. Read path: `_system/scripts/identity_audit.py`, run nightly by `/minder:mem:lint` A.8, which recomputes residue from the base itself and re-raises whatever a write path let through.
 
 ---
 
@@ -1059,7 +1059,7 @@ knowledge base tracks. Format and rules: `_system/registries/CONCEPT_NAMING.md`.
   list — `theme`/`tool`/`decision`/`idea`/`event`/`organization`/`skill`/
   `technical`/`location`/`emotion`/`goal`/`value`/`preference`/`constraint`/
   `algorithm`/`fact`/`other`. `person` and `project` are reserved in the
-  vocabulary and never emitted by ZTN.
+  vocabulary and never emitted by Minder Memory.
 - **Autonomous resolution.** Engine resolves every format issue via
   `_system/scripts/_common.py::normalize_concept_name()`; never raises
   CLARIFICATIONs (see ENGINE_DOCTRINE §3.1 layer-specific exception).
@@ -1111,7 +1111,7 @@ Omit all three if note is purely operational, private, or context-free.
 | insight | Non-obvious connection, counter-intuitive observation, pattern recognition |
 | observation | Lightweight seed thought, casual noticing, not yet developed |
 
-Closed set — `/ztn:process` emits exactly one of these five; lint Scan A.11 heals
+Closed set — `/minder:mem:process` emits exactly one of these five; lint Scan A.11 heals
 any drift (`CANON_MAP` in `lint_content_markup.py`).
 
 ### content_angle: ALWAYS a YAML list of strings
@@ -1139,7 +1139,7 @@ content_angle:
 sometimes emit (technical, idea, decision, …) are mapped to the canonical five by
 lint Scan A.11. The mapping table is owned in one place —
 `_system/scripts/lint_content_markup.py::CANON_MAP` (synonym rows autofix; judgment
-rows surface as CLARIFICATIONs). See `/ztn:lint` SKILL Scan A.11 for the method.
+rows surface as CLARIFICATIONs). See `/minder:mem:lint` SKILL Scan A.11 for the method.
 
 ---
 
@@ -1152,9 +1152,9 @@ rows surface as CLARIFICATIONs). See `/ztn:lint` SKILL Scan A.11 for the method.
 
 ---
 
-## Processing Workflow (/ztn:process)
+## Processing Workflow (/minder:mem:process)
 
-Pipeline обработки определён в SKILL.md (`/ztn:process`).
+Pipeline обработки определён в SKILL.md (`/minder:mem:process`).
 
 Краткая последовательность:
 0. Pre-Scan — People Resolution Map (three-tier: RESOLVED / NEW / AMBIGUOUS), hub signal matching
@@ -1256,7 +1256,7 @@ tags:
 Task IDs: уникальные в рамках файла, формат `^task-short-description`.
 Примеры: `^task-write-letter-ivan-petrov`, `^task-prepare-presentation`.
 
-### Aggregate в TASKS.md (maintained by /ztn:process — incremental merge + reconciler backstop)
+### Aggregate в TASKS.md (maintained by /minder:mem:process — incremental merge + reconciler backstop)
 
 **Структура (6 секций):**
 
@@ -1323,7 +1323,7 @@ Stale — это результат ручного ревью пользоват
 - 📅 **YYYY-MM-DD HH:MM** — Описание события ^meeting-id
 ```
 
-### Aggregate в CALENDAR.md (maintained by /ztn:process — incremental merge; best-effort reconciler)
+### Aggregate в CALENDAR.md (maintained by /minder:mem:process — incremental merge; best-effort reconciler)
 
 **Структура (4 секции):**
 
@@ -1377,43 +1377,43 @@ Before saving each note:
 | File | Purpose | Updated |
 |------|---------|---------|
 | _system/docs/SYSTEM_CONFIG.md | This file — runtime config (formats, routing, types) | Manual |
-| _system/SOUL.md | Identity + Focus + Working Style | Manual + /ztn:bootstrap (once) |
-| _system/state/OPEN_THREADS.md | Active open threads + resolved history | /ztn:bootstrap, /ztn:maintain, /ztn:resolve-clarifications (writers per Skill Write Territory) |
-| _system/views/CURRENT_CONTEXT.md | Live state snapshot for thin orientation | /ztn:bootstrap, /ztn:maintain |
-| _system/views/INDEX.md | Surface catalog of knowledge + archive + constitution + hubs (PARA / domains / cross-domain / hubs facets); records and posts intentionally out of scope | /ztn:bootstrap Step 5.5, /ztn:maintain Step 7.6, regen_all.py — all via `_system/scripts/render_index.py` |
-| _system/state/log_lint.md | Append-only log of /ztn:lint runs | Each /ztn:lint |
-| `.engine-migrations.jsonl` (repo root) | Append-only migration ledger — one line per attempt: name, declared kind, exit code, outcome (`applied` / `partial`), timestamp, note. A clone carrying the older flat `.engine-migrations-applied` has it folded in on read. Committed, so a second machine agrees on what has run | `scripts/run_migrations.py`, called by `/ztn:update` and `scripts/sync_engine.sh` |
-| _system/state/log_maintenance.md | Append-only log of /ztn:maintain + /ztn:bootstrap runs | Each /ztn:maintain / /ztn:bootstrap |
-| _system/state/log_process.md | Chronological log of /ztn:process operations | Each /ztn:process |
-| _system/state/log_agent_lens.md | Append-only log of /ztn:agent-lens runs | Each /ztn:agent-lens |
-| _system/state/agent-lens-runs.jsonl | Machine index of every agent-lens run (one JSON line per run) | Each /ztn:agent-lens |
+| _system/SOUL.md | Identity + Focus + Working Style | Manual + /minder:mem:bootstrap (once) |
+| _system/state/OPEN_THREADS.md | Active open threads + resolved history | /minder:mem:bootstrap, /minder:mem:maintain, /minder:mem:resolve-clarifications (writers per Skill Write Territory) |
+| _system/views/CURRENT_CONTEXT.md | Live state snapshot for thin orientation | /minder:mem:bootstrap, /minder:mem:maintain |
+| _system/views/INDEX.md | Surface catalog of knowledge + archive + constitution + hubs (PARA / domains / cross-domain / hubs facets); records and posts intentionally out of scope | /minder:mem:bootstrap Step 5.5, /minder:mem:maintain Step 7.6, regen_all.py — all via `_system/scripts/render_index.py` |
+| _system/state/log_lint.md | Append-only log of /minder:mem:lint runs | Each /minder:mem:lint |
+| `.engine-migrations.jsonl` (repo root) | Append-only migration ledger — one line per attempt: name, declared kind, exit code, outcome (`applied` / `partial`), timestamp, note. A clone carrying the older flat `.engine-migrations-applied` has it folded in on read. Committed, so a second machine agrees on what has run | `scripts/run_migrations.py`, called by `/minder:mem:update` and `scripts/sync_engine.sh` |
+| _system/state/log_maintenance.md | Append-only log of /minder:mem:maintain + /minder:mem:bootstrap runs | Each /minder:mem:maintain / /minder:mem:bootstrap |
+| _system/state/log_process.md | Chronological log of /minder:mem:process operations | Each /minder:mem:process |
+| _system/state/log_agent_lens.md | Append-only log of /minder:mem:agent-lens runs | Each /minder:mem:agent-lens |
+| _system/state/agent-lens-runs.jsonl | Machine index of every agent-lens run (one JSON line per run) | Each /minder:mem:agent-lens |
 | _system/state/tick-telemetry.jsonl | Append-only token-consumption record, one JSON line per scheduler tick: totals (input / output / thinking / cache write split by 1h and 5m TTL / cache read / server-tool calls), per-model message counts, and a `by_agent` breakdown that names each role by its own id and carries that agent's own model tally — a roles tick can put each role on a different model, and the tick-level tally cannot say which one was where. Read from the tick's own transcript at Step 4.9, never self-reported by the model — a model cannot see its own usage. `measured_through` marks the horizon past which the tick's closing messages are uncounted; `layout_check` records whether sub-agent transcripts were where the parser expected them. | Each scheduler tick |
-| _system/state/check-decision-runs.jsonl | Append-only audit substrate of `/ztn:check-decision` invocations. Two `kind`'s per line — `run` (mechanical fields always; optional self-report `intent` / `pre_confidence` / `expected_verdict` when caller supplies) and `followup` (post-action signal). Sensitive runs omit `situation_text` + `rationale`, keep `situation_hash`. Consumers: `decision-review` lens (Layer A enrichment via `record_ref` exact match; Layer B aggregate observations on rolling 30-day window). Schema is forward-additive — unknown fields treated as no-signal by consumers, never fail. Substrate is never compacted / aggregated; rotation by year only when volume warrants. | Each /ztn:check-decision (run + optional followup) |
-| _system/state/.check-decision-runs.lock | Advisory `flock` serialising telemetry emission (run + followup) from concurrent /ztn:check-decision invocations. Narrow scope — does NOT cover Evidence Trail edits to `0_constitution/` (existing pre-emission race surface, out of telemetry scope). | /ztn:check-decision (helper acquires + releases) |
+| _system/state/check-decision-runs.jsonl | Append-only audit substrate of `/minder:mem:check-decision` invocations. Two `kind`'s per line — `run` (mechanical fields always; optional self-report `intent` / `pre_confidence` / `expected_verdict` when caller supplies) and `followup` (post-action signal). Sensitive runs omit `situation_text` + `rationale`, keep `situation_hash`. Consumers: `decision-review` lens (Layer A enrichment via `record_ref` exact match; Layer B aggregate observations on rolling 30-day window). Schema is forward-additive — unknown fields treated as no-signal by consumers, never fail. Substrate is never compacted / aggregated; rotation by year only when volume warrants. | Each /minder:mem:check-decision (run + optional followup) |
+| _system/state/.check-decision-runs.lock | Advisory `flock` serialising telemetry emission (run + followup) from concurrent /minder:mem:check-decision invocations. Narrow scope — does NOT cover Evidence Trail edits to `0_constitution/` (existing pre-emission race surface, out of telemetry scope). | /minder:mem:check-decision (helper acquires + releases) |
 | _system/state/agent-lens-rejected/{lens}/{ts}.md | Raw Stage 2 outputs that failed structural validator | On validator rejection |
-| _system/agent-lens/{lens}/{date}.md | Structured agent-lens observation outputs | Each successful /ztn:agent-lens lens run |
-| _system/registries/AGENT_LENSES.md | Agent-lens registry (active/draft/paused, cadence, schema) | /ztn:agent-lens-add (table row append on creation) + Manual (owner edits) + /ztn:agent-lens (status updates only on auto-pause) |
-| _system/registries/lenses/{id}/prompt.md | Per-lens prompt + frontmatter | /ztn:agent-lens-add (creates new lens) + Manual (owner edits) |
+| _system/agent-lens/{lens}/{date}.md | Structured agent-lens observation outputs | Each successful /minder:mem:agent-lens lens run |
+| _system/registries/AGENT_LENSES.md | Agent-lens registry (active/draft/paused, cadence, schema) | /minder:mem:agent-lens-add (table row append on creation) + Manual (owner edits) + /minder:mem:agent-lens (status updates only on auto-pause) |
+| _system/registries/lenses/{id}/prompt.md | Per-lens prompt + frontmatter | /minder:mem:agent-lens-add (creates new lens) + Manual (owner edits) |
 | _system/registries/lenses/_frame.md | Two-stage frame (thinker + structurer) + validator rules | Manual (engine-shipped) |
-| _system/state/lint-context/daily/*.md | 30-day rolling daily summaries | Each /ztn:lint |
-| _system/state/lint-context/monthly/*.md | Append-forever monthly summaries | First /ztn:lint of new UTC month |
-| _system/state/BATCH_LOG.md | Append-only index of batch operations | Each /ztn:process |
-| _system/state/batches/{batch-id}-{skill}.md + .json | Full batch report + JSON manifest, one pair per emitting run | Each /ztn:process, /ztn:maintain, /ztn:lint, /ztn:agent-lens |
+| _system/state/lint-context/daily/*.md | 30-day rolling daily summaries | Each /minder:mem:lint |
+| _system/state/lint-context/monthly/*.md | Append-forever monthly summaries | First /minder:mem:lint of new UTC month |
+| _system/state/BATCH_LOG.md | Append-only index of batch operations | Each /minder:mem:process |
+| _system/state/batches/{batch-id}-{skill}.md + .json | Full batch report + JSON manifest, one pair per emitting run | Each /minder:mem:process, /minder:mem:maintain, /minder:mem:lint, /minder:mem:agent-lens |
 | _system/docs/batch-format.md | Batch format contract — markdown report + JSON manifest; per-entity privacy trio + concept fields; sections `## Concepts Upserted` + `## Sensitive Entities` | Manual (bump version on change) |
-| _system/state/PROCESSED.md | Source → Note mapping | Each /ztn:process |
+| _system/state/PROCESSED.md | Source → Note mapping | Each /minder:mem:process |
 | _system/TASKS.md | All open tasks | Regenerated |
 | _system/CALENDAR.md | All events | Regenerated |
-| _system/POSTS.md | Published posts archive + content strategy | Manual or /ztn:content |
-| _system/views/CONTENT_MAP.md | Content pipeline interface — compact view over hubs + content notes + POSTS.md (ripeness, posts-on-theme) | /ztn:maintain Step 7.8 (canonical writer; regenerable, read-only) |
-| 5_meta/mocs/hub-cognitive-model.md | Cognitive-model hub — per-axis projection of `cognitive_axes`-tagged principles + candidate buffer (axis set is the SoT in `lenses/cognitive-model/prompt.md`); AUTO-GENERATED zone between markers, owner «portrait» above | /ztn:maintain Step 7.9 via `render_cognitive_model_hub.py` (owner-data; managed zone regenerable) |
-| _system/state/content-pipeline-state.json | Content ledger — per-draft state (theme_ids[], ripeness, draft_status, owner_touched) | /ztn:content --maintain (NOT regenerable) |
+| _system/POSTS.md | Published posts archive + content strategy | Manual or /minder:mem:content |
+| _system/views/CONTENT_MAP.md | Content pipeline interface — compact view over hubs + content notes + POSTS.md (ripeness, posts-on-theme) | /minder:mem:maintain Step 7.8 (canonical writer; regenerable, read-only) |
+| 5_meta/mocs/hub-cognitive-model.md | Cognitive-model hub — per-axis projection of `cognitive_axes`-tagged principles + candidate buffer (axis set is the SoT in `lenses/cognitive-model/prompt.md`); AUTO-GENERATED zone between markers, owner «portrait» above | /minder:mem:maintain Step 7.9 via `render_cognitive_model_hub.py` (owner-data; managed zone regenerable) |
+| _system/state/content-pipeline-state.json | Content ledger — per-draft state (theme_ids[], ripeness, draft_status, owner_touched) | /minder:mem:content --maintain (NOT regenerable) |
 | _system/state/CLARIFICATIONS.md | Non-blocking human-in-the-loop questions | All skills (safety valve) |
-| _system/registries/TAGS.md | Tag registry (`tags:` namespace labels) — census of the `tags:` frontmatter across the knowledge layer; AUTO-GENERATED zone between markers, owner-curated preamble above and `## Notes` below | `render_tags.py` only (via `/ztn:maintain` Step 7.10 and `regen_all.py`; managed zone regenerable, read-only) |
+| _system/registries/TAGS.md | Tag registry (`tags:` namespace labels) — census of the `tags:` frontmatter across the knowledge layer; AUTO-GENERATED zone between markers, owner-curated preamble above and `## Notes` below | `render_tags.py` only (via `/minder:mem:maintain` Step 7.10 and `regen_all.py`; managed zone regenerable, read-only) |
 | _system/registries/CONCEPT_NAMING.md | Spec — canonical concept-name format (engine-shipped) | Manual (engine maintainer) |
-| _system/registries/AUDIENCES.md | Spec + extensions for `audience_tags` privacy labels | /ztn:resolve-clarifications (extension append on owner approval) + Manual (owner edits) |
+| _system/registries/AUDIENCES.md | Spec + extensions for `audience_tags` privacy labels | /minder:mem:resolve-clarifications (extension append on owner approval) + Manual (owner edits) |
 | 1_projects/PROJECTS.md | Project registry | When new projects |
 | 3_resources/people/PEOPLE.md | People registry | When new people |
 | _system/registries/FOLDERS.md | Folder structure | Rarely |
-| _system/views/HUB_INDEX.md | Index of all hub notes | /ztn:maintain (rebuild) + /ztn:process (additive on hub create) — writers per Skill Write Territory |
+| _system/views/HUB_INDEX.md | Index of all hub notes | /minder:mem:maintain (rebuild) + /minder:mem:process (additive on hub create) — writers per Skill Write Territory |
 | 5_meta/CONCEPT.md | Architecture, philosophy, ADRs (human reference) | Manual |
 | 5_meta/PROCESSING_PRINCIPLES.md | 8 principles + values profile (LLM guidance) | Manual |

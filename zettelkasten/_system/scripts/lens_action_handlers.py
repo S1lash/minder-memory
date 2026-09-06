@@ -545,9 +545,9 @@ def apply_metric_record_rerender_apply(params: dict, source_lens: str, base: Pat
 # ---------------------------------------------------------------------------
 #
 # Appends one candidate to `_system/state/principle-candidates.jsonl`, the
-# SAME high-recall buffer the `/ztn:capture-candidate` hook writes. This is
+# SAME high-recall buffer the `/minder:mem:capture-candidate` hook writes. This is
 # CAPTURE (high-recall), never PROMOTION: the candidate is reviewed in batch
-# by the owner via `/ztn:lint` F.5 before anything reaches `0_constitution/`
+# by the owner via `/minder:mem:lint` F.5 before anything reaches `0_constitution/`
 # (ENGINE_DOCTRINE §3.6). Append-only + git-revertible → qualifies as an
 # additive auto-apply, on par with wikilink_add.
 
@@ -611,11 +611,11 @@ def validate_principle_candidate_add(params: dict, base: Path | None = None) -> 
 def apply_principle_candidate_add(params: dict, source_lens: str, base: Path | None = None) -> dict:
     """Append a candidate line to the principle-candidates buffer.
 
-    `captured_by: ztn:agent-lens`, `origin: agent-lens` (a non-personal
+    `captured_by: minder:mem:agent-lens`, `origin: agent-lens` (a non-personal
     origin — lens output is inferred / batch-extracted, so the F.5
     non-personal-origin guard always routes it to owner review, never L2
     auto-merge), source lens in `session_id` for provenance. Promotion stays
-    gated downstream by `/ztn:lint` F.5 — this handler only captures.
+    gated downstream by `/minder:mem:lint` F.5 — this handler only captures.
     """
     ok, reason = validate_principle_candidate_add(params, base)
     if not ok:
@@ -640,7 +640,7 @@ def apply_principle_candidate_add(params: dict, source_lens: str, base: Path | N
         "origin": "agent-lens",
         "session_id": f"agent-lens/{source_lens}",
         "record_ref": params.get("record_ref"),
-        "captured_by": "ztn:agent-lens",
+        "captured_by": "minder:mem:agent-lens",
     }
     line = _json.dumps(record, ensure_ascii=False)
     existing = p.read_text(encoding="utf-8") if p.exists() else ""

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Emit a ZTN engine batch manifest as JSON.
+"""Emit a Minder Memory engine batch manifest as JSON.
 
 Reads structured batch data from a file (or stdin), runs every
 concept-name and audience-tag through the autonomous-resolution
@@ -20,7 +20,7 @@ The format contract is owned by `_system/docs/manifest-schema/` — the
 canonical JSON Schema in `v{N}.json`, the SemVer evolution rules and
 consumer-integration patterns in its `README.md`. The contract is
 consumer-agnostic: it is the engine's promise to any downstream reader,
-not to one of them. ZTN-side guarantee: every concept name reaches the
+not to one of them. Minder Memory-side guarantee: every concept name reaches the
 consumer already conformant per CONCEPT_NAMING.md; every audience tag is
 in canonical 5 ∪ active AUDIENCES.md extensions; every privacy trio field
 is type-correct with conservative defaults.
@@ -74,9 +74,25 @@ REQUIRED_TOP_LEVEL: tuple[str, ...] = (
     "batch_id", "timestamp", "format_version", "processor",
 )
 
-ALLOWED_PROCESSORS: frozenset[str] = frozenset({
-    "ztn:process", "ztn:maintain", "ztn:lint", "ztn:agent-lens",
-})
+# The four pipelines, by the bare name that follows the namespace. The
+# `processor` value is `minder:mem:<name>`; every table below is keyed by it
+# and every lookup goes through `canonical_processor`, the one place that
+# says whether a value names a pipeline at all.
+PROCESSOR_NAMES: tuple[str, ...] = ("process", "maintain", "lint", "agent-lens")
+PROCESSOR_NAMESPACE = "minder:mem:"
+
+ALLOWED_PROCESSORS: frozenset[str] = frozenset(
+    PROCESSOR_NAMESPACE + name for name in PROCESSOR_NAMES
+)
+
+
+def canonical_processor(value) -> str | None:
+    """`minder:mem:<name>` when `value` names a known processor, else None."""
+    if not isinstance(value, str):
+        return None
+    if value.startswith(PROCESSOR_NAMESPACE) and value[len(PROCESSOR_NAMESPACE):] in PROCESSOR_NAMES:
+        return value
+    return None
 
 # Major version this emitter / consumer pair speaks. Bump only on
 # breaking schema changes (per ARCHITECTURE.md §8.12.2). Manifests
@@ -88,22 +104,22 @@ SUPPORTED_FORMAT_MAJOR = 2
 # not enforce inner structure beyond walk_and_normalise). Keys are
 # dotted paths into the manifest dict.
 PROCESSOR_REQUIRED_SECTIONS: dict[str, tuple[str, ...]] = {
-    "ztn:process": (
+    "minder:mem:process": (
         "sources_processed", "records", "knowledge_notes",
         "concepts", "stats",
     ),
-    "ztn:maintain": ("stats",),
-    "ztn:lint": ("stats",),
-    "ztn:agent-lens": ("stats",),
+    "minder:mem:maintain": ("stats",),
+    "minder:mem:lint": ("stats",),
+    "minder:mem:agent-lens": ("stats",),
 }
 
 # Filename skill suffix → processor, longest suffix first so
 # `-agent-lens` is matched before `-lint` would ever shadow it.
 FILENAME_SKILL_SUFFIXES: tuple[tuple[str, str], ...] = (
-    ("-agent-lens", "ztn:agent-lens"),
-    ("-process", "ztn:process"),
-    ("-maintain", "ztn:maintain"),
-    ("-lint", "ztn:lint"),
+    ("-agent-lens", "minder:mem:agent-lens"),
+    ("-process", "minder:mem:process"),
+    ("-maintain", "minder:mem:maintain"),
+    ("-lint", "minder:mem:lint"),
 )
 
 # Early-dialect manifests carried the run timestamp under these keys
@@ -133,7 +149,7 @@ EMPTY_REQUIRED_SECTION: dict[str, object] = {
 }
 
 # Empty-shorthand reconciliation. The accumulator inside Claude-driven
-# /ztn:process sometimes emits `tier1_objects.tasks: []` (and friends) as
+# /minder:mem:process sometimes emits `tier1_objects.tasks: []` (and friends) as
 # a literal empty list when no entities exist, instead of the canonical
 # `{"created": [], "updated": []}` envelope the schema declares.
 # The schema (manifest-schema/v2.json) is strict on the sectioned shape,
@@ -148,7 +164,7 @@ TIER1_UPSERT_KEYS: frozenset[str] = frozenset({"people", "projects"})
 # Tier 2 subsection keys (per manifest-schema/v2.json
 # tier2_objects_section): each is an object `{upserts: [...]}` of
 # tier2_typed_object_entry / tier2_lens_observation_entry. The
-# /ztn:process accumulator occasionally drops these to bare arrays
+# /minder:mem:process accumulator occasionally drops these to bare arrays
 # (mirroring the tier1 shorthand bug). The normaliser coerces both
 # empty and non-empty bare arrays to the canonical envelope.
 TIER2_SUBSECTION_KEYS: frozenset[str] = frozenset({
@@ -157,7 +173,7 @@ TIER2_SUBSECTION_KEYS: frozenset[str] = frozenset({
     "lens-observation",
 })
 
-# Legacy concept-type aliases — historical /ztn:process emissions used
+# Legacy concept-type aliases — historical /minder:mem:process emissions used
 # wider vocabulary than the schema's 17-value enum. Mapping to the
 # closest canonical value; the original is preserved under
 # section_extras.legacy_type so the audit chain stays recoverable.
@@ -263,7 +279,7 @@ LEGACY_CONCEPT_TYPE_ALIASES: dict[str, str] = {
 
 # Legacy tier2.tasks → tier1.tasks relocation. Owner tasks belong in
 # tier1_objects.tasks (per ARCHITECTURE.md three-tier model). The
-# /ztn:process accumulator historically misrouted them under
+# /minder:mem:process accumulator historically misrouted them under
 # tier2_objects.tasks (tier2 is for typed registries: inventory,
 # wardrobe, lens-observation). Producer relocates with
 # title-derivation from id and ownership mapping from legacy `type`.
@@ -1294,7 +1310,7 @@ def normalise_empty_section_shapes(
     the manifest schema (manifest-schema/v2.json) is the consumer-facing
     contract — keeping it strict means downstream consumers do not have
     to handle two equivalent representations of "nothing here". The
-    /ztn:process accumulator (Claude-driven) sometimes drops to literal
+    /minder:mem:process accumulator (Claude-driven) sometimes drops to literal
     `[]` (empty) or `[entity, ...]` (non-empty) on sections that the
     schema requires as objects. This helper rewrites both forms:
     - Tier 1 create-update sections → `{"created": [...], "updated": [...]}`
@@ -1804,7 +1820,7 @@ def synthesise_required_fields(
 
     # processor
     proc = data.get("processor")
-    if proc not in ALLOWED_PROCESSORS:
+    if canonical_processor(proc) is None:
         derived = None
         if stem:
             for suffix, mapped in FILENAME_SKILL_SUFFIXES:
@@ -1812,15 +1828,20 @@ def synthesise_required_fields(
                     derived = mapped
                     break
         if derived is None:
+            # An early dialect carried `skill` instead: `<namespace>:<name>`
+            # or `<prefix>-<name>`. The last colon segment is the name; a
+            # leading skill-directory prefix is stripped by matching the
+            # known names, never by string surgery on a namespace.
             skill = data.get("skill")
             if isinstance(skill, str):
-                key = skill.split(":")[-1].replace("ztn-", "").strip()
+                key = skill.split(":")[-1].strip()
                 for suffix, mapped in FILENAME_SKILL_SUFFIXES:
-                    if suffix.lstrip("-") == key:
+                    name = suffix.lstrip("-")
+                    if key == name or key.endswith("-" + name):
                         derived = mapped
                         break
         if derived is None:
-            derived = "ztn:process"
+            derived = "minder:mem:process"
         data["processor"] = derived
         events.append({
             "fix_id": "manifest-processor-synthesised",
@@ -1901,7 +1922,7 @@ def synthesise_required_fields(
     if not isinstance(data.get("stats"), dict):
         data["stats"] = {}
 
-    processor = data.get("processor")
+    processor = canonical_processor(data.get("processor"))
     for section in PROCESSOR_REQUIRED_SECTIONS.get(processor, ()):
         if section == "stats":
             continue
@@ -1953,6 +1974,7 @@ def validate_manifest(data: dict) -> None:
         raise ManifestValidationError(
             f"processor {processor!r} not in {sorted(ALLOWED_PROCESSORS)}"
         )
+    processor = canonical_processor(processor)
 
     fv = data["format_version"]
     if not isinstance(fv, str) or "." not in fv:

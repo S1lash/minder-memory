@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""ZTN lint Scan A.11 — content markup canonicalization.
+"""Minder Memory lint Scan A.11 — content markup canonicalization.
 
 Heals `content_type` drift and flags missing `content_angle` on knowledge
 notes carrying `content_potential`, so a drifted type never silently falls
-out of the content pipeline's routing. `/ztn:process` Q14 constrains its own
+out of the content pipeline's routing. `/minder:mem:process` Q14 constrains its own
 output to the canonical five; this is the post-write gate for existing notes
 and any incoming drift (manual edits, older notes, future producers).
 
@@ -54,7 +54,7 @@ from _common import (
 )
 
 
-# The canonical five — `/ztn:process` Q14 closed set. `story` included
+# The canonical five — `/minder:mem:process` Q14 closed set. `story` included
 # (canonical); never a drift target unless a CANON_MAP row points to it.
 CANONICAL_FIVE: frozenset[str] = frozenset(
     {"expert", "reflection", "story", "insight", "observation"}
@@ -162,7 +162,7 @@ def apply_content_type(path: Path, new_type: str, evidence_entry: str) -> bool:
     the autofix a minimal intervention instead of re-dumping the whole frontmatter
     through PyYAML. Returns False if the file has no frontmatter or no
     content_type line. Shared by the synonym autofix here and the owner-resolved
-    judgment apply path (e.g. /ztn:resolve-clarifications, backfill).
+    judgment apply path (e.g. /minder:mem:resolve-clarifications, backfill).
     """
     text = path.read_text(encoding="utf-8")
     parts = _split_frontmatter_text(text)
@@ -332,7 +332,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--root", type=Path, default=None,
-        help="Zettelkasten root (default: from ZTN_BASE / script-relative "
+        help="Zettelkasten root (default: from MINDER_MEMORY_BASE / script-relative "
              "resolution). Pass an explicit path for tests.",
     )
     args = parser.parse_args(argv)

@@ -143,7 +143,7 @@ violation with deterministic heuristics and never raises a
 CLARIFICATION. The single source of truth is
 `_system/scripts/_common.py::normalize_audience_tag()` plus the
 whitelist check (canonical 5 ∪ active Extensions) performed by
-`/ztn:lint` Scan A.7 (`lint_concept_audit.py`).
+`/minder:mem:lint` Scan A.7 (`lint_concept_audit.py`).
 
 | Condition | Engine action |
 |---|---|
@@ -159,7 +159,7 @@ Extensions table below remains owner-curated outside the pipeline.
 When owner wants a new audience available to the engine, owner adds
 a row; subsequent emissions can use it.
 
-`/ztn:process` Q16 applies a heuristic canonical-mapping at extraction
+`/minder:mem:process` Q16 applies a heuristic canonical-mapping at extraction
 time when the model's intended audience semantically fits a canonical
 (e.g. "team" → `work`, "linkedin" → `professional-network`, "tweet" →
 `world`). Only after that mapping fails is the tag silently dropped.

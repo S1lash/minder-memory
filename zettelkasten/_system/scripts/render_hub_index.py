@@ -36,7 +36,7 @@ disk gets its own section after them, so no hub can fall out of the index;
 lint A.6.2 checks exactly that, against this file.
 
 Idempotency: the managed zone is rendered, then compared (timestamp line
-excluded) to what is on disk. Identical → NO write at all, so `/ztn:maintain`
+excluded) to what is on disk. Identical → NO write at all, so `/minder:mem:maintain`
 run twice produces a byte-identical tree.
 
 First run on a base whose HUB_INDEX.md predates the markers adopts the legacy

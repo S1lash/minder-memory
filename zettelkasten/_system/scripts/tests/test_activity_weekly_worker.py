@@ -196,7 +196,7 @@ def test_maintain_manifest_emission(tmp_path):
     assert res.weeks_processed
     manifest_path = base / "_system" / "state" / "batches" / "20240125-091500-maintain.json"
     m = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert m["processor"] == "ztn:maintain"
+    assert m["processor"] == "minder:mem:maintain"
     assert m["format_version"] == "2.0"
     assert "activity" in m["tier2_objects"]
     section = m["tier2_objects"]["activity"]
@@ -218,7 +218,7 @@ def test_maintain_manifest_merges_existing(tmp_path):
     pre.parent.mkdir(parents=True, exist_ok=True)
     pre.write_text(json.dumps({
         "batch_id": "20240125-091500",
-        "processor": "ztn:maintain",
+        "processor": "minder:mem:maintain",
         "format_version": "2.0",
         "hubs": {"updated": [{"path": "5_meta/mocs/foo.md"}]},
         "tier2_objects": {"biometric": {"weeks_processed": ["2024-W03"]}},

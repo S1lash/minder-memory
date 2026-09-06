@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests._fixture import clear_ztn_env, make_fixture  # type: ignore
+from tests._fixture import clear_minder_memory_env, make_fixture  # type: ignore
 import append_candidate as a  # type: ignore
 
 
@@ -39,10 +39,10 @@ class AppendCandidateTests(unittest.TestCase):
             self.assertEqual(entry["suggested_type"], "principle")
             self.assertEqual(entry["suggested_domain"], "work")
             self.assertEqual(entry["session_id"], "session-test-001")
-            self.assertEqual(entry["captured_by"], "ztn:capture-candidate")
+            self.assertEqual(entry["captured_by"], "minder:mem:capture-candidate")
             self.assertEqual(entry["hypothesis"], "prefer-higher-quality-path")
             self.assertIn("лучше", entry["observation"])  # unicode
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_captured_by_is_declared_by_the_caller(self):
         """Provenance is read at F.5 promotion, where only some origins
@@ -54,11 +54,11 @@ class AppendCandidateTests(unittest.TestCase):
                 "--situation", "Recurring decision rationale across 3 records",
                 "--suggested-type", "principle",
                 "--suggested-domain", "work",
-                "--captured-by", "ztn:maintain",
+                "--captured-by", "minder:mem:maintain",
                 "--buffer", str(buf),
             ])
-            self.assertEqual(_read_buffer(buf)[0]["captured_by"], "ztn:maintain")
-        clear_ztn_env()
+            self.assertEqual(_read_buffer(buf)[0]["captured_by"], "minder:mem:maintain")
+        clear_minder_memory_env()
 
     def test_blank_captured_by_falls_back_to_the_default(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -73,7 +73,7 @@ class AppendCandidateTests(unittest.TestCase):
             ])
             self.assertEqual(_read_buffer(buf)[0]["captured_by"],
                              a.DEFAULT_CAPTURED_BY)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_default_origin_is_personal(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -87,7 +87,7 @@ class AppendCandidateTests(unittest.TestCase):
             ])
             entries = _read_buffer(buf)
             self.assertEqual(entries[-1]["origin"], "personal")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_multiple_appends_accumulate(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -107,7 +107,7 @@ class AppendCandidateTests(unittest.TestCase):
                 [e["session_id"] for e in entries],
                 ["session-test-000", "session-test-001", "session-test-002"],
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_bogus_type_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -120,7 +120,7 @@ class AppendCandidateTests(unittest.TestCase):
                     "--suggested-domain", "tech",
                     "--buffer", str(buf),
                 ])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_bogus_domain_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -133,7 +133,7 @@ class AppendCandidateTests(unittest.TestCase):
                     "--suggested-domain", "random",  # bogus
                     "--buffer", str(buf),
                 ])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_empty_situation_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -146,7 +146,7 @@ class AppendCandidateTests(unittest.TestCase):
                     "--suggested-domain", "tech",
                     "--buffer", str(buf),
                 ])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_unknown_as_type_and_domain_accepted(self):
         """Explicit 'unknown' is legit when caller cannot confidently
@@ -164,7 +164,7 @@ class AppendCandidateTests(unittest.TestCase):
             entry = _read_buffer(buf)[-1]
             self.assertEqual(entry["suggested_type"], "unknown")
             self.assertEqual(entry["suggested_domain"], "unknown")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_dry_run_writes_nothing(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -179,7 +179,7 @@ class AppendCandidateTests(unittest.TestCase):
             ])
             self.assertEqual(rc, 0)
             self.assertFalse(buf.exists())
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_concurrent_appends_do_not_interleave(self):
         """Concurrent writers must not produce partial or interleaved lines
@@ -219,7 +219,7 @@ class AppendCandidateTests(unittest.TestCase):
             session_ids = {e["session_id"] for e in entries}
             self.assertEqual(len(session_ids), 10,
                              "concurrent writes produced duplicate or missing entries")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_explicit_origin_overrides_default(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -234,7 +234,7 @@ class AppendCandidateTests(unittest.TestCase):
             ])
             entry = _read_buffer(buf)[-1]
             self.assertEqual(entry["origin"], "external")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_applies_in_concepts_default_empty(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -248,7 +248,7 @@ class AppendCandidateTests(unittest.TestCase):
             ])
             entry = _read_buffer(buf)[-1]
             self.assertEqual(entry["applies_in_concepts"], [])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_applies_in_concepts_valid_names_persisted(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -266,7 +266,7 @@ class AppendCandidateTests(unittest.TestCase):
                 entry["applies_in_concepts"],
                 ["delegation_pattern", "code_review_quality"],
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_applies_in_concepts_normalises_kebab_and_case(self):
         """Autonomous-pipeline: kebab-case + caps → snake_case lowercase silently."""
@@ -285,7 +285,7 @@ class AppendCandidateTests(unittest.TestCase):
                 _read_buffer(buf)[-1]["applies_in_concepts"],
                 ["delegation_pattern"],
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_applies_in_concepts_keeps_type_prefixed_name(self):
         """Autonomous-pipeline: type-prefixed names are kept verbatim — the
@@ -306,7 +306,7 @@ class AppendCandidateTests(unittest.TestCase):
                 _read_buffer(buf)[-1]["applies_in_concepts"],
                 ["theme_delegation"],
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_applies_in_concepts_drops_non_ascii(self):
         """Autonomous-pipeline: non-ASCII residue → drop silently, never raise."""
@@ -325,7 +325,7 @@ class AppendCandidateTests(unittest.TestCase):
                 _read_buffer(buf)[-1]["applies_in_concepts"],
                 ["delegation_pattern"],
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_applies_in_concepts_truncates_overlength(self):
         """Autonomous-pipeline: > 64 chars → truncate at last underscore."""
@@ -344,7 +344,7 @@ class AppendCandidateTests(unittest.TestCase):
             entry = _read_buffer(buf)[-1]
             self.assertEqual(len(entry["applies_in_concepts"]), 1)
             self.assertLessEqual(len(entry["applies_in_concepts"][0]), 64)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_applies_in_concepts_dedups_after_normalisation(self):
         """Autonomous-pipeline: raw forms collapsing to the same canonical →
@@ -364,7 +364,7 @@ class AppendCandidateTests(unittest.TestCase):
                 _read_buffer(buf)[-1]["applies_in_concepts"],
                 ["delegation_pattern", "theme_delegation_pattern"],
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 if __name__ == "__main__":

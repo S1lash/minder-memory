@@ -643,7 +643,50 @@ def baseline_additions(root: Path, ref: str = "HEAD") -> list[str] | None:
         return out
     path = root / rel
     now = _rows(path.read_text(encoding="utf-8")) if path.is_file() else set()
-    return sorted(now - _rows(prior.stdout))
+    before = _rows(prior.stdout)
+    # A note renamed since `ref` keeps its row: the row's path follows the file,
+    # and that is the same orphan under a new name, not a new orphan. Git's
+    # rename detection between the two trees is the one source for that map.
+    renamed = _renames_since(cwd, ref)
+    if renamed:
+        carried = set()
+        for row in before:
+            tag, sep, old_path = row.partition("|")
+            old_path = old_path.strip()
+            if sep and old_path in renamed:
+                carried.add(f"{tag.strip()} | {renamed[old_path]}")
+        before |= carried
+    return sorted(now - before)
+
+
+def _renames_since(cwd: str, ref: str) -> dict[str, str]:
+    """`old -> new` for every file git sees renamed between `ref` and the
+    working tree, as paths relative to the base (`zettelkasten/`)."""
+    import subprocess
+
+    try:
+        diff = subprocess.run(
+            # 30 %: a note whose body was rewritten by a product rename keeps
+            # well under half its lines, and git's default 50 % then reports the
+            # move as a delete plus an add — which is exactly the shape this map
+            # exists to see through.
+            ["git", "diff", "--name-status", "-M30%", "--diff-filter=R", ref],
+            cwd=cwd, capture_output=True, text=True, encoding="utf-8",
+        )
+    except OSError:
+        return {}
+    if diff.returncode != 0:
+        return {}
+    out: dict[str, str] = {}
+    prefix = "zettelkasten/"
+    for line in diff.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) != 3:
+            continue
+        old_path, new_path = parts[1], parts[2]
+        if old_path.startswith(prefix) and new_path.startswith(prefix):
+            out[old_path[len(prefix):]] = new_path[len(prefix):]
+    return out
 
 
 def _tags_of(fm: dict) -> list[str]:
@@ -2421,7 +2464,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--root", type=Path, default=None,
-        help="ZTN base path (defaults to repo_root(), the zettelkasten base).",
+        help="Minder Memory base path (defaults to repo_root(), the zettelkasten base).",
     )
     parser.add_argument(
         "--report", action="store_true",
@@ -2447,7 +2490,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    # `repo_root()` already resolves to the zettelkasten base (or `ZTN_BASE`).
+    # `repo_root()` already resolves to the zettelkasten base (or `MINDER_MEMORY_BASE`).
     root = args.root or repo_root()
     if not root.exists():
         print(f"ERROR: root does not exist: {root}", file=sys.stderr)

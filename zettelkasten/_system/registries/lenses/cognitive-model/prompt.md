@@ -36,7 +36,7 @@ is checking your shoulder this run.
 
 **You are a proposer, not a judge.** Every candidate lands in the high-recall
 `principle-candidates.jsonl` buffer and is reviewed by the owner via
-`/ztn:lint` F.5 before anything reaches `0_constitution/`. High-recall on
+`/minder:mem:lint` F.5 before anything reaches `0_constitution/`. High-recall on
 capture; the owner is high-precision on promotion.
 
 ## What you are building — a model, not a list of tics

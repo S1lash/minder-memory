@@ -22,7 +22,7 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
-from tests._fixture import clear_ztn_env  # type: ignore
+from tests._fixture import clear_minder_memory_env  # type: ignore
 import emit_batch_manifest as e  # type: ignore
 
 
@@ -98,7 +98,7 @@ def _minimal_manifest() -> dict:
         "batch_id": "20260502-120000",
         "timestamp": "2026-05-02T12:00:00Z",
         "format_version": "2.1",
-        "processor": "ztn:process",
+        "processor": "minder:mem:process",
         "sources_processed": [],
         "records": {"created": [], "updated": []},
         "knowledge_notes": {"created": [], "updated": []},
@@ -131,7 +131,7 @@ class HappyPathTests(unittest.TestCase):
             )
             # No fix events expected on clean input
             self.assertEqual(err.strip(), "")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class ConceptNormalisationTests(unittest.TestCase):
@@ -157,7 +157,7 @@ class ConceptNormalisationTests(unittest.TestCase):
             )
             # Events on stderr
             self.assertIn("concept-format-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_concepts_upserts_dropped_when_unnormalisable(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -177,7 +177,7 @@ class ConceptNormalisationTests(unittest.TestCase):
             self.assertEqual(names, ["valid_concept", "office_move"])
             self.assertIn("concept-drop-autofix", err)
             self.assertIn("concept-format-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_type_prefixed_concept_names_kept_verbatim(self):
         # The engine does NOT strip type prefixes — names are kept verbatim
@@ -229,7 +229,7 @@ class ConceptNormalisationTests(unittest.TestCase):
             self.assertEqual(entry["subtype"], "vector_database")
             self.assertEqual(entry["related_concepts"],
                              ["vector_search", "embedding"])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class AudienceWhitelistTests(unittest.TestCase):
@@ -252,7 +252,7 @@ class AudienceWhitelistTests(unittest.TestCase):
                 ["work", "world"],
             )
             self.assertIn("audience-tag-drop-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_extension_accepted(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -272,7 +272,7 @@ class AudienceWhitelistTests(unittest.TestCase):
                 written["records"]["created"][0]["audience_tags"],
                 ["spouse"],
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_case_normalised_to_canonical(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -293,7 +293,7 @@ class AudienceWhitelistTests(unittest.TestCase):
                 ["family"],
             )
             self.assertIn("audience-tag-normalise-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class PrivacyCoercionTests(unittest.TestCase):
@@ -315,7 +315,7 @@ class PrivacyCoercionTests(unittest.TestCase):
                 written["records"]["created"][0]["origin"], "personal"
             )
             self.assertIn("origin-coerce-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_is_sensitive_coerced_from_string(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -335,7 +335,7 @@ class PrivacyCoercionTests(unittest.TestCase):
                 written["records"]["created"][0]["is_sensitive"]
             )
             self.assertIn("is-sensitive-coerce-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class ManifestContractValidationTests(unittest.TestCase):
@@ -349,19 +349,19 @@ class ManifestContractValidationTests(unittest.TestCase):
             self.assertEqual(rc, 3)
             self.assertIn("missing required top-level keys", err)
             self.assertFalse((tmp / "out.json").exists())
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_unknown_processor_rejects(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
             audiences = _audiences_file(tmp)
             data = _minimal_manifest()
-            data["processor"] = "ztn:bogus"
+            data["processor"] = "minder:mem:bogus"
             rc, _, err = _run(data, tmp / "out.json", audiences)
             self.assertEqual(rc, 3)
-            self.assertIn("processor 'ztn:bogus' not in", err)
+            self.assertIn("processor 'minder:mem:bogus' not in", err)
             self.assertFalse((tmp / "out.json").exists())
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_incompatible_major_version_rejects(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -373,7 +373,7 @@ class ManifestContractValidationTests(unittest.TestCase):
             self.assertEqual(rc, 3)
             self.assertIn("format_version major", err)
             self.assertFalse((tmp / "out.json").exists())
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_minor_version_drift_accepted(self):
         # 2.5 still major-2 → accepted (forward-compat per ARCHITECTURE
@@ -386,7 +386,7 @@ class ManifestContractValidationTests(unittest.TestCase):
             rc, _, _ = _run(data, tmp / "out.json", audiences)
             self.assertEqual(rc, 0)
             self.assertTrue((tmp / "out.json").exists())
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_missing_required_section_rejects(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -398,7 +398,7 @@ class ManifestContractValidationTests(unittest.TestCase):
             self.assertEqual(rc, 3)
             self.assertIn("requires sections", err)
             self.assertFalse((tmp / "out.json").exists())
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_malformed_format_version_rejects(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -409,14 +409,14 @@ class ManifestContractValidationTests(unittest.TestCase):
             rc, _, err = _run(data, tmp / "out.json", audiences)
             self.assertEqual(rc, 3)
             self.assertIn("format_version", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_other_processors_have_relaxed_section_requirements(self):
-        # ztn:lint / ztn:maintain / ztn:agent-lens require only `stats`
+        # minder:mem:lint / minder:mem:maintain / minder:mem:agent-lens require only `stats`
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
             audiences = _audiences_file(tmp)
-            for proc in ("ztn:maintain", "ztn:lint", "ztn:agent-lens"):
+            for proc in ("minder:mem:maintain", "minder:mem:lint", "minder:mem:agent-lens"):
                 data = {
                     "batch_id": "20260502-120000",
                     "timestamp": "2026-05-02T12:00:00Z",
@@ -428,7 +428,7 @@ class ManifestContractValidationTests(unittest.TestCase):
                 rc, _, err = _run(data, output, audiences)
                 self.assertEqual(rc, 0, f"{proc}: {err}")
                 self.assertTrue(output.exists())
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class DryRunTests(unittest.TestCase):
@@ -443,7 +443,7 @@ class DryRunTests(unittest.TestCase):
             self.assertFalse(output.exists())
             # JSON was printed to stdout
             self.assertIn("batch_id", out)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class IdempotenceTests(unittest.TestCase):
@@ -467,7 +467,7 @@ class IdempotenceTests(unittest.TestCase):
             )
             _, _, err2 = _run(written_data, tmp / "out2.json", audiences)
             self.assertEqual(err2.strip(), "")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class EmptySectionShapeTests(unittest.TestCase):
@@ -502,7 +502,7 @@ class EmptySectionShapeTests(unittest.TestCase):
                                  {"upserts": []})
             # Each coercion emits a fix event on stderr
             self.assertGreaterEqual(err.count("tier1-empty-shape-autofix"), 7)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_tier2_empty_list_becomes_object(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -516,7 +516,7 @@ class EmptySectionShapeTests(unittest.TestCase):
             written = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(written["tier2_objects"], {})
             self.assertIn("tier2-empty-shape-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_tier2_inner_empty_list_becomes_upserts(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -530,7 +530,7 @@ class EmptySectionShapeTests(unittest.TestCase):
             written = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(written["tier2_objects"]["inventory"], {"upserts": []})
             self.assertEqual(written["tier2_objects"]["wardrobe"], {"upserts": []})
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_constitution_principles_empty_list_becomes_envelope(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -547,7 +547,7 @@ class EmptySectionShapeTests(unittest.TestCase):
                 {"upserts": [], "archived": [], "superseded": []},
             )
             self.assertIn("constitution-principles-empty-shape-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_clean_envelopes_pass_through(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -563,7 +563,7 @@ class EmptySectionShapeTests(unittest.TestCase):
             rc, _, err = _run(data, output, audiences)
             self.assertEqual(rc, 0)
             self.assertNotIn("empty-shape-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class DomainNormalisationTests(unittest.TestCase):
@@ -590,7 +590,7 @@ class DomainNormalisationTests(unittest.TestCase):
                 if ln.strip() and "domain" in ln
             ]
             self.assertEqual(domain_events, [])
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_unknown_value_dropped_from_array(self):
         with tempfile.TemporaryDirectory() as td:
@@ -713,7 +713,7 @@ class AtomicWriteTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertTrue(output.exists())
             self.assertFalse(output.with_suffix(".json.tmp").exists())
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_crash_mid_write_leaves_no_partial_file(self):
         with tempfile.TemporaryDirectory() as td:
@@ -741,7 +741,7 @@ class AtomicWriteTests(unittest.TestCase):
                 _os.replace = real_replace
             self.assertFalse(output.exists())
             self.assertFalse(output.with_suffix(".json.tmp").exists())
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class SourcesProcessedCoercionTests(unittest.TestCase):
@@ -780,7 +780,7 @@ class SourcesProcessedCoercionTests(unittest.TestCase):
                 written["stats"].get("source_type_inferred_unknown"), 1,
             )
             self.assertIn("sources-processed-coerce-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class Tier1NonEmptyArrayCoercionTests(unittest.TestCase):
@@ -807,7 +807,7 @@ class Tier1NonEmptyArrayCoercionTests(unittest.TestCase):
                 ["alice-smith", "bob-jones"],
             )
             self.assertIn("tier1-nonempty-shape-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_tier1_projects_nonempty_bare_strings_coerced(self):
         with tempfile.TemporaryDirectory() as td:
@@ -815,7 +815,7 @@ class Tier1NonEmptyArrayCoercionTests(unittest.TestCase):
             audiences = _audiences_file(tmp)
             data = _minimal_manifest()
             data["tier1_objects"] = {
-                "projects": ["minder", "ztn-engine"],
+                "projects": ["minder", "minder-memory-engine"],
             }
             rc, _, err = _run(data, tmp / "out.json", audiences)
             self.assertEqual(rc, 0)
@@ -823,10 +823,10 @@ class Tier1NonEmptyArrayCoercionTests(unittest.TestCase):
             upserts = written["tier1_objects"]["projects"]["upserts"]
             self.assertEqual(
                 [u["id"] for u in upserts],
-                ["minder", "ztn-engine"],
+                ["minder", "minder-memory-engine"],
             )
             self.assertIn("tier1-bare-string-wrap-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_hubs_nonempty_array_coerced(self):
         with tempfile.TemporaryDirectory() as td:
@@ -851,7 +851,7 @@ class Tier1NonEmptyArrayCoercionTests(unittest.TestCase):
                 len(written["hubs"]["updated"]), 1,
             )
             self.assertIn("hubs-nonempty-shape-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class PrivacyTrioInjectionTests(unittest.TestCase):
@@ -878,7 +878,7 @@ class PrivacyTrioInjectionTests(unittest.TestCase):
             self.assertEqual(note["audience_tags"], [])
             self.assertEqual(note["is_sensitive"], False)
             self.assertIn("privacy-trio-inject-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_privacy_trio_partial_keys_injected(self):
         with tempfile.TemporaryDirectory() as td:
@@ -897,7 +897,7 @@ class PrivacyTrioInjectionTests(unittest.TestCase):
             self.assertEqual(rec["origin"], "work")
             self.assertEqual(rec["audience_tags"], [])
             self.assertEqual(rec["is_sensitive"], False)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_privacy_trio_not_injected_at_top_level(self):
         # Defaults must not leak onto the manifest root.
@@ -910,7 +910,7 @@ class PrivacyTrioInjectionTests(unittest.TestCase):
             self.assertNotIn("origin", written)
             self.assertNotIn("audience_tags", written)
             self.assertNotIn("is_sensitive", written)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class RecordsKnowledgeNotesBareArrayTests(unittest.TestCase):
@@ -933,7 +933,7 @@ class RecordsKnowledgeNotesBareArrayTests(unittest.TestCase):
             self.assertEqual(written["records"]["created"][0]["id"], "r1")
             self.assertEqual(written["records"]["updated"][0]["id"], "r2")
             self.assertIn("records-nonempty-shape-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_knowledge_notes_nonempty_bare_array_coerced(self):
         with tempfile.TemporaryDirectory() as td:
@@ -952,7 +952,7 @@ class RecordsKnowledgeNotesBareArrayTests(unittest.TestCase):
             self.assertEqual(len(written["knowledge_notes"]["created"]), 1)
             self.assertEqual(len(written["knowledge_notes"]["updated"]), 1)
             self.assertIn("knowledge-notes-nonempty-shape-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class Tier2SubsectionBareArrayTests(unittest.TestCase):
@@ -986,7 +986,7 @@ class Tier2SubsectionBareArrayTests(unittest.TestCase):
             self.assertEqual(entry["audience_tags"], [])
             self.assertEqual(entry["is_sensitive"], False)
             self.assertIn("tier2-nonempty-shape-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_tier2_all_known_subsections_coerced(self):
         # Parametrise-style: every tier2 subsection accepts bare-array
@@ -1016,7 +1016,7 @@ class Tier2SubsectionBareArrayTests(unittest.TestCase):
                 self.assertEqual(
                     len(written["tier2_objects"][sub]["upserts"]), 1,
                 )
-            clear_ztn_env()
+            clear_minder_memory_env()
 
 
 class LegacyConceptTypeAliasTests(unittest.TestCase):
@@ -1052,7 +1052,7 @@ class LegacyConceptTypeAliasTests(unittest.TestCase):
                     entry["section_extras"]["legacy_type"], legacy,
                 )
                 self.assertIn("concept-type-legacy-alias-autofix", err)
-            clear_ztn_env()
+            clear_minder_memory_env()
 
     def test_unknown_concept_type_failsafe_to_other(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1078,7 +1078,7 @@ class LegacyConceptTypeAliasTests(unittest.TestCase):
             self.assertIn(
                 "concept-type-unknown-coerced-to-other", err,
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class ConstitutionEmptyArrayCoercionTests(unittest.TestCase):
@@ -1093,7 +1093,7 @@ class ConstitutionEmptyArrayCoercionTests(unittest.TestCase):
             written = json.loads((tmp / "out.json").read_text(encoding="utf-8"))
             self.assertEqual(written["constitution"], {})
             self.assertIn("constitution-empty-shape-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class HubMissingPathDerivationTests(unittest.TestCase):
@@ -1115,7 +1115,7 @@ class HubMissingPathDerivationTests(unittest.TestCase):
             entry = written["hubs"]["updated"][0]
             self.assertEqual(entry["path"], "5_meta/mocs/hub-example-topic.md")
             self.assertIn("hub-path-derive-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class SensitiveEntitiesCoercionTests(unittest.TestCase):
@@ -1141,7 +1141,7 @@ class SensitiveEntitiesCoercionTests(unittest.TestCase):
             self.assertIn(
                 "sensitive-entities-note-id-coerce-autofix", err,
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_sensitive_entities_idempotent(self):
         # Re-running on already-coerced output emits zero coercion
@@ -1165,7 +1165,7 @@ class SensitiveEntitiesCoercionTests(unittest.TestCase):
             self.assertNotIn(
                 "sensitive-entities-note-id-coerce-autofix", err2,
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_sensitive_entities_missing_kind_injected(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1187,7 +1187,7 @@ class SensitiveEntitiesCoercionTests(unittest.TestCase):
             entry = written["sensitive_entities"][0]
             self.assertEqual(entry["weird_field"], "value")
             self.assertEqual(entry["kind"], "note")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class Tier2TasksRelocationTests(unittest.TestCase):
@@ -1250,7 +1250,7 @@ class Tier2TasksRelocationTests(unittest.TestCase):
             second = created[1]
             self.assertEqual(second["ownership"], "DELEGATED")
             self.assertIn("tier2-tasks-relocated-to-tier1", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_tier2_tasks_with_name_field_NOT_relocated(self):
         # Genuine tier2 typed-object task (has `name`) stays in tier2.
@@ -1283,7 +1283,7 @@ class Tier2TasksRelocationTests(unittest.TestCase):
                 for entry in tier1_tasks.get("created", []) or []:
                     self.assertNotEqual(entry.get("id"), "task-genuine")
             self.assertNotIn("tier2-tasks-relocated-to-tier1", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_tier2_events_unmappable_preserved_in_section_extras(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1310,7 +1310,7 @@ class Tier2TasksRelocationTests(unittest.TestCase):
             self.assertEqual(len(preserved), 1)
             self.assertEqual(preserved[0]["id"], "event-foo")
             self.assertIn("tier2-events-preserved-as-legacy", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_tier2_people_candidates_preserved_in_section_extras(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1338,7 +1338,7 @@ class Tier2TasksRelocationTests(unittest.TestCase):
             self.assertIn(
                 "tier2-people-candidates-preserved-as-legacy", err,
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_tier2_relocation_idempotent(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1373,7 +1373,7 @@ class Tier2TasksRelocationTests(unittest.TestCase):
                 "tier2-people-candidates-preserved-as-legacy",
             ):
                 self.assertNotIn(fix_id, err2)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class Phase4LowFindingsTests(unittest.TestCase):
@@ -1387,7 +1387,7 @@ class Phase4LowFindingsTests(unittest.TestCase):
                 "batch_id": "20260502-120000",
                 "timestamp": "2026-05-02T12:00:00Z",
                 "format_version": "2.1",
-                "processor": "ztn:process",
+                "processor": "minder:mem:process",
                 "sources_processed": [
                     "_sources/processed/garmin/2026-05-02.md",
                     {"path": "_sources/processed/plaud/x.md",
@@ -1449,7 +1449,7 @@ class Phase4LowFindingsTests(unittest.TestCase):
             self.assertEqual(
                 fix_lines, [], msg=f"unexpected fix events: {fix_lines}",
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_tier1_people_mixed_dict_and_bare_strings(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1471,7 +1471,7 @@ class Phase4LowFindingsTests(unittest.TestCase):
             self.assertEqual(upserts[0]["id"], "alice")
             self.assertEqual(upserts[1]["id"], "bob-jones")
             self.assertEqual(upserts[2]["id"], "charlie")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_privacy_trio_NOT_injected_at_non_entity_lists(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1496,7 +1496,7 @@ class Phase4LowFindingsTests(unittest.TestCase):
                 self.assertNotIn("origin", streak)
                 self.assertNotIn("audience_tags", streak)
                 self.assertNotIn("is_sensitive", streak)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class LegacyConceptTypeAliasCompletenessTests(unittest.TestCase):
@@ -1547,7 +1547,7 @@ class Tier1NullShapeTests(unittest.TestCase):
                 written["tier1_objects"]["projects"], {"upserts": []},
             )
             self.assertIn("tier1-null-shape-autofix", err)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class DegenerateTaskIdTests(unittest.TestCase):
@@ -1580,7 +1580,7 @@ class _NormaliserHelper:
 
 class SynthesiseRequiredFieldsTests(unittest.TestCase):
     def test_timestamp_derived_from_batch_id(self):
-        data = {"batch_id": "20260519-150515", "processor": "ztn:process"}
+        data = {"batch_id": "20260519-150515", "processor": "minder:mem:process"}
         e.synthesise_required_fields(data, [], fill_sections=False)
         self.assertEqual(data["timestamp"], "2026-05-19T15:05:15Z")
         self.assertEqual(data["format_version"], "2.0")
@@ -1590,7 +1590,7 @@ class SynthesiseRequiredFieldsTests(unittest.TestCase):
         e.synthesise_required_fields(
             data, [], filename="20260519-150515-maintain.json",
         )
-        self.assertEqual(data["processor"], "ztn:maintain")
+        self.assertEqual(data["processor"], "minder:mem:maintain")
 
     def test_batch_id_conformed_from_batch_suffix(self):
         data = {"batch_id": "20260531-030000-batch3"}
@@ -1605,7 +1605,7 @@ class SynthesiseRequiredFieldsTests(unittest.TestCase):
 
     def test_fill_sections_recovers_alias_and_empties(self):
         data = {
-            "batch_id": "20260528-000000", "processor": "ztn:process",
+            "batch_id": "20260528-000000", "processor": "minder:mem:process",
             "format_version": "2.1", "timestamp": "2026-05-28T00:00:00Z",
             "sources": [{"path": "_sources/processed/plaud/x.md"}],
             "records": 2,

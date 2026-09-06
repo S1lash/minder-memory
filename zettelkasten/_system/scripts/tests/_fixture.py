@@ -1,4 +1,4 @@
-"""Fixture builder for tests — synthesises a temporary ZTN base on disk."""
+"""Fixture builder for tests — synthesises a temporary Minder Memory base on disk."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ framing: positive
 binding: hard
 core: true
 scope: shared
-applies_to: [claude-code, ztn]
+applies_to: [claude-code, minder-memory]
 derived_from: []
 contradicts: []
 confidence: proven
@@ -61,7 +61,7 @@ framing: positive
 binding: soft
 core: false
 scope: personal
-applies_to: [claude-code, ztn]
+applies_to: [claude-code, minder-memory]
 derived_from: [axiom-identity-001]
 contradicts: []
 confidence: working
@@ -260,10 +260,10 @@ def make_fixture(tmp_dir: Path) -> Fixture:
     base = tmp_dir / "zettelkasten"
     (base / "0_constitution").mkdir(parents=True)
     (base / "_system").mkdir(parents=True)
-    os.environ["ZTN_BASE"] = str(base)
+    os.environ["MINDER_MEMORY_BASE"] = str(base)
     return Fixture(base=base)
 
 
-def clear_ztn_env() -> None:
-    os.environ.pop("ZTN_BASE", None)
+def clear_minder_memory_env() -> None:
+    os.environ.pop("MINDER_MEMORY_BASE", None)
     os.environ.pop("CLAUDE_CONTEXT", None)

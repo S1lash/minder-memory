@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# minder-ztn — remove Claude Code integration symlinks.
+# minder-memory — remove Claude Code integration symlinks.
 #
 # Removes only symlinks pointing into THIS repo. Untouched: any
 # unrelated entries in ~/.claude/{rules,commands,skills,agents}, including
-# files backed up by install.sh (those live under ~/.claude/.minder-ztn-backup-*).
+# files backed up by install.sh (those live under ~/.claude/.minder-memory-backup-*).
 
 set -euo pipefail
 
@@ -25,7 +25,9 @@ remove_if_points_into_repo() {
   fi
 }
 
-for d in "$CLAUDE_HOME/rules" "$CLAUDE_HOME/commands" "$CLAUDE_HOME/skills" "$CLAUDE_HOME/agents"; do
+# `commands/minder/` is the ecosystem's namespace directory (a real directory
+# shared with sibling products); this product's link is `commands/minder/mem`.
+for d in "$CLAUDE_HOME/rules" "$CLAUDE_HOME/commands" "$CLAUDE_HOME/commands/minder" "$CLAUDE_HOME/skills" "$CLAUDE_HOME/agents"; do
   [ -d "$d" ] || continue
   for entry in "$d"/*; do
     remove_if_points_into_repo "$entry"
@@ -34,11 +36,11 @@ done
 
 # Strip managed block from ~/.claude/CLAUDE.md (added by install.sh).
 CLAUDE_MD="$CLAUDE_HOME/CLAUDE.md"
-BEGIN_MARK="<!-- MINDER-ZTN BEGIN — managed by install.sh, do not edit by hand -->"
-END_MARK="<!-- MINDER-ZTN END -->"
+BEGIN_MARK="<!-- MINDER-MEMORY BEGIN — managed by install.sh, do not edit by hand -->"
+END_MARK="<!-- MINDER-MEMORY END -->"
 if [ -f "$CLAUDE_MD" ] && grep -qF "$BEGIN_MARK" "$CLAUDE_MD"; then
   TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
-  BACKUP_DIR="$CLAUDE_HOME/.minder-ztn-backup-$TIMESTAMP"
+  BACKUP_DIR="$CLAUDE_HOME/.minder-memory-backup-$TIMESTAMP"
   mkdir -p "$BACKUP_DIR"
   cp "$CLAUDE_MD" "$BACKUP_DIR/CLAUDE.md.before-uninstall"
   awk -v begin="$BEGIN_MARK" -v end="$END_MARK" '
@@ -49,4 +51,4 @@ if [ -f "$CLAUDE_MD" ] && grep -qF "$BEGIN_MARK" "$CLAUDE_MD"; then
   echo "[uninstall] stripped managed block from $CLAUDE_MD (backup: $BACKUP_DIR)"
 fi
 
-echo "[uninstall] done. Backups (if any) preserved at $CLAUDE_HOME/.minder-ztn-backup-*"
+echo "[uninstall] done. Backups (if any) preserved at $CLAUDE_HOME/.minder-memory-backup-*"

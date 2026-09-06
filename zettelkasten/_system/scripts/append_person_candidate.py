@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Append a bare-name people candidate to `_system/state/people-candidates.jsonl`.
 
-Invoked by `/ztn:process` Step 3.8 when a bare first name is encountered
+Invoked by `/minder:mem:process` Step 3.8 when a bare first name is encountered
 that cannot be resolved to a `firstname-lastname` PEOPLE.md ID. Instead
 of creating a CLARIFICATION per one-off mention (high friction for the
-user), the mention is appended to this buffer. `/ztn:lint` Scan C.5
+user), the mention is appended to this buffer. `/minder:mem:lint` Scan C.5
 aggregates the buffer weekly and promotes recurring or information-rich
 candidates to CLARIFICATIONS.
 
@@ -16,13 +16,13 @@ Schema of each JSONL line:
       "captured_at": "YYYY-MM-DDThh:mm:ssZ",
       "name_as_transcribed": "Петя",
       "source": "plaud/2026-04-21T13:31:11Z",
-      "note_id": "20260421-meeting-...",  # record produced by /ztn:process
+      "note_id": "20260421-meeting-...",  # record produced by /minder:mem:process
       "quote": "...",                     # verbatim transcript fragment (≥1 sentence)
       "role_hint": "dev (review likes)" | null,
       "related_people": ["ivan-petrov"] | [],
       "suggested_id": null | "petya-ivanov",
       "high_importance_hint": false,      # if true, lint will auto-promote regardless of count
-      "captured_by": "ztn:process"
+      "captured_by": "minder:mem:process"
     }
 
 Usage:
@@ -108,7 +108,7 @@ def main() -> int:
     parser.add_argument("--name", required=True, help="name as transcribed (bare)")
     parser.add_argument("--date", required=True, help="transcript date YYYY-MM-DD")
     parser.add_argument("--source", required=True, help="source path excerpt")
-    parser.add_argument("--note-id", required=True, help="ZTN record/note id produced by process")
+    parser.add_argument("--note-id", required=True, help="Minder Memory record/note id produced by process")
     parser.add_argument("--quote", required=True, help="verbatim transcript fragment (≥1 sentence)")
     parser.add_argument("--role-hint", default=None)
     parser.add_argument("--related-people", default="", help="comma-separated person ids")
@@ -146,7 +146,7 @@ def main() -> int:
         "related_people": related,
         "suggested_id": args.suggested_id,
         "high_importance_hint": bool(args.high_importance),
-        "captured_by": "ztn:process",
+        "captured_by": "minder:mem:process",
     }
 
     line = json.dumps(record, ensure_ascii=False, separators=(",", ":"))

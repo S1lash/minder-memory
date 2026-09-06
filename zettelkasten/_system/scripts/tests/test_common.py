@@ -13,7 +13,7 @@ from tests._fixture import (  # type: ignore
     VALID_NOTE,
     VALID_PERSONAL_NOTE,
     VALID_SENSITIVE_NOTE,
-    clear_ztn_env,
+    clear_minder_memory_env,
     make_fixture,
 )
 import _common as c  # type: ignore
@@ -30,7 +30,7 @@ class ParseFileTests(unittest.TestCase):
             self.assertTrue(p.is_core)
             self.assertEqual(p.scope, "shared")
             self.assertIn("claude-code", p.applies_to)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_missing_required_raises_schema_error(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -38,7 +38,7 @@ class ParseFileTests(unittest.TestCase):
             md = fx.write_principle("axiom/identity/002.md", MALFORMED_YAML)
             with self.assertRaises(c.SchemaError):
                 c.parse_file(md)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_bad_enum_value_raises_schema_error(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -46,7 +46,7 @@ class ParseFileTests(unittest.TestCase):
             md = fx.write_principle("axiom/identity/003.md", BAD_ENUM)
             with self.assertRaises(c.SchemaError):
                 c.parse_file(md)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_bad_id_shape_raises_schema_error(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -54,7 +54,7 @@ class ParseFileTests(unittest.TestCase):
             md = fx.write_principle("axiom/identity/004.md", BAD_ID_SHAPE)
             with self.assertRaises(c.SchemaError):
                 c.parse_file(md)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_no_frontmatter_raises_parse_error(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -62,7 +62,7 @@ class ParseFileTests(unittest.TestCase):
             md = fx.write_principle("axiom/identity/005.md", "# no frontmatter\njust markdown\n")
             with self.assertRaises(c.ParseError):
                 c.parse_file(md)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class IterPrinciplesTests(unittest.TestCase):
@@ -75,7 +75,7 @@ class IterPrinciplesTests(unittest.TestCase):
             principles = c.iter_principles(fx.constitution)
             self.assertEqual(len(principles), 1)
             self.assertEqual(principles[0].id, "axiom-identity-001")
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_deterministic_ordering_by_id(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -88,7 +88,7 @@ class IterPrinciplesTests(unittest.TestCase):
                 [p.id for p in principles],
                 sorted([p.id for p in principles]),
             )
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_duplicate_id_across_files_fails(self):
         """Two files with the same `id` is a real bug (copy-paste mistake)."""
@@ -100,7 +100,7 @@ class IterPrinciplesTests(unittest.TestCase):
             with self.assertRaises(c.SchemaError) as ctx:
                 c.iter_principles(fx.constitution)
             self.assertIn("duplicate id", str(ctx.exception))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_unicode_title_and_statement_preserved(self):
         """Russian text in title / statement must round-trip cleanly."""
@@ -127,7 +127,7 @@ class IterPrinciplesTests(unittest.TestCase):
             p = c.parse_file(md)
             self.assertIn("Качество", p.title)
             self.assertIn("Выбирай", p.statement)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_symlinks_are_skipped(self):
         import os
@@ -139,7 +139,7 @@ class IterPrinciplesTests(unittest.TestCase):
             principles = c.iter_principles(fx.constitution)
             # Only the real file, symlink skipped
             self.assertEqual(len(principles), 1)
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class VisibilityTests(unittest.TestCase):
@@ -168,7 +168,7 @@ class VisibilityTests(unittest.TestCase):
             self.assertFalse(c.is_visible(p2, consumer="claude-code"))
             self.assertTrue(c.is_visible(p2, consumer="claude-code",
                                           allow_statuses={"placeholder"}))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
     def test_is_visible_respects_applies_to(self):
         """Consumer filter uses applies_to inclusion."""
@@ -180,7 +180,7 @@ class VisibilityTests(unittest.TestCase):
             p = c.parse_file(md)
             self.assertTrue(c.is_visible(p, consumer="claude-code"))
             self.assertFalse(c.is_visible(p, consumer="minder"))
-        clear_ztn_env()
+        clear_minder_memory_env()
 
 
 class SoulMarkersTests(unittest.TestCase):
@@ -292,7 +292,7 @@ class NormalizeConceptNameTests(unittest.TestCase):
         self.assertIsNone(c.normalize_concept_name(None))
 
     def test_no_transliteration_heuristic(self):
-        # Translation is the LLM's contract in /ztn:process Q15. There is
+        # Translation is the LLM's contract in /minder:mem:process Q15. There is
         # no mechanical transliteration-detector — its false-positive cost
         # (legitimate English borrowings like `intelligentsia`) outweighs
         # its narrow Russian-morphology hit rate. If the model slips, the
@@ -886,7 +886,7 @@ class TestConceptTypeMirror(unittest.TestCase):
     # Search pattern for the upstream Minder ConceptType.java enum
     # source. Owner-package-agnostic so the engine repo carries no
     # personal data in tests; resolution happens via filesystem glob
-    # at test time. Override via env var ZTN_CONCEPT_TYPE_JAVA when
+    # at test time. Override via env var MINDER_MEMORY_CONCEPT_TYPE_JAVA when
     # the file lives elsewhere.
     JAVA_FILENAME = "ConceptType.java"
     JAVA_GLOB_SUFFIX = "minder/domain/graph/ConceptType.java"
@@ -894,7 +894,7 @@ class TestConceptTypeMirror(unittest.TestCase):
     @classmethod
     def _find_java_source(cls) -> Path | None:
         import os
-        env_override = os.environ.get("ZTN_CONCEPT_TYPE_JAVA")
+        env_override = os.environ.get("MINDER_MEMORY_CONCEPT_TYPE_JAVA")
         if env_override:
             p = Path(env_override)
             return p if p.exists() else None

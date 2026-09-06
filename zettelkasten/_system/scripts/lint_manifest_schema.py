@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate recent ZTN engine batch manifests against the published JSON
+"""Validate recent Minder Memory engine batch manifests against the published JSON
 Schema (`_system/docs/manifest-schema/v{N}.json`).
 
 Defence-in-depth gate: producer-side normalisers in
@@ -26,7 +26,7 @@ Outputs JSONL on stdout, one event per line:
     {"kind": "skipped-pre-baseline", "batch": "<filename>",
      "baseline": "<iso ts>"}
 
-Each non-`ok` line is the payload `/ztn:lint` Scan G converts into a
+Each non-`ok` line is the payload `/minder:mem:lint` Scan G converts into a
 CLARIFICATION (`manifest-schema-violation: <batch_id>`,
 `manifest-schema-unknown-version: <batch_id>`, or
 `validator-internal-error: <batch_id>`).

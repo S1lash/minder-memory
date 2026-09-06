@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests._fixture import clear_ztn_env, make_fixture  # type: ignore
+from tests._fixture import clear_minder_memory_env, make_fixture  # type: ignore
 import render_hub_index as r  # type: ignore
 
 
@@ -90,7 +90,7 @@ class RenderHubIndexTest(unittest.TestCase):
         self.view_path = self.views / "HUB_INDEX.md"
 
     def tearDown(self) -> None:
-        clear_ztn_env()
+        clear_minder_memory_env()
         self._tmp.cleanup()
 
     # -- helpers ---------------------------------------------------------

@@ -7,9 +7,9 @@ modified: REPLACE_WITH_DATE
 # SOUL
 
 > Identity + Current Focus + Working Style + Active Goals.
-> Maintained manually. Focus shift detection — suggestion in `/ztn:lint`.
+> Maintained manually. Focus shift detection — suggestion in `/minder:mem:lint`.
 >
-> **Bootstrap:** `/ztn:bootstrap` interviews you and fills the sections below
+> **Bootstrap:** `/minder:mem:bootstrap` interviews you and fills the sections below
 > on first run. Edit freely afterwards. The Values auto-zone (between markers)
 > is regenerated from `0_constitution/` and must not be hand-edited.
 
@@ -37,7 +37,7 @@ modified: REPLACE_WITH_DATE
 
 > Derived from TASKS.md streams (density of last 4 weeks) + open threads.
 > Split into **Work** and **Personal** to mirror TASKS.md sections.
-> Refreshed by `/ztn:bootstrap` and reviewed manually.
+> Refreshed by `/minder:mem:bootstrap` and reviewed manually.
 
 ### Work
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ZTN lint Scan A.9 — hub frontmatter integrity (ARCH-B).
+"""Minder Memory lint Scan A.9 — hub frontmatter integrity (ARCH-B).
 
 Validates the ARCH-B hub schema:
   - hub_kind ∈ {project, trajectory, domain} (default project)
@@ -130,7 +130,7 @@ def _scan_hub(path: Path, valid_ids: set[str]) -> None:
                    "to_resolve": (
                        "Run `python3 _system/scripts/render_hub_maps.py "
                        f"--apply --hub {hub_id}` "
-                       "OR run `/ztn:maintain` (Step 7.7 covers this)."
+                       "OR run `/minder:mem:maintain` (Step 7.7 covers this)."
                    )})
 
     # 4. Excluded-list integrity
@@ -197,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path, default=None)
     args = parser.parse_args(argv)
 
-    # `repo_root()` already resolves to the zettelkasten base (or `ZTN_BASE`).
+    # `repo_root()` already resolves to the zettelkasten base (or `MINDER_MEMORY_BASE`).
     root = args.root or repo_root()
     if not root.exists():
         print(f"ERROR: root does not exist: {root}", file=sys.stderr)

@@ -35,7 +35,7 @@ _MIN_SCHEMA = {
         "batch_id":       {"type": "string"},
         "timestamp":      {"type": "string"},
         "format_version": {"type": "string"},
-        "processor":      {"enum": ["ztn:process", "ztn:lint"]},
+        "processor":      {"enum": ["minder:mem:process", "minder:mem:lint"]},
         "tier1_objects": {
             "type": "object",
             "properties": {
@@ -87,7 +87,7 @@ class ScanHTests(unittest.TestCase):
             bdir, sdir = _setup(Path(tmp))
             _write_batch(bdir, "20260601-000000-process.json", {
                 "batch_id": "x", "timestamp": "y",
-                "format_version": "2.0", "processor": "ztn:process",
+                "format_version": "2.0", "processor": "minder:mem:process",
             })
             rc, events, _ = _run(bdir, sdir)
             self.assertEqual(rc, 0)
@@ -97,7 +97,7 @@ class ScanHTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             bdir, sdir = _setup(Path(tmp))
             _write_batch(bdir, "20260601-000001-process.json", {
-                "format_version": "2.0", "processor": "ztn:process",
+                "format_version": "2.0", "processor": "minder:mem:process",
             })
             _, events, _ = _run(bdir, sdir)
             self.assertEqual(events[0]["kind"], "violation")
@@ -109,7 +109,7 @@ class ScanHTests(unittest.TestCase):
             bdir, sdir = _setup(Path(tmp))
             _write_batch(bdir, "20260601-000002-process.json", {
                 "batch_id": "x", "timestamp": "y",
-                "format_version": "2.0", "processor": "ztn:process",
+                "format_version": "2.0", "processor": "minder:mem:process",
                 "tier1_objects": {"tasks": []},
             })
             _, events, _ = _run(bdir, sdir)
@@ -124,7 +124,7 @@ class ScanHTests(unittest.TestCase):
             bdir, sdir = _setup(Path(tmp))
             _write_batch(bdir, "20260601-000003-process.json", {
                 "batch_id": "x", "timestamp": "y",
-                "format_version": "9.0", "processor": "ztn:process",
+                "format_version": "9.0", "processor": "minder:mem:process",
             })
             _, events, _ = _run(bdir, sdir)
             self.assertEqual(events[0]["kind"], "unknown-version")
@@ -143,7 +143,7 @@ class ScanHTests(unittest.TestCase):
             bdir, sdir = _setup(Path(tmp))
             _write_batch(bdir, "20260601-000005-process.json", {
                 "batch_id": "x", "timestamp": "y",
-                "format_version": "2.0", "processor": "ztn:process",
+                "format_version": "2.0", "processor": "minder:mem:process",
             })
             # baseline AFTER the batch's timestamp prefix
             future = datetime(2027, 1, 1, tzinfo=timezone.utc)
@@ -224,7 +224,7 @@ class ScanHTests(unittest.TestCase):
             })
             _write_batch(bdir, "20260601-000010-process.json", {
                 "batch_id": "x", "timestamp": "y",
-                "format_version": "2.0", "processor": "ztn:process",
+                "format_version": "2.0", "processor": "minder:mem:process",
             })
             _, events, _ = _run(bdir, sdir)
             # v2.5 schema requires `must_have`; missing → violation

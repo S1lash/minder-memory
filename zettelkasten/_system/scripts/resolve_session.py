@@ -1,4 +1,4 @@
-"""Persistence helpers for `/ztn:resolve-clarifications`.
+"""Persistence helpers for `/minder:mem:resolve-clarifications`.
 
 Two append-only artefacts:
 

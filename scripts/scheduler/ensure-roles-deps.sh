@@ -34,7 +34,7 @@
 #
 # Exit codes:
 #   0 — nothing needed, or the package is importable (before or after install)
-#   2 — more than one ZTN base in the repository (which one is meant?)
+#   2 — more than one Minder Memory base in the repository (which one is meant?)
 #       (no base at all is exit 0 — a repo without one has nothing to check)
 #   3 — a store exists and the package is still unimportable; the tick will
 #       degrade and say so. Advisory: the caller does NOT abort on this.
@@ -50,14 +50,14 @@ BASE=""
 for d in "$REPO_ROOT"/*/; do
     [ -f "$d/_system/scripts/roles_run.py" ] || continue
     if [ -n "$BASE" ]; then
-        echo "ensure-roles-deps: more than one ZTN base in $REPO_ROOT" >&2
+        echo "ensure-roles-deps: more than one Minder Memory base in $REPO_ROOT" >&2
         exit 2
     fi
     BASE="${d%/}"
 done
 
 if [ -z "$BASE" ]; then
-    echo "ensure-roles-deps: no ZTN base found; nothing to check"
+    echo "ensure-roles-deps: no Minder Memory base found; nothing to check"
     exit 0
 fi
 

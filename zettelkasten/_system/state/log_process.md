@@ -1,12 +1,12 @@
 ---
 id: log-process
 layer: system
-description: Append-only chronological log of /ztn:process runs. Newest-first.
+description: Append-only chronological log of /minder:mem:process runs. Newest-first.
 owned_by:
-  - ztn:process
+  - minder:mem:process
 read_by:
-  - ztn:lint
-  - ztn:maintain
+  - minder:mem:lint
+  - minder:mem:maintain
 # One-time migration flags (add as needed):
 # migration_completed:
 #   {migration_name}: YYYY-MM-DD
@@ -14,7 +14,7 @@ read_by:
 
 # Operations Log
 
-> Append-only chronological log of `/ztn:process` runs.
+> Append-only chronological log of `/minder:mem:process` runs.
 > Each entry — one batch invocation.
 
 ---

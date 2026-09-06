@@ -17,7 +17,7 @@ Behaviour:
 
 Lives in python rather than in `sync_engine.sh` for two reasons: the logic is
 identical on every platform without a single bash-3.2 or Git-Bash caveat, and
-it is testable. `sync_engine.sh` and the `/ztn:update` skill both call this one
+it is testable. `sync_engine.sh` and the `/minder:mem:update` skill both call this one
 entrypoint, so there is a single owner of "what has run here".
 
 Usage:

@@ -9,7 +9,7 @@ Reads:
   _system/SOUL.md (Goals section, optional)
 
 Output: a markdown block (≤ 15 lines normally; 5-line variant on
-no-signal day). Caller (ztn-maintain) injects this between existing
+no-signal day). Caller (minder-mem-maintain) injects this between existing
 sections of CURRENT_CONTEXT.md.
 
 Layout choice (per SDD §16.5.5): inserted AFTER Identity/Focus block,

@@ -59,7 +59,7 @@ DEFAULT_BUDGET = 40_000
 
 MINDER_MISSING = "[_minder.md missing — base conventions unavailable]"
 CONSTITUTION_MISSING = (
-    "[constitution-core.md missing — run /ztn:regen-constitution]"
+    "[constitution-core.md missing — run /minder:mem:regen-constitution]"
 )
 PREVIOUS_RUN_NONE = "[previous run: none]"
 

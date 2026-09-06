@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Append a check-decision telemetry line to the audit substrate.
 
-Invoked by `/ztn:check-decision` from any session — pipelines, ad-hoc
+Invoked by `/minder:mem:check-decision` from any session — pipelines, ad-hoc
 agents, schedulers. Two modes:
 
   - `--kind run`     — full per-invocation record. Mandatory mechanical
@@ -60,12 +60,12 @@ LOCK_FILENAME = ".check-decision-runs.lock"
 
 CALLER_CLASSES = frozenset({"mechanical", "judgmental"})
 MECHANICAL_PIPELINES = frozenset({
-    "/ztn:process",
-    "/ztn:lint",
-    "/ztn:maintain",
-    "/ztn:agent-lens",
-    "/ztn:bootstrap",
-    "/ztn:resolve-clarifications",
+    "/minder:mem:process",
+    "/minder:mem:lint",
+    "/minder:mem:maintain",
+    "/minder:mem:agent-lens",
+    "/minder:mem:bootstrap",
+    "/minder:mem:resolve-clarifications",
 })
 
 # `no-match` and `no-basis` are NOT interchangeable and consumers route them
@@ -297,7 +297,7 @@ def acquire_lock(lock_path: Path):
     """Advisory exclusive flock around emit + commit.
 
     Scope is narrow: serialises concurrent telemetry writers from
-    parallel sessions. Does NOT cover the rest of /ztn:check-decision
+    parallel sessions. Does NOT cover the rest of /minder:mem:check-decision
     (Evidence Trail edits remain unguarded — that race is pre-existing
     and out of this helper's scope).
     """
@@ -337,7 +337,7 @@ def auto_commit(repo_root: Path, jsonl_path: Path, message: str) -> None:
 
     Never raises — telemetry must not block the verdict pipeline. JSONL
     line is the source of truth; commit is convenience for ad-hoc
-    callers that won't trigger /ztn:save themselves.
+    callers that won't trigger /minder:mem:save themselves.
     """
     rel = jsonl_path.relative_to(repo_root)
     try:
@@ -349,7 +349,7 @@ def auto_commit(repo_root: Path, jsonl_path: Path, message: str) -> None:
             print(
                 f"warning: git add failed (rc={result.returncode}): "
                 f"{result.stderr.strip()} — JSONL line written, commit "
-                f"skipped; will be picked up by next /ztn:save",
+                f"skipped; will be picked up by next /minder:mem:save",
                 file=sys.stderr,
             )
             return
@@ -361,7 +361,7 @@ def auto_commit(repo_root: Path, jsonl_path: Path, message: str) -> None:
             print(
                 f"warning: git commit failed (rc={result.returncode}): "
                 f"{result.stderr.strip()} — JSONL line written, commit "
-                f"skipped; will be picked up by next /ztn:save",
+                f"skipped; will be picked up by next /minder:mem:save",
                 file=sys.stderr,
             )
     except FileNotFoundError:
@@ -381,7 +381,7 @@ def auto_commit(repo_root: Path, jsonl_path: Path, message: str) -> None:
 def repo_root_from_jsonl(jsonl_path: Path) -> Path:
     """Walk up from the JSONL path to find the git repo root.
 
-    For ZTN setups with the repo rooted at the parent of `zettelkasten/`
+    For Minder Memory setups with the repo rooted at the parent of `zettelkasten/`
     (current layout), repo root is two levels up from `_system/state/`.
     Use `git rev-parse` for robustness rather than hard-coding levels.
     """
