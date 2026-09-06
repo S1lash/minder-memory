@@ -73,6 +73,12 @@ class TokenMapTests(unittest.TestCase):
         "ztn-engine-doctrine.md": "minder-memory-engine-doctrine.md",
         "ZTN_BASE": "MINDER_MEMORY_BASE", "{{MINDER_ZTN_BASE}}": "{{MINDER_MEMORY_BASE}}",
         "ZTN_ROLES_KEY": "MINDER_MEMORY_ROLES_KEY", "ZTN_SECRET_MASTER_KEY": "MINDER_MEMORY_SECRET_MASTER_KEY",
+        "ZTN_SYMLINK_REEXEC": "MINDER_MEMORY_SYMLINK_REEXEC",
+        # ...but a credential is the OWNER's name: a role declares it and the
+        # store holds it under that spelling, and the store is never rewritten.
+        # Renaming one side of that pair is what broke the role's preflight.
+        "ZTN_TELEGRAM_TOKEN": "ZTN_TELEGRAM_TOKEN",
+        "ZTN_OPENAI_API_KEY": "ZTN_OPENAI_API_KEY",
         "MINDER-ZTN BEGIN": "MINDER-MEMORY BEGIN",
         "urn:ztn:manifest-schema:v2": "urn:minder-memory:manifest-schema:v2",
         "ztn_constitution": "minder_memory_constitution", "clear_ztn_env": "clear_minder_memory_env",
@@ -141,7 +147,22 @@ class TokenMapTests(unittest.TestCase):
             self.assertEqual(payload["own_name"], {"note.md": 1})
             self.assertNotIn("note.md", payload["residue"],
                              "an own-name hit is explained, not unexplained residue")
-            self.assertIn("name your own repository or folder", rb.render_inventory(report))
+            self.assertIn("name your own repository, folder or credential",
+                          rb.render_inventory(report))
+
+    def test_an_owners_credential_name_is_reported_as_kept_not_renamed(self):
+        """Left alone AND named, on the same axis as their folder names."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write(root, "role.md", "secrets:\n  - ZTN_TELEGRAM_TOKEN\nRun /ztn:process.\n")
+            report = rb.run(root, dry_run=False)
+            self.assertEqual((root / "role.md").read_text(encoding="utf-8"),
+                             "secrets:\n  - ZTN_TELEGRAM_TOKEN\nRun /minder:mem:process.\n")
+            payload = json.loads(report.to_json())
+            self.assertEqual(payload["own_name"], {"role.md": 1})
+            self.assertNotIn("role.md", payload["residue"])
+            self.assertIn("name your own repository, folder or credential",
+                          rb.render_inventory(report))
 
     def test_every_code_safe_rule_names_a_real_map_entry(self):
         sources = {pat for pat, _ in rb.TOKEN_MAP}

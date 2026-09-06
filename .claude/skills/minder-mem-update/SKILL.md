@@ -646,8 +646,13 @@ Ask for more detail on any point?
 - **Auto-resolve divergence.** Three-way merge of prompts is not safe;
   owner decides per file.
 - **Push.** Hands off to `/minder:mem:save`.
-- **Run install.sh / regen-constitution / tests automatically.**
-  Suggests; owner runs explicitly.
+- **Run regen-constitution or the tests automatically.** Suggests; owner runs
+  explicitly. `install.sh` is the exception and is NOT in this list: migration
+  031 runs it, because a harness left half-wired imports a rule that no longer
+  exists in every session that follows. Do not ask the owner to run it again
+  after a migration has — a step suggested twice is a step somebody performs
+  twice and then wonders which one counted. Check whether it already ran (031's
+  report says so) before adding it to the follow-ups.
 - **Rewrite the migration ledger.** If the owner needs to re-run a migration
   that already succeeded, they remove its line from
   `.engine-migrations.jsonl` themselves — guarded territory. A `heal` that

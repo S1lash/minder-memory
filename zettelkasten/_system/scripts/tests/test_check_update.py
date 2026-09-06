@@ -41,6 +41,11 @@ def _git(root: Path, *args: str) -> subprocess.CompletedProcess:
                           encoding="utf-8", env={**os.environ, **_GIT_IDENTITY})
 
 
+def parent_ref(sha: str) -> str:
+    """`<sha>^` — spelled out so the caret cannot be eaten by a shell."""
+    return sha + "^"
+
+
 def _write(root: Path, rel: str, text: str) -> Path:
     p = root / rel
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -69,11 +74,26 @@ class CheckUpdateTests(unittest.TestCase):
                    + "Backups go to ~/backups/minder-ztn-ivanov/daily.\n")
     NOTE_REL_BEFORE = "zettelkasten/1_projects/ztn-as-second-brain.md"
     NOTE_REL_AFTER = "zettelkasten/1_projects/minder-memory-as-second-brain.md"
-    # Not three lines: git pairs a rename by content similarity, and a file too
-    # small to hash meaningfully is reported as a delete plus an add however low
-    # the threshold. A real note is this long or longer.
-    NOTE_BODY = ("# Second brain\n\n" + "A paragraph of ordinary prose.\n" * 20
-                 + "It is checked out at ~/projects/minder-ztn-ivanov.\n")
+    # An ORDINARY renamed note: a product rename rewrites the title, the slug in
+    # the frontmatter, every command line and every path. What survives is the
+    # owner's own prose — which is why git's similarity detection does not pair
+    # the two sides, and why the predecessor has to be resolved exactly.
+    NOTE_BODY = (
+        "---\nid: ztn-as-second-brain\ntags:\n  - topic/ztn\n---\n"
+        "# ZTN as a second brain\n\n"
+        "Run /ztn:process every evening.\n"
+        "Then /ztn:maintain, and /ztn:lint before bed.\n"
+        "The base is ~/projects/minder-ztn-ivanov/zettelkasten.\n"
+        "Backups live in ~/backups/minder-ztn-ivanov.\n"
+    )
+    NOTE_BODY_AFTER = (
+        "---\nid: minder-memory-as-second-brain\ntags:\n  - topic/minder-memory\n---\n"
+        "# Minder Memory as a second brain\n\n"
+        "Run /minder:mem:process every evening.\n"
+        "Then /minder:mem:maintain, and /minder:mem:lint before bed.\n"
+        "The base is ~/projects/minder-memory-ivanov/zettelkasten.\n"
+        "Backups live in ~/backups/minder-memory-ivanov.\n"
+    )
     # The engine's OWN backup directory, renamed with the product. An engine
     # file cannot hold an owner's folder name, and reading it as one is what
     # made the damage probe fail on every clone.
@@ -90,7 +110,7 @@ class CheckUpdateTests(unittest.TestCase):
         this fixture's baseline — while the engine's own name moved with the
         product, which must not read as damage.
         """
-        _write(self.clone, "integrations/VERSION", "1.0.3\n")
+        _write(self.clone, "integrations/VERSION", "1.0.4\n")
         _write(self.clone, "zettelkasten/minder-memory.md",
                "# Minder Memory\n\nMy own dashboard line.\n")
         _write(self.clone, "zettelkasten/_sources/inbox/.gitkeep", "")
@@ -98,7 +118,10 @@ class CheckUpdateTests(unittest.TestCase):
                "An ordinary note about Minder Memory.\n")
         _write(self.clone, "zettelkasten/_system/SOUL.md", self.SOUL_BEFORE)
         _write(self.clone, self.NOTE_REL_BEFORE, self.NOTE_BODY)
-        _write(self.clone, self.SECRETS_REL, '{"telegram_token":"<encrypted>"}\n')
+        # A key is the OWNER's name for a service. It carries the former token
+        # on purpose and the store is never rewritten.
+        _write(self.clone, self.SECRETS_REL,
+               '{"ZTN_TELEGRAM_TOKEN":"' + "x" * 64 + '"}\n')
         _write(self.clone, "integrations/claude-code/install.sh", self.INSTALLER_BEFORE)
         _git(self.clone, "init", "-q", "-b", "main")
         _git(self.clone, "add", "-A")
@@ -108,6 +131,8 @@ class CheckUpdateTests(unittest.TestCase):
         # owner's did not, and one note's FILE NAME moved with the product.
         _write(self.clone, "integrations/claude-code/install.sh", self.INSTALLER_AFTER)
         _git(self.clone, "mv", self.NOTE_REL_BEFORE, self.NOTE_REL_AFTER)
+        _write(self.clone, self.NOTE_REL_AFTER,
+               self.NOTE_BODY_AFTER.replace("minder-memory-ivanov", "minder-ztn-ivanov"))
         ledger = "".join(
             json.dumps({"name": name, "kind": kind, "rc": 0, "outcome": "applied",
                         "ts": "2026-01-01T00:00:00Z", "note": ""}, sort_keys=True) + "\n"
@@ -272,7 +297,8 @@ class CheckUpdateTests(unittest.TestCase):
         residue = next(p for p in json.loads(res.stdout)["probes"]
                        if p["probe"] == "clone-residue")
         self.assertEqual(residue["status"], "ok", residue["evidence"])
-        self.assertIn("name your own repository or folder", residue["evidence"])
+        self.assertIn("name your own repository, folder or credential",
+                      residue["evidence"])
 
     def test_a_name_the_rename_damaged_is_reported_against_the_pre_migration_tree(self):
         """1.0.0's map renamed the owner's own folder into a path that is not there.
@@ -301,7 +327,7 @@ class CheckUpdateTests(unittest.TestCase):
         bill of health.
         """
         fresh = self.tmp / "no-ledger"
-        _write(fresh, "integrations/VERSION", "1.0.3\n")
+        _write(fresh, "integrations/VERSION", "1.0.4\n")
         _write(fresh, "zettelkasten/minder-memory.md", "# Minder Memory\n")
         _git(fresh, "init", "-q", "-b", "main")
         _git(fresh, "add", "-A")
@@ -326,6 +352,11 @@ class CheckUpdateTests(unittest.TestCase):
         import _032_minder_memory_rebrand as rename_map  # noqa: E402
         import check_update  # noqa: E402
         self.assertEqual(check_update.OWN_NAME_PATTERN, rename_map.OWN_NAME_PATTERN)
+        self.assertEqual(check_update.OWN_CREDENTIAL_PATTERN,
+                         rename_map.OWN_CREDENTIAL_PATTERN)
+        self.assertEqual(tuple(check_update.ENGINE_ENV_NAMES),
+                         tuple(rename_map.ENGINE_ENV_NAMES),
+                         'the engine-owned variable list must not fork')
 
     def test_the_engines_own_renamed_name_is_not_read_as_damage(self):
         """`.minder-memory-backup-` in the installer is the ENGINE's own name.
@@ -347,14 +378,27 @@ class CheckUpdateTests(unittest.TestCase):
         owner's path is most likely to be written down, so failing to follow
         the rename loses the findings most worth having.
         """
-        _write(self.clone, self.NOTE_REL_AFTER,
-               self.NOTE_BODY.replace("minder-ztn-ivanov", "minder-memory-ivanov"))
+        _write(self.clone, self.NOTE_REL_AFTER, self.NOTE_BODY_AFTER)
         _git(self.clone, "commit", "-qam", "the same damage, in a file that was renamed")
+
+        # The test must not be able to pass by accident: similarity detection
+        # does NOT pair these two sides, which is the whole reason the
+        # predecessor has to be resolved exactly.
+        before = _git(self.clone, "log", "--reverse", "--format=%H", "-S", "032-minder-memory",
+                      "--", ".engine-migrations.jsonl").stdout.splitlines()[0].strip()
+        parent = _git(self.clone, "rev-parse", parent_ref(before)).stdout.strip()
+        paired = _git(self.clone, "diff", "--name-status", "-M30%", "--diff-filter=R",
+                      parent, "HEAD").stdout
+        self.assertNotIn("as-second-brain", paired,
+                         "similarity paired the rename, so this fixture proves nothing")
+
         res = self._run("--json")
         self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
         self.assertIn("own-name-damage", self._failed(res))
         self.assertIn("minder-memory-as-second-brain.md", res.stdout)
-        self.assertIn("minder-ztn-ivanov", res.stdout)
+        # BOTH dead paths, each with its before/now pair.
+        self.assertIn("~/projects/minder-ztn-ivanov/zettelkasten", res.stdout)
+        self.assertIn("~/backups/minder-ztn-ivanov", res.stdout)
 
     def test_the_before_text_is_the_line_that_matches_not_the_first_one(self):
         """Two lines carry the name; the evidence must quote the right one."""
@@ -380,18 +424,33 @@ class CheckUpdateTests(unittest.TestCase):
         res = self._run("--json")
         self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
 
-    def test_the_credential_store_is_compared_against_the_pre_rename_commit(self):
-        """`git status` clean only means nobody has touched it SINCE the commit."""
+    def test_a_store_whose_bytes_moved_is_not_a_fault_by_itself(self):
+        """Both sides renamed together is a consistent clone, not a broken one.
+
+        A clone that passed through the release which renamed the declaration
+        AND the store needs no repair, and failing it would send its owner
+        hunting for damage that is not there. The bytes are evidence; whether
+        every declared credential RESOLVES is the answer.
+        """
+        runner = _REPO_ROOT / "zettelkasten" / "_system" / "scripts" / "roles_run.py"
+        if not runner.is_file():
+            self.skipTest("no roles runner in this engine")
+        import shutil
+        dest = self.clone / "zettelkasten" / "_system" / "scripts"
+        dest.mkdir(parents=True, exist_ok=True)
+        for item in runner.parent.iterdir():
+            if item.is_file() and item.suffix == ".py":
+                shutil.copy(item, dest / item.name)
+        _write(self.clone, self.SECRETS_REL, '{"MY_TELEGRAM_TOKEN":"' + "y" * 64 + '"}\n')
+        _git(self.clone, "add", "-A")
+        _git(self.clone, "commit", "-qam", "a store both sides of which moved together")
+
         res = self._run("--json")
         store = next(p for p in json.loads(res.stdout)["probes"]
                      if p["probe"] == "credential-store")
         self.assertEqual(store["status"], "ok", store["evidence"])
-
-        _write(self.clone, self.SECRETS_REL, '{"telegram_token_renamed":"<encrypted>"}\n')
-        _git(self.clone, "commit", "-qam", "the rename reached the credential store")
-        res = self._run("--json")
-        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
-        self.assertIn("credential-store", self._failed(res))
+        self.assertIn("bytes differ", store["evidence"],
+                      "the byte comparison is still reported, as evidence")
 
     def test_the_owner_space_predicate_agrees_with_the_rename_map(self):
         """Owner space is the map's own owner-data class, plus named extras."""
@@ -412,6 +471,54 @@ class CheckUpdateTests(unittest.TestCase):
                        "docs/CHANGELOG.md", "zettelkasten/_system/docs/SYSTEM_CONFIG.md"):
             self.assertNotEqual(rename_map.classify(engine), "owner-data", engine)
             self.assertFalse(check_update.in_owner_space(engine), engine)
+
+    def test_the_credential_store_may_carry_the_owners_own_key_names(self):
+        """The store is never rewritten, so a key of theirs keeps its spelling."""
+        res = self._run("--json")
+        residue = next(p for p in json.loads(res.stdout)["probes"]
+                       if p["probe"] == "clone-residue")
+        self.assertEqual(residue["status"], "ok", residue["evidence"])
+
+    def test_the_credential_probe_asks_whether_every_declared_secret_resolves(self):
+        """Byte-identity is evidence; resolution is the question.
+
+        A clone that passed through the release which renamed BOTH sides has a
+        store that differs from the pre-rename tree and is perfectly correct.
+        The check that matters is the engine's own preflight: does every name a
+        role declares exist in the store.
+        """
+        runner = _REPO_ROOT / "zettelkasten" / "_system" / "scripts" / "roles_run.py"
+        if not runner.is_file():
+            self.skipTest("no roles runner in this engine")
+        dest = self.clone / "zettelkasten" / "_system" / "scripts"
+        dest.mkdir(parents=True, exist_ok=True)
+        import shutil
+        for item in (runner.parent).iterdir():
+            if item.is_file() and item.suffix == ".py":
+                shutil.copy(item, dest / item.name)
+        _write(self.clone, "zettelkasten/_system/roles/telegram-digest/role.md",
+               "---\nid: telegram-digest\nname: Telegram digest\nstatus: active\n"
+               "cadence: daily 07:00\nsecrets:\n  - ZTN_TELEGRAM_TOKEN\n---\n\nDo it.\n")
+        _git(self.clone, "add", "-A")
+        _git(self.clone, "commit", "-qm", "a role declaring a credential of the owner's")
+
+        res = self._run("--json")
+        store = next(p for p in json.loads(res.stdout)["probes"]
+                     if p["probe"] == "credential-store")
+        self.assertEqual(store["status"], "ok", store["evidence"])
+        self.assertIn("resolve", store["evidence"])
+
+        # ...and a declaration the store cannot answer is a failure that names
+        # the role and the secret.
+        _write(self.clone, "zettelkasten/_system/roles/telegram-digest/role.md",
+               "---\nid: telegram-digest\nname: Telegram digest\nstatus: active\n"
+               "cadence: daily 07:00\nsecrets:\n  - ZTN_MISSING_TOKEN\n---\n\nDo it.\n")
+        _git(self.clone, "commit", "-qam", "a declaration nothing answers")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        self.assertIn("credential-store", self._failed(res))
+        self.assertIn("telegram-digest", res.stdout)
+        self.assertIn("ZTN_MISSING_TOKEN", res.stdout)
 
     # -- cannot run at all -------------------------------------------------- #
 

@@ -19,6 +19,11 @@ Never touched:
   does not exist. Left whole and reported on the `own_name` axis, so the
   digest can say why those lines still read the old way. The engine's own
   retired project identifier `minder-ztn-platform` is the one exception.
+- `ZTN_<NAME>` that is not one of `ENGINE_ENV_NAMES` — the owner's own
+  credential, declared by that name in a role and stored under it. The engine
+  renames the variables it owns; renaming one of theirs breaks the pair.
+- `zettelkasten/_system/state/secrets.enc.json` — the store itself, for the
+  same reason and because its values are encrypted, so a change goes unseen.
 - `docs/CHANGELOG.md` and `zettelkasten/5_meta/DECISION_LOG.md` — release and
   decision history; each carries its own note of the rename.
 - Any `.git` directory, generated output, binaries, files that are not UTF-8.
@@ -71,6 +76,30 @@ SKILL_PREFIX = "minder-mem-"            # directory name prefix of every skill
 SKILL_NAMESPACE = "minder:mem:"          # slash-command namespace
 ENV_PREFIX = "MINDER_MEMORY_"
 
+# The environment variables the ENGINE owns — every `ZTN_*` name the engine
+# itself ever read, recovered from the tree as it stood before the rename.
+#
+# Why a list and not a pattern. A role declares its own credentials by name in
+# its `secrets:` block, and those names are the OWNER's: they match whatever
+# they called the thing in the store and in their scheduler. A blanket
+# `ZTN_* -> MINDER_MEMORY_*` rule renamed one side of that pair and not the
+# other — the credential store is never touched — so the role's next preflight
+# failed with «declared secret ... is not in the credential store», naming a
+# variable the owner had never written. The engine renames the variables it
+# owns; everything else with the same shape is somebody's own name and is kept.
+ENGINE_ENV_NAMES: tuple[str, ...] = (
+    "BASE_PATH",              # longest-first, so `BASE` cannot shadow it
+    "BASE",
+    "CONCEPT_TYPE_JAVA",
+    "DEV",
+    "PATH",
+    "ROLES_AUTONOMOUS_ACK",
+    "ROLES_KEY",
+    "SECRET_MASTER_KEY",
+    "SYMLINK_REEXEC",
+)
+_ENGINE_ENV_ALT = "|".join(ENGINE_ENV_NAMES)
+
 # The engine's skills and commands, by the bare name that follows the prefix.
 # Ordered longest-first so `role-add` is matched before `role`, `agent-lens-add`
 # before `agent-lens`. A name absent here falls through to the generic
@@ -104,6 +133,15 @@ PROTECTED_PATTERNS: tuple[str, ...] = (
 # `20260519-reflection-minder-ztn-origin-story` is a note's own slug with the
 # product named inside it, and that one moves with the product.
 OWN_NAME_PATTERN = r"(?i)(?<![\w-])minder-ztn-(?!platform\b)[A-Za-z0-9][A-Za-z0-9_-]*"
+
+# The owner's own CREDENTIAL name — the same distinction, one axis over. Any
+# `ZTN_*` that is not one of the engine's own (ENGINE_ENV_NAMES) is what the
+# owner called a secret of theirs, in their role and in their store. The map
+# leaves it alone; this pattern is what lets the residue report say so instead
+# of listing it as a surface the rename missed.
+OWN_CREDENTIAL_PATTERN = (
+    r"\bZTN_(?!(?:" + _ENGINE_ENV_ALT + r")\b)[A-Z][A-Z0-9_]*\b"
+)
 
 _SENTINEL = "@@PROTECT{}@@"
 
@@ -160,8 +198,8 @@ TOKEN_MAP: tuple[tuple[str, str], ...] = (
     (r"\burn:ztn:", "urn:minder-memory:"),
     # Environment and placeholders.
     (r"\bMINDER_ZTN_", ENV_PREFIX),
-    (r"\bZTN_BASE\b", ENV_PREFIX + "BASE"),
-    (r"\bZTN_([A-Z][A-Z0-9_]*)\b", ENV_PREFIX + r"\1"),
+    # ONLY the variables the engine itself owns — see ENGINE_ENV_NAMES.
+    (r"\bZTN_(" + _ENGINE_ENV_ALT + r")\b", ENV_PREFIX + r"\1"),
     # The two commands in their former flat spelling (`/ztn-recap`) answer to
     # the namespace now; the same for the wrong form an earlier map produced.
     (r"/ztn-(recap|search)\b", "/" + SKILL_NAMESPACE + r"\1"),
@@ -215,7 +253,7 @@ _CODE_SAFE_RULES = frozenset({
     r"\bMinder[ /\-]ZTN\b", r"(?i)\bмайндер[ \-]ZTN\b", r"(?i)\bмайндер[ \-]ЗТН\b", r"\bZTN/Minder\b",
     r"(?<=-)minder-ztn(?=-)", r"\bminder-ztn\b(?!-)", r"\bminder_ztn\b(?!_)", r"\bminder_ztn_", r"\bztn-memory\b", r"(?i)\bztn memory\b",
     r"\bMINDER-ZTN\b", r"\bmy-ztn\b", r"\burn:ztn:",
-    r"\bMINDER_ZTN_", r"\bZTN_BASE\b", r"\bZTN_([A-Z][A-Z0-9_]*)\b",
+    r"\bMINDER_ZTN_", r"\bZTN_(" + _ENGINE_ENV_ALT + r")\b",
     r"/ztn:", r"\bztn:(?=[a-z])",
     r"\bztn-roles-(?![a-z]+-)", r"\bztn-(" + _SKILL_ALT + r")-skill\b", r"\bztn-(" + _SKILL_ALT + r")(?![\w-])", r"\bztn-(?=[*{])", r"\bZTN-MVP\b", r"\bnon-ZTN\b", r"\bZTNs\b",
     r"/ztn-(recap|search)\b", r"\bztn-(recap|search)\b", r"/minder-mem-(recap|search)\b", r"\bminder-mem-(recap|search)\b",
@@ -271,6 +309,7 @@ _COMPILED_PROTECTED: tuple[re.Pattern[str], ...] = tuple(
     re.compile(pat) for pat in PROTECTED_PATTERNS
 )
 _OWN_NAME_RE = re.compile(OWN_NAME_PATTERN)
+_OWN_CREDENTIAL_RE = re.compile(OWN_CREDENTIAL_PATTERN)
 # Anything that still smells of the old name after the map ran.
 _RESIDUE_RE = re.compile(r"ztn|ЗТН|зтн", re.IGNORECASE)
 
@@ -635,7 +674,7 @@ def run(root: Path, *, dry_run: bool,
         # An own-name span carries exactly one old-name match and is EXPLAINED:
         # it is subtracted from the residue so that residue keeps meaning
         # «still unaccounted for», and reported on its own axis instead.
-        own = len(_OWN_NAME_RE.findall(probe))
+        own = len(_OWN_NAME_RE.findall(probe)) + len(_OWN_CREDENTIAL_RE.findall(probe))
         if own:
             report.own_name[key] = own
         n = len(_RESIDUE_RE.findall(probe)) - own
@@ -644,21 +683,30 @@ def run(root: Path, *, dry_run: bool,
     return report
 
 
-def dirty_sentence(count: int) -> str:
-    """What the owner needs: how many, and where the previous text went."""
+def dirty_sentence(paths: list[str]) -> str:
+    """What the owner needs: WHICH files, and where the previous text went.
+
+    Names, not a count: a number tells the owner something happened to work of
+    theirs and leaves them to find out what. The whole point of the warning is
+    that they can go and look.
+    """
+    count = len(paths)
+    listed = ", ".join(paths)
     if count == 1:
-        return ("1 file with uncommitted changes was renamed in place "
-                "(its previous text is in git under the old name).")
-    return (f"{count} files with uncommitted changes were renamed in place "
-            "(their previous text is in git under the old name).")
+        return ("1 file with uncommitted changes was rewritten in place "
+                f"(its previous text is in git under the old name): {listed}")
+    return (f"{count} files with uncommitted changes were rewritten in place "
+            f"(their previous text is in git under the old name): {listed}")
 
 
-def unsaved_sentence(count: int) -> str:
+def unsaved_sentence(paths: list[str]) -> str:
+    count = len(paths)
+    listed = ", ".join(paths)
     if count == 1:
-        return ("1 file git had never seen was also renamed "
-                "(nothing holds its previous text).")
-    return (f"{count} files git had never seen were also renamed "
-            "(nothing holds their previous text).")
+        return ("1 file git had never seen was also rewritten "
+                f"(nothing holds its previous text): {listed}")
+    return (f"{count} files git had never seen were also rewritten "
+            f"(nothing holds their previous text): {listed}")
 
 
 def render_inventory(report: Report) -> str:
@@ -683,17 +731,17 @@ def render_inventory(report: Report) -> str:
         lines += ["", "## Left alone — uncommitted changes belong to somebody's session", ""]
         lines += [f"- `{rel}`" for rel in report.skipped_dirty]
     if report.own_name:
-        lines += ["", "## Left alone — these name your own repository or folder", "",
+        lines += ["", "## Left alone — these name your own repository, folder or credential", "",
                   "| Path | Occurrences |", "|---|---|"]
         for rel, n in sorted(report.own_name.items()):
             lines.append(f"| `{rel}` | {n} |")
     if report.rewritten_dirty or report.rewritten_unsaved:
         lines += ["", "## Rewritten while unsaved", ""]
         if report.rewritten_dirty:
-            lines.append(dirty_sentence(len(report.rewritten_dirty)))
+            lines.append(dirty_sentence(report.rewritten_dirty))
             lines += [f"- `{rel}`" for rel in report.rewritten_dirty]
         if report.rewritten_unsaved:
-            lines.append(unsaved_sentence(len(report.rewritten_unsaved)))
+            lines.append(unsaved_sentence(report.rewritten_unsaved))
             lines += [f"- `{rel}`" for rel in report.rewritten_unsaved]
     if report.residue:
         lines += ["", "## Residue after the run (must each be an allowed one)", "",
@@ -730,14 +778,15 @@ def main(argv: list[str] | None = None) -> int:
         verb = "would change" if args.dry_run else "changed"
         print(f"rebrand: {verb} {len(report.changes)} file(s), "
               f"{sum(1 for c in report.changes if c.new_path)} renamed, "
-              f"{len(report.residue)} file(s) with residue")
+              f"{len(report.residue)} file(s) keep the former name on purpose "
+              "(aliases, history, migration inputs, your own names)")
         if report.own_name:
-            print(f"rebrand: {len(report.own_name)} file(s) still carry the former name because "
-                  "these name your own repository or folder and were left alone")
+            print(f"rebrand: {len(report.own_name)} file(s) name your own repository, folder "
+                  "or credential — kept exactly as you wrote them")
         if report.rewritten_dirty:
-            print("rebrand: " + dirty_sentence(len(report.rewritten_dirty)))
+            print("rebrand: " + dirty_sentence(report.rewritten_dirty))
         if report.rewritten_unsaved:
-            print("rebrand: " + unsaved_sentence(len(report.rewritten_unsaved)))
+            print("rebrand: " + unsaved_sentence(report.rewritten_unsaved))
     return 0
 
 

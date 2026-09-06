@@ -2,6 +2,32 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.0.4 — Your credentials are yours
+
+**The engine renames only the variables it owns.** A role names its credentials,
+and the store holds them under those names. Until now the rename moved the
+declaration and left the store alone — so a role that had worked for months
+failed at its next tick with «declared secret … is not in the credential store»,
+naming a variable you had never written anywhere. Now only the engine's own
+variables move; anything else shaped like one is your name for something and is
+kept exactly as you wrote it, and reported as kept rather than as leftovers.
+
+**And the check asks the question that matters.** Instead of comparing the
+store's bytes, it runs the engine's own preflight: does every credential every
+role declares actually resolve. A store where both sides moved together is
+consistent and passes; a role whose declaration nothing answers fails, by name.
+
+**Renamed notes are found exactly.** A product rename rewrites a note's title,
+its slug, its tags and every command line in it, so the two sides no longer look
+alike enough for git to pair them — one real note scored 28 %. The check now
+resolves the predecessor by inverting the rename itself, which needs no
+guessing, and so finds the dead paths inside notes it used to walk past.
+
+**Smaller:** the script now tells you to commit (two of its own checks compare
+against a commit and stay unanswerable without one), says which files it
+rewrote rather than how many, and no longer asks you to run the installer a
+second time.
+
 ## 1.0.3 — The self-check, taught the difference between your names and ours
 
 **It no longer fails on every clone.** The check that looks for names an earlier

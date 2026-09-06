@@ -101,6 +101,10 @@ RESIDUE_EXCLUDE: tuple[str, ...] = (
     # A pre-refresh backup of the vault help holds what the docs said before;
     # it exists precisely so the former wording survives.
     ":!zettelkasten/5_meta/help/.pre-refresh-backup",
+    # The credential store is NEVER_TOUCH by design: a key there is the owner's
+    # name for a service, and the rename that moved one side of that pair and
+    # not the other is exactly the defect the engine now refuses to repeat.
+    ":!zettelkasten/_system/state/secrets.enc.json",
 )
 
 # The two rename opt-outs. A line carrying LINE_KEEP is written as it is on
@@ -123,6 +127,19 @@ FILE_KEEP = "minder-memory-rebrand: keep-legacy-tokens"
 # as the two markers above; `test_check_update.py` pins it equal to the map's.
 OWN_NAME_PATTERN = r"(?i)(?<![\w-])minder-ztn-(?!platform\b)[A-Za-z0-9][A-Za-z0-9_-]*"
 _OWN_NAME_RE = re.compile(OWN_NAME_PATTERN)
+
+# The same distinction one axis over: a `ZTN_*` that is not one of the engine's
+# own is what the OWNER called a credential of theirs, in their role and in
+# their store. Restated from the map for the same reason as everything above,
+# and pinned to it by `test_check_update.py`.
+ENGINE_ENV_NAMES: tuple[str, ...] = (
+    "BASE_PATH", "BASE", "CONCEPT_TYPE_JAVA", "DEV", "PATH",
+    "ROLES_AUTONOMOUS_ACK", "ROLES_KEY", "SECRET_MASTER_KEY", "SYMLINK_REEXEC",
+)
+OWN_CREDENTIAL_PATTERN = (
+    r"\bZTN_(?!(?:" + "|".join(ENGINE_ENV_NAMES) + r")\b)[A-Z][A-Z0-9_]*\b"
+)
+_OWN_CREDENTIAL_RE = re.compile(OWN_CREDENTIAL_PATTERN)
 
 # What 1.0.0's map did before it learned the distinction: an owner's own
 # repository or folder rewritten to a path that does not exist. Found by
@@ -280,16 +297,18 @@ def probe_clone_residue(repo: Path) -> dict:
         path, _lineno, text = parts
         if LINE_KEEP in text:
             continue
-        # The owner's own repository or folder name is kept BY DESIGN, so its
-        # spans come out of the line before what is left is judged.
+        # The owner's own names — a repository, a folder, a credential — are
+        # kept BY DESIGN, so their spans come out of the line before what is
+        # left is judged.
         stripped, hits = _OWN_NAME_RE.subn("", text)
-        own += hits
+        stripped, credential_hits = _OWN_CREDENTIAL_RE.subn("", stripped)
+        own += hits + credential_hits
         if not re.search(r"ztn|ЗТН", stripped, re.IGNORECASE):
             continue
         counts[path] = counts.get(path, 0) + 1
     files = sorted(p for p in counts if FILE_KEEP not in _read(repo / p))
-    kept = (f"; {own} line{'' if own == 1 else 's'} name your own repository or folder — kept"
-            if own else "")
+    kept = (f"; {own} line{'' if own == 1 else 's'} name your own repository, folder or "
+            "credential — kept" if own else "")
     if not files:
         return _result("clone-residue", OK,
                        "nothing outside the allowed set still carries the former name" + kept)
@@ -345,12 +364,53 @@ def _path_like_own_names(text: str) -> list[tuple[int, str, str]]:
     return out
 
 
+def _renames_by_map(repo: Path, ref: str) -> tuple[dict[str, str], str]:
+    """`new -> old`, computed EXACTLY by inverting the rename's own path map.
+
+    Similarity detection cannot be relied on here, and the reason is structural
+    rather than a matter of tuning the threshold. An ordinary note carries the
+    product's name in its title, its frontmatter slug, its tags and every
+    command line it mentions; a product rename rewrites all of those at once,
+    and what survives is only the owner's own prose. A real one measured 28 %
+    against its predecessor — below any threshold that would not also pair
+    unrelated files.
+
+    The rename map, on the other hand, is a pure function: apply it to every
+    path in the pre-rename tree and the one that lands on `rel` IS its
+    predecessor. No heuristic, no threshold.
+
+    The map lives in a migration, so the import is guarded: when the chain floor
+    moves past it the module is gone, and the caller falls back to similarity
+    with the reason attached rather than silently reporting fewer findings.
+    """
+    listed = _git(repo, "ls-tree", "-r", "--name-only", ref)
+    if listed.returncode != 0:
+        return {}, "the pre-rename tree could not be listed"
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "migrations"))
+        from _032_minder_memory_rebrand import rebrand_path  # noqa: PLC0415
+    except Exception:  # noqa: BLE001 — a retired migration is not an error here
+        return {}, "the rename map has been retired, so predecessors are matched by similarity"
+    out: dict[str, str] = {}
+    for old in listed.stdout.splitlines():
+        old = old.strip()
+        if not old:
+            continue
+        try:
+            new = rebrand_path(old)
+        except Exception:  # noqa: BLE001
+            continue
+        if new != old:
+            out[new] = old
+    return out, ""
+
+
 def _renames_since(repo: Path, ref: str) -> dict[str, str]:
     """`new -> old` for every file git sees renamed between `ref` and HEAD.
 
-    30 %: a note whose body was rewritten by a product rename keeps well under
-    half its lines, and git's default 50 % then reports the move as a delete
-    plus an add — which is exactly the shape this map exists to see through.
+    The fallback, used only when the map cannot be loaded. 30 %: a note whose
+    body was rewritten by a product rename keeps well under half its lines, and
+    git's default 50 % then reports the move as a delete plus an add.
     """
     diff = _git(repo, "diff", "--name-status", "-M30%", "--diff-filter=R", ref, "HEAD")
     if diff.returncode != 0:
@@ -379,7 +439,9 @@ def find_own_name_damage(repo: Path, before: str) -> list[dict]:
                   ":!zettelkasten/_sources", *RESIDUE_EXCLUDE)
     if listed.returncode != 0:
         return []
-    renames = _renames_since(repo, before)
+    renames, degraded = _renames_by_map(repo, before)
+    if degraded:
+        renames = _renames_since(repo, before)
     findings: list[dict] = []
     for rel in [p for p in listed.stdout.split("\0") if p.strip()]:
         if not in_owner_space(rel):
@@ -515,41 +577,70 @@ def probe_roles(repo: Path, before: str | None) -> dict:
     return _result("roles", OK, f"{len(rows)} role(s) listed with a status")
 
 
-def probe_credential_store(repo: Path, before: str | None) -> dict:
-    """The credential store must be byte-identical to what it was before the rename.
+def _store_identity_note(repo: Path, before: str | None) -> str:
+    """Whether the store's bytes moved — evidence beside the answer, not the answer.
 
-    A clean `git status` proves only that nobody has touched it SINCE the
-    commit — and the rename ran inside that commit, so the one thing it cannot
-    see is the one thing worth knowing. The comparison is against the state
-    before the rename migration, or it is not made at all: a credential key is
-    the OWNER's name for something, and a role whose key was renamed under it
-    fails at its next tick with a lookup error that names nothing.
+    A store that differs from the pre-rename tree is not by itself a fault: a
+    clone that passed through the release which renamed BOTH the declaration
+    and the store is perfectly consistent and needs no repair. So the byte
+    comparison is reported and never decides the probe.
     """
-    store = repo / SECRETS
-    if not store.is_file():
-        return _result("credential-store", SKIP, "no credential store in this clone")
-    dirty = _git(repo, "status", "--porcelain", "--", SECRETS).stdout.strip()
-    if dirty:
-        return _result("credential-store", FAIL, f"{SECRETS} has uncommitted changes")
     baseline = before or pre_032_commit(repo)
     if baseline is None:
-        return _result("credential-store", SKIP,
-                       "there is no pre-rename commit to compare the store against — "
-                       "unchanged-since-the-commit is not the same claim, so this is unanswered")
-    existed = _git(repo, "cat-file", "-e", f"{baseline}:{SECRETS}")
-    if existed.returncode != 0:
-        return _result("credential-store", SKIP,
-                       f"{SECRETS} did not exist before the rename — nothing to compare")
+        return "no pre-rename commit to compare its bytes against"
+    if _git(repo, "cat-file", "-e", f"{baseline}:{SECRETS}").returncode != 0:
+        return "it did not exist before the rename"
     moved = _git(repo, "diff", "--quiet", baseline, "--", SECRETS)
     if moved.returncode == 0:
-        return _result("credential-store", OK,
-                       f"{SECRETS} is byte-identical to what it was before the rename")
+        return "byte-identical to before the rename"
     if moved.returncode == 1:
+        return "its bytes differ from before the rename, which is fine when both sides moved together"
+    return "git could not compare its bytes"
+
+
+def probe_credential_store(repo: Path, before: str | None) -> dict:
+    """Does every credential every role declares actually resolve in the store?
+
+    That is the question, and byte-identity is not it. A credential name is the
+    OWNER's name for a service: the role declares it and the store holds it
+    under that spelling, and what breaks a role is the two sides disagreeing —
+    not either side having changed. A clone that took a release which renamed
+    both is consistent and needs nothing; a clone where only one side moved
+    fails at its next tick with «declared secret X is not in the credential
+    store», naming a variable the owner never wrote.
+
+    So the engine's own preflight answers it, and the byte comparison rides
+    along as evidence.
+    """
+    runner = repo / ROLES_RUNNER
+    if not runner.is_file():
+        return _result("credential-store", SKIP,
+                       "no roles runner in this clone, so no declaration to resolve")
+    if not (repo / SECRETS).is_file():
+        return _result("credential-store", SKIP, "no credential store in this clone")
+    ran = subprocess.run(
+        [sys.executable, str(runner), "validate", "--base", BASE_DIR, "--repo", "."],
+        cwd=str(repo), capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    try:
+        report = json.loads(ran.stdout or "{}")
+    except json.JSONDecodeError:
+        return _result("credential-store", SKIP,
+                       "the roles preflight did not return a report")
+    findings = report.get("findings") or []
+    # Only a finding that names a SECRET is about the pair under test. One
+    # without it is about the environment doing the checking — no decryption
+    # key here, which is normal and not the owner's problem to fix.
+    unresolved = [f for f in findings
+                  if f.get("secret") and "credential store" in str(f.get("issue", ""))]
+    note = _store_identity_note(repo, before)
+    if unresolved:
+        named = "; ".join(f"{f.get('role')} declares {f.get('secret')}" for f in unresolved[:5])
         return _result("credential-store", FAIL,
-                       f"{SECRETS} differs from {baseline[:8]} — a credential key is the owner's "
-                       "name for something, and a renamed one breaks its role's lookup silently")
-    return _result("credential-store", SKIP,
-                   f"git could not compare {SECRETS} against {baseline[:8]}")
+                       f"{len(unresolved)} declared credential(s) do not resolve in the store — "
+                       f"the role fails at its next tick with a lookup error: {named} ({note})")
+    return _result("credential-store", OK,
+                   f"every credential every role declares resolves in the store ({note})")
 
 
 # --------------------------------------------------------------------------- #

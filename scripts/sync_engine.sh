@@ -373,13 +373,25 @@ if [ -x "$REPO_ROOT/integrations/obsidian/seed.sh" ] || [ -f "$REPO_ROOT/integra
     echo "[sync] warning: vault help docs not refreshed — re-run: bash integrations/obsidian/seed.sh --refresh-help" >&2
 fi
 
+# The commit is not optional housekeeping. Two of the update's own checks —
+# «was your credential store touched» and «what did an earlier release rename»
+# — are answered by comparing against a commit, so a clone that never commits
+# its update leaves them permanently unanswerable. The skill's Step 8 does this
+# for the owner; a friend running the script directly was never told, which is
+# why the caveat is here rather than in a doc they may not read.
+#
+# The installer already ran inside migration 031, so this does not ask for it
+# again: a step suggested twice is a step somebody performs twice and then
+# wonders which one counted.
 cat <<EOF
 
-[sync] done.
+[sync] done. The Claude Code installer ran as part of migration 031 — nothing to re-run.
 
 Review the diff:    git status
 Run tests:          (your test suite — engine ships pytest under zettelkasten/_system/scripts/tests/)
-Re-install Claude:  bash integrations/claude-code/install.sh
+Commit it:          git add -A && git commit -m "engine ${version_after:-updated}"
+                    Careful: that stages everything, including notes you have open and
+                    have not saved. Commit those separately first if you want them apart.
 
 If something looks wrong, revert with:  git restore --staged --worktree .
 EOF

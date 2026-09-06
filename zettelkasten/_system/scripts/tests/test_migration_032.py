@@ -11,6 +11,7 @@ run is a no-op.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -137,10 +138,14 @@ class Migration032Tests(unittest.TestCase):
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual((self.root / "zettelkasten/_system/SOUL.md").read_text(encoding="utf-8"),
                          "I use Minder Memory and I am mid-edit.\n")
-        self.assertIn("1 file with uncommitted changes was renamed in place "
-                      "(its previous text is in git under the old name)", res.stdout)
-        self.assertIn("1 file git had never seen was also renamed "
-                      "(nothing holds its previous text)", res.stdout)
+        # Named, not counted: a number tells the owner something happened to
+        # work of theirs and leaves them to find out what.
+        self.assertIn("1 file with uncommitted changes was rewritten in place "
+                      "(its previous text is in git under the old name): "
+                      "zettelkasten/_system/SOUL.md", res.stdout)
+        self.assertIn("1 file git had never seen was also rewritten "
+                      "(nothing holds its previous text): "
+                      "zettelkasten/_records/observations/2026-06-01-open.md", res.stdout)
 
     def test_the_credential_store_is_never_rewritten(self):
         """A credential key names something OUTSIDE the repository.
@@ -201,6 +206,65 @@ class Migration032Tests(unittest.TestCase):
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertNotIn("renamed in place", res.stdout)
         self.assertNotIn("git had never seen", res.stdout)
+
+    def test_a_roles_own_credential_name_survives_on_both_sides(self):
+        """The declaration and the store must still agree afterwards.
+
+        A role names its credentials; the store holds them under those names.
+        The store is never rewritten, so rewriting the declaration renamed one
+        half of a pair — and the role's next preflight failed naming a variable
+        the owner had never written anywhere.
+        """
+        self._clone()
+        _write(self.root, "zettelkasten/_system/roles/telegram-digest/role.md",
+               "---\nid: telegram-digest\nsecrets:\n  - ZTN_TELEGRAM_TOKEN\n---\n\n"
+               "Every morning, read ZTN and post a digest. Run /ztn:process first.\n")
+        store = self.root / "zettelkasten/_system/state/secrets.enc.json"
+        store_before = store.read_bytes()
+
+        res = _run(self.mig, cwd=self.root)
+        self.assertEqual(res.returncode, 0, res.stderr)
+
+        role = (self.root / "zettelkasten/_system/roles/telegram-digest/role.md").read_text(
+            encoding="utf-8")
+        self.assertIn("- ZTN_TELEGRAM_TOKEN", role, "the owner's credential name is theirs")
+        self.assertIn("/minder:mem:process", role, "the engine's own names still move")
+        self.assertIn("read Minder Memory and post", role)
+        self.assertEqual(store.read_bytes(), store_before)
+
+    def test_the_declared_secret_still_resolves_after_the_rename(self):
+        """The pair, checked by the engine's own preflight rather than by eye."""
+        self._clone()
+        base = self.root / "zettelkasten"
+        _write(self.root, "zettelkasten/_system/roles/telegram-digest/role.md",
+               "---\nid: telegram-digest\nname: Telegram digest\nstatus: active\n"
+               "cadence: daily 07:00\nsecrets:\n  - ZTN_TELEGRAM_TOKEN\n---\n\nDo the thing.\n")
+        # `{name: ciphertext}` — the store's real shape; the value is never
+        # decrypted here, only its NAME is resolved against the declaration.
+        _write(self.root, "zettelkasten/_system/state/secrets.enc.json",
+               '{"ZTN_TELEGRAM_TOKEN":"' + "x" * 64 + '"}\n')
+        runner = _REPO_ROOT / "zettelkasten" / "_system" / "scripts" / "roles_run.py"
+        if not runner.is_file():
+            self.skipTest("no roles runner in this engine")
+
+        self.assertEqual(_run(self.mig, cwd=self.root).returncode, 0)
+
+        out = subprocess.run(
+            ["python3", str(runner), "validate", "--base", str(base), "--repo", str(self.root)],
+            capture_output=True, text=True, encoding="utf-8", cwd=str(self.root))
+        report = json.loads(out.stdout or "{}")
+        # A finding without a `secret` key is about the checking environment
+        # (no decryption key here), not about the pair under test — but a
+        # corrupt or unreadable store would hide the real check, so those are
+        # asserted away too rather than filtered silently.
+        findings = report.get("findings", [])
+        self.assertNotIn("corrupt", out.stdout)
+        unresolved = [f for f in findings
+                      if f.get("secret") and "credential store" in f.get("issue", "")]
+        self.assertEqual(unresolved, [], out.stdout)
+        self.assertTrue(any(n.get("role") == "telegram-digest" for n in report.get("notes", []))
+                        or not findings,
+                        f"the role was never discovered, so nothing was checked: {out.stdout}")
 
     def test_second_run_is_a_no_op(self):
         self._clone()
