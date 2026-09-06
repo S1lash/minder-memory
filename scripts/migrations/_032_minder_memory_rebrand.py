@@ -252,6 +252,9 @@ def is_code_path(rel: str, name: str, suffix: str) -> bool:
     if rel.startswith(_PROSE_EVEN_IF_CODE):
         return False
     return suffix in CODE_SUFFIXES or name in ("install.sh", "uninstall.sh", "Dockerfile")
+# Untracked because the engine's own seeder just wrote them, never because the
+# owner has work in flight there.
+_SEEDED_UNTRACKED: tuple[str, ...] = ("zettelkasten/.obsidian/",)
 _COMPILED_PROTECTED: tuple[re.Pattern[str], ...] = tuple(
     re.compile(pat) for pat in PROTECTED_PATTERNS
 )
@@ -597,7 +600,14 @@ def run(root: Path, *, dry_run: bool,
     # unsaved notes open deserves to be told which ones moved under them.
     changed = {c.path for c in report.changes}
     report.rewritten_dirty = sorted(p for p in changed & unsaved if p not in untracked)
-    report.rewritten_unsaved = sorted(changed & untracked)
+    # The vault configuration is seeded by `integrations/obsidian/seed.sh`, which
+    # the installer runs as part of the same update. Those files arrive untracked
+    # because the seeder just wrote them, not because the owner left work unsaved
+    # — counting them would put a number in front of the owner that is entirely
+    # the engine's own doing.
+    report.rewritten_unsaved = sorted(
+        p for p in changed & untracked if not p.startswith(_SEEDED_UNTRACKED)
+    )
     # Residue: what still matches after the run (or would, in a dry run).
     for rel in _candidates(root):
         if any(rel == e.rstrip("/") or rel.startswith(e.rstrip("/") + "/") for e in exclude) or rel in dirty:
@@ -621,6 +631,23 @@ def run(root: Path, *, dry_run: bool,
         if n > 0:
             report.residue[key] = n
     return report
+
+
+def dirty_sentence(count: int) -> str:
+    """What the owner needs: how many, and where the previous text went."""
+    if count == 1:
+        return ("1 file with uncommitted changes was renamed in place "
+                "(its previous text is in git under the old name).")
+    return (f"{count} files with uncommitted changes were renamed in place "
+            "(their previous text is in git under the old name).")
+
+
+def unsaved_sentence(count: int) -> str:
+    if count == 1:
+        return ("1 file git had never seen was also renamed "
+                "(nothing holds its previous text).")
+    return (f"{count} files git had never seen were also renamed "
+            "(nothing holds their previous text).")
 
 
 def render_inventory(report: Report) -> str:
@@ -652,12 +679,10 @@ def render_inventory(report: Report) -> str:
     if report.rewritten_dirty or report.rewritten_unsaved:
         lines += ["", "## Rewritten while unsaved", ""]
         if report.rewritten_dirty:
-            lines.append(f"{len(report.rewritten_dirty)} unsaved files were renamed in place — "
-                         "their previous text is in git under the old name.")
+            lines.append(dirty_sentence(len(report.rewritten_dirty)))
             lines += [f"- `{rel}`" for rel in report.rewritten_dirty]
         if report.rewritten_unsaved:
-            lines.append(f"{len(report.rewritten_unsaved)} of them were never saved to git — "
-                         "nothing holds their previous text.")
+            lines.append(unsaved_sentence(len(report.rewritten_unsaved)))
             lines += [f"- `{rel}`" for rel in report.rewritten_unsaved]
     if report.residue:
         lines += ["", "## Residue after the run (must each be an allowed one)", "",
@@ -699,11 +724,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"rebrand: {len(report.own_name)} file(s) still carry the former name because "
                   "these name your own repository or folder and were left alone")
         if report.rewritten_dirty:
-            print(f"rebrand: {len(report.rewritten_dirty)} unsaved files were renamed in place — "
-                  "their previous text is in git under the old name")
+            print("rebrand: " + dirty_sentence(len(report.rewritten_dirty)))
         if report.rewritten_unsaved:
-            print(f"rebrand: {len(report.rewritten_unsaved)} of them were never saved to git — "
-                  "nothing holds their previous text")
+            print("rebrand: " + unsaved_sentence(len(report.rewritten_unsaved)))
     return 0
 
 

@@ -134,9 +134,10 @@ class Migration032Tests(unittest.TestCase):
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual((self.root / "zettelkasten/_system/SOUL.md").read_text(encoding="utf-8"),
                          "I use Minder Memory and I am mid-edit.\n")
-        self.assertIn("1 unsaved files were renamed in place — their previous text is in git "
-                      "under the old name", res.stdout)
-        self.assertIn("never saved to git", res.stdout)
+        self.assertIn("1 file with uncommitted changes was renamed in place "
+                      "(its previous text is in git under the old name)", res.stdout)
+        self.assertIn("1 file git had never seen was also renamed "
+                      "(nothing holds its previous text)", res.stdout)
 
     def test_second_run_is_a_no_op(self):
         self._clone()

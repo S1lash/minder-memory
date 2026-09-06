@@ -55,6 +55,37 @@ _MANIFEST = textwrap.dedent(
 )
 
 
+# What a clone at 0.65 / 0.69 carries as its own `sync_engine.sh`: a self-heal
+# that restores `scripts/` from the remote and re-execs the RESTORED script
+# WITHOUT passing the flag on. Everything the new script does inside its own
+# self-heal branch is therefore unreachable from here — which is the whole
+# point of this fixture.
+_OLD_STYLE_SELF_HEAL = """#!/usr/bin/env bash
+set -euo pipefail
+REMOTE="upstream"
+BRANCH="main"
+SELF_HEAL=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --self-heal) SELF_HEAL=1 ;;
+    --remote) REMOTE="$2"; shift ;;
+    --branch) BRANCH="$2"; shift ;;
+    *) ;;
+  esac
+  shift
+done
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+if [ $SELF_HEAL -eq 1 ]; then
+  git fetch "$REMOTE" "$BRANCH"
+  git checkout "$REMOTE/$BRANCH" -- scripts/
+  exec bash "$REPO_ROOT/scripts/sync_engine.sh" --remote "$REMOTE" --branch "$BRANCH"
+fi
+echo "[old] this stub implements nothing but the self-heal" >&2
+exit 2
+"""
+
+
 def _git(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["git", *args], cwd=cwd, check=check, capture_output=True, text=True, encoding="utf-8", env=_ENV
@@ -68,7 +99,7 @@ def _run(cwd: Path, *args: str) -> subprocess.CompletedProcess:
     )
 
 
-def _seed_upstream(tmp: Path, version: str = "1.0.0") -> Path:
+def _seed_upstream(tmp: Path, version: str = "1.0.2") -> Path:
     up = tmp / "upstream"
     (up / "integrations").mkdir(parents=True)
     (up / "integrations" / "VERSION").write_text(f"{version}\n", encoding="utf-8")
@@ -139,9 +170,9 @@ class SyncEngineTests(unittest.TestCase):
         result = _run(clone)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((clone / "integrations" / "VERSION").read_text(encoding="utf-8").strip(),
-                         "1.0.0")
+                         "1.0.2")
         self.assertEqual((clone / "engine-doc.md").read_text(encoding="utf-8"), "current\n")
-        self.assertIn("0.69.0 → 1.0.0", result.stdout)
+        self.assertIn("0.69.0 → 1.0.2", result.stdout)
 
     def test_a_path_added_upstream_lands_on_the_same_update(self):
         """The engine list is read from the manifest the sync is ABOUT TO APPLY.
@@ -232,7 +263,7 @@ class SyncEngineTests(unittest.TestCase):
         self.assertEqual(healed.returncode, 0, healed.stderr)
         self.assertTrue((clone / "scripts" / "lib" / "git.sh").is_file())
         self.assertEqual((clone / "integrations" / "VERSION").read_text(encoding="utf-8").strip(),
-                         "1.0.0")
+                         "1.0.2")
 
     def test_self_heal_removes_what_upstream_deleted_under_scripts(self):
         """A restore that only COPIES leaves the clone permanently un-syncable.
@@ -259,7 +290,64 @@ class SyncEngineTests(unittest.TestCase):
         self.assertFalse((clone / "scripts" / "migrations" / "002-retired-upstream.sh").exists(),
                          "a path upstream deleted must not survive the restore")
         self.assertEqual((clone / "integrations" / "VERSION").read_text(encoding="utf-8").strip(),
-                         "1.0.0", "the first --self-heal run must reach the upstream version")
+                         "1.0.2", "the first --self-heal run must reach the upstream version")
+
+    def _clone_carrying_a_retired_file(self) -> Path:
+        """A clone whose `scripts/` differs from upstream in BOTH directions.
+
+        `lib/` removed so the restore has something to write, and a migration
+        upstream has since deleted so the restore has something to remove. Only
+        the second one is invisible to a copy-only restore.
+        """
+        clone = _clone(self.tmp, self.up, version="0.69.0")
+        shutil.rmtree(clone / "scripts" / "lib")
+        (clone / "scripts" / "migrations").mkdir(parents=True, exist_ok=True)
+        (clone / "scripts" / "migrations" / "002-retired-upstream.sh").write_text(
+            "# a migration upstream deleted\n", encoding="utf-8")
+        _git(clone, "add", "-A")
+        _git(clone, "commit", "-q", "-m", "an old clone carrying retired migrations")
+        return clone
+
+    def test_a_plain_sync_clears_what_upstream_deleted_under_scripts(self):
+        """The convergence has to run on the ORDINARY path, not inside --self-heal.
+
+        An old clone runs its own updater, whose self-heal restores `scripts/`
+        and re-execs the restored script WITHOUT the flag. Everything guarded by
+        `--self-heal` in the new script is therefore unreachable from the only
+        clone that needs it, and the repaired script meets the dirty guard with
+        the stale files still in place. This test enters at exactly that point.
+        """
+        clone = self._clone_carrying_a_retired_file()
+        # Precisely what the old self-heal leaves behind before it re-execs.
+        subprocess.run(["git", "checkout", "upstream/main", "--", "scripts/"],
+                       cwd=clone, check=True, env=_ENV)
+
+        result = _run(clone)          # PLAIN sync — no --self-heal
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse((clone / "scripts" / "migrations" / "002-retired-upstream.sh").exists())
+        self.assertEqual((clone / "integrations" / "VERSION").read_text(encoding="utf-8").strip(),
+                         "1.0.2")
+
+    def test_an_old_clones_own_self_heal_reaches_the_new_version(self):
+        """End to end from the version the recovery exists for."""
+        clone = self._clone_carrying_a_retired_file()
+        (clone / "scripts" / "sync_engine.sh").write_text(_OLD_STYLE_SELF_HEAL, encoding="utf-8")
+        _git(clone, "commit", "-q", "-am", "the updater this clone actually carries")
+
+        result = _run(clone, "--self-heal")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse((clone / "scripts" / "migrations" / "002-retired-upstream.sh").exists())
+        self.assertEqual((clone / "integrations" / "VERSION").read_text(encoding="utf-8").strip(),
+                         "1.0.2")
+
+    def test_the_dirty_guard_says_to_commit_scripts_alone(self):
+        """A friend told only «commit or stash» commits their notes with it."""
+        clone = _clone(self.tmp, self.up, version="0.69.0")
+        (clone / "engine-doc.md").write_text("my own edit\n", encoding="utf-8")
+        result = _run(clone)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("git add scripts && git commit", result.stderr)
+        self.assertIn("your notes must not go into that commit", result.stderr)
 
     def test_a_path_dirty_but_identical_to_upstream_is_not_an_abort(self):
         """Otherwise the self-heal deadlocks against the script's own dirty check."""

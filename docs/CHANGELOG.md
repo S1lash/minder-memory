@@ -2,6 +2,28 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.0.2 — What the rename update looks like from an old clone
+
+**The two-step path works from the updater you actually have.** 1.0.1 taught the
+sync to clear what upstream had deleted, but it did it only under `--self-heal`
+— and a clone old enough to need that runs its OWN older updater, which restores
+`scripts/` and hands off without the flag. So the fix never ran on the clone it
+was for, and the update still stopped at «dirty: scripts». The clearing now
+happens on every sync. When that commit is asked of you, it is `git add scripts
+&& git commit` and nothing else: your notes do not belong in it.
+
+**The self-check knows your own folder name.** A path of yours like
+`~/projects/minder-ztn-<yours>` is not something the engine renamed and forgot —
+it is yours, kept on purpose. The check says so and counts it as fine, instead
+of reporting a failure on every clone that came through the update correctly.
+
+**And it spots what 1.0.0 got wrong.** That release's rename could not yet tell
+the product from its owner, so a folder or repository of yours may have been
+rewritten into a path that does not exist — a line that reads perfectly well and
+points nowhere. The check finds those by reading what the same file said before
+the rename ran, and a repair item names each one with both texts side by side.
+Nothing is rewritten: only you know what the directory is called now.
+
 ## 1.0.1 — The rename update, after watching someone take it
 
 Five things that only show up when a real clone goes through the rename.

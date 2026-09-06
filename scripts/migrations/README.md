@@ -61,6 +61,7 @@ fetch + checkout. One file per breaking engine change.
   |---|---|---|
   | `031` harness wiring | structural | after the sync the old skills are gone and the old hot rule dangles; a session that continues imports a dead rule and finds no skill under either name |
   | `032` product rename over the clone | heal | un-run means the old name in files the engine still reads correctly — stale words, not a wrong place |
+  | `033` names an earlier rename damaged | heal | it only RAISES a question with the owner; a clone where it never ran is unwarned, not broken, and a notice must never be able to block an update |
 
   The distinction is not stylistic. A repair of historical data used to abort
   the whole update and stay unrecorded, so every future update re-ran it and
@@ -104,6 +105,13 @@ it as a migration of its own (`pending()` globs `*.sh`).
   path rule that turned the former product name into Minder Memory. Migration
   `032` runs it over the clone; the maintainer ran it over the authoring base
   and the sibling repositories.
+- `_033_own_names.py` — migration `033`'s producer: the names an earlier
+  release's map renamed out from under the owner, raised as one clarification
+  with the text from before the rename beside the text now. It rewrites
+  nothing, and it does not restate the detection — that lives in
+  `scripts/check_update.py`, which the post-update check uses too. The import
+  runs migration → permanent script and never the other way, so retiring the
+  migration cannot take the check down with it.
 
 ## The floor
 

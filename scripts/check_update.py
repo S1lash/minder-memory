@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -109,6 +110,27 @@ RESIDUE_EXCLUDE: tuple[str, ...] = (
 # long as the map exists, so the copy cannot drift silently.
 LINE_KEEP = "rebrand:keep"
 FILE_KEEP = "minder-memory-rebrand: keep-legacy-tokens"
+
+# The owner's own name — the skeleton name with their tail on it, which the
+# rename map leaves whole. Restated from the same home and for the same reason
+# as the two markers above; `test_check_update.py` pins it equal to the map's.
+OWN_NAME_PATTERN = r"(?i)(?<![\w-])minder-ztn-(?!platform\b)[A-Za-z0-9][A-Za-z0-9_-]*"
+_OWN_NAME_RE = re.compile(OWN_NAME_PATTERN)
+
+# What 1.0.0's map did before it learned the distinction: an owner's own
+# repository or folder rewritten to a path that does not exist. Found by
+# reading what the SAME file said before the rename migration ran — nothing in
+# the tree afterwards betrays it, because the damaged line reads plausibly.
+_RENAMED_OWN_NAME_RE = re.compile(r"(?<![\w-])minder-memory-([A-Za-z0-9][A-Za-z0-9_-]*)")
+# Suffixes the ENGINE owns: `minder-memory-platform` is this base's retired
+# project identifier (the map renames it on purpose) and `minder-memory-mcp` is
+# an engine directory whose predecessor sits in the manifest's retired rows.
+# Both would otherwise answer the before/after test and read as damage.
+ENGINE_OWNED_SUFFIXES = frozenset({"platform", "mcp"})
+# The token a match sits in, so «is this a path?» can be asked of it.
+_TOKEN_CHARS = re.compile(r"[^\s`'\"()\[\],;<>|]+")
+# The ledger line whose first appearance dates the rename migration.
+_LEDGER_MARK = "032-minder-memory"
 
 MIGRATIONS_REQUIRED: tuple[str, ...] = (
     "031-minder-memory-harness-wiring.sh",
@@ -190,6 +212,7 @@ def probe_clone_residue(repo: Path) -> dict:
     if found.returncode != 0:
         return _result("clone-residue", SKIP, "git grep could not run")
     counts: dict[str, int] = {}
+    own = 0
     for line in found.stdout.splitlines():
         parts = line.split(":", 2)
         if len(parts) < 3:
@@ -197,13 +220,121 @@ def probe_clone_residue(repo: Path) -> dict:
         path, _lineno, text = parts
         if LINE_KEEP in text:
             continue
+        # The owner's own repository or folder name is kept BY DESIGN, so its
+        # spans come out of the line before what is left is judged.
+        stripped, hits = _OWN_NAME_RE.subn("", text)
+        own += hits
+        if not re.search(r"ztn|ЗТН", stripped, re.IGNORECASE):
+            continue
         counts[path] = counts.get(path, 0) + 1
     files = sorted(p for p in counts if FILE_KEEP not in _read(repo / p))
+    kept = (f"; {own} line{'' if own == 1 else 's'} name your own repository or folder — kept"
+            if own else "")
     if not files:
         return _result("clone-residue", OK,
-                       "every remaining hit is on a line or in a file that opts out on purpose")
+                       "nothing outside the allowed set still carries the former name" + kept)
     return _result("clone-residue", FAIL,
-                   f"{len(files)} file(s) still carry the former name: " + ", ".join(files[:8]))
+                   f"{len(files)} file(s) still carry the former name: "
+                   + ", ".join(files[:8]) + kept)
+
+
+def pre_032_commit(repo: Path) -> str | None:
+    """The commit the clone stood at before the rename migration ran.
+
+    Dated by the ledger rather than by a tag or a version file: the ledger line
+    is written by the runner at the moment the migration is applied, so its
+    first appearance is the update that ran it, whatever the clone did before
+    or since. The answer is that commit's PARENT — the last state of the tree
+    the migration had not yet touched.
+    """
+    log = _git(repo, "log", "--reverse", "--format=%H", "-S", _LEDGER_MARK,
+               "--", LEDGER)
+    if log.returncode != 0:
+        return None
+    shas = [ln.strip() for ln in log.stdout.splitlines() if ln.strip()]
+    if not shas:
+        return None
+    parent = _git(repo, "rev-parse", "--verify", shas[0] + "^")
+    if parent.returncode != 0:
+        return None
+    return parent.stdout.strip()
+
+
+def _path_like_own_names(text: str) -> list[tuple[int, str, str]]:
+    """(line number, suffix, the whole line) for every path-like `minder-memory-<suffix>`.
+
+    Path-like is decided by the token the match sits in: a name inside
+    something containing a `/` — `~/projects/…`, `/Users/…`, `projects/…` — is
+    being used as a location, and a location that does not exist is the damage
+    this looks for. The same name in prose is just the product.
+    """
+    out: list[tuple[int, str, str]] = []
+    for index, line in enumerate(text.splitlines(), start=1):
+        for match in _RENAMED_OWN_NAME_RE.finditer(line):
+            suffix = match.group(1)
+            if suffix.lower() in ENGINE_OWNED_SUFFIXES:
+                continue
+            token = ""
+            for candidate in _TOKEN_CHARS.finditer(line):
+                if candidate.start() <= match.start() < candidate.end():
+                    token = candidate.group(0)
+                    break
+            if "/" not in token:
+                continue
+            out.append((index, suffix, line.rstrip()))
+    return out
+
+
+def find_own_name_damage(repo: Path, before: str) -> list[dict]:
+    """Names the rename turned into a path that does not exist.
+
+    One home for the detection: the post-update check reports it, and migration
+    `033` raises it with the owner. The migration imports THIS function rather
+    than restating it — a migration may import a permanent script, never the
+    other way round.
+    """
+    listed = _git(repo, "ls-files", "-z", "--", ".",
+                  ":!zettelkasten/_sources", *RESIDUE_EXCLUDE)
+    if listed.returncode != 0:
+        return []
+    findings: list[dict] = []
+    for rel in [p for p in listed.stdout.split("\0") if p.strip()]:
+        current = _read(repo / rel)
+        if not current:
+            continue
+        candidates = _path_like_own_names(current)
+        if not candidates:
+            continue
+        shown = _git(repo, "show", f"{before}:{rel}")
+        if shown.returncode != 0:
+            continue  # the file did not exist before the migration — nothing to compare
+        original = shown.stdout
+        for lineno, suffix, line in candidates:
+            was = f"minder-ztn-{suffix}"
+            if was not in original:
+                continue
+            before_line = next(
+                (ln.rstrip() for ln in original.splitlines() if was in ln), was)
+            findings.append({"path": rel, "line": lineno, "text": line,
+                             "before": before_line, "name": was})
+    return findings
+
+
+def probe_own_name_damage(repo: Path) -> dict:
+    before = pre_032_commit(repo)
+    if before is None:
+        return _result("own-name-damage", SKIP,
+                       "the ledger was never committed here — there is no before-state to read")
+    findings = find_own_name_damage(repo, before)
+    if not findings:
+        return _result("own-name-damage", OK,
+                       "no name of yours was renamed into a path that does not exist")
+    shown = "; ".join(f"{f['path']}:{f['line']} now «{f['text'].strip()}», was «{f['before'].strip()}»"
+                      for f in findings[:5])
+    return _result("own-name-damage", FAIL,
+                   f"{len(findings)} line(s) where your own name was renamed by an earlier "
+                   f"release into a path that does not exist — restore by hand, nothing here "
+                   f"rewrites them: {shown}")
 
 
 def probe_dashboard(repo: Path) -> dict:
@@ -405,6 +536,7 @@ def run(repo: Path, home: Path, *, remote: str, branch: str, before: str | None)
         probe_version(repo, remote, branch),
         probe_conflict_markers(repo),
         probe_clone_residue(repo),
+        probe_own_name_damage(repo),
         probe_dashboard(repo),
         probe_sources(repo),
         probe_ledger(repo),

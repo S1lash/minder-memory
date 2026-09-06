@@ -63,13 +63,27 @@ class CheckUpdateTests(unittest.TestCase):
 
     # -- fixtures ---------------------------------------------------------- #
 
+    OWN_NAME_LINE = "My base lives in ~/projects/minder-ztn-ivanov/zettelkasten.\n"
+
     def _build_clone(self) -> None:
-        _write(self.clone, "integrations/VERSION", "1.0.1\n")
+        """Two commits, because the damage probe needs a BEFORE to read.
+
+        The first is the clone as it stood before the rename migration ran; the
+        second is the update that recorded 032 in the ledger. The owner's own
+        folder name sits in SOUL across both — untouched, which is the correct
+        outcome and the fixture's baseline.
+        """
+        _write(self.clone, "integrations/VERSION", "1.0.2\n")
         _write(self.clone, "zettelkasten/minder-memory.md",
                "# Minder Memory\n\nMy own dashboard line.\n")
         _write(self.clone, "zettelkasten/_sources/inbox/.gitkeep", "")
         _write(self.clone, "zettelkasten/_records/observations/note.md",
                "An ordinary note about Minder Memory.\n")
+        _write(self.clone, "zettelkasten/_system/SOUL.md", self.OWN_NAME_LINE)
+        _git(self.clone, "init", "-q", "-b", "main")
+        _git(self.clone, "add", "-A")
+        _git(self.clone, "commit", "-qm", "the clone before the rename migration ran")
+
         ledger = "".join(
             json.dumps({"name": name, "kind": kind, "rc": 0, "outcome": "applied",
                         "ts": "2026-01-01T00:00:00Z", "note": ""}, sort_keys=True) + "\n"
@@ -77,7 +91,6 @@ class CheckUpdateTests(unittest.TestCase):
                                ("032-minder-memory-owner-surfaces.sh", "heal"))
         )
         _write(self.clone, ".engine-migrations.jsonl", ledger)
-        _git(self.clone, "init", "-q", "-b", "main")
         _git(self.clone, "add", "-A")
         _git(self.clone, "commit", "-qm", "a clone that came through the update")
 
@@ -223,6 +236,73 @@ class CheckUpdateTests(unittest.TestCase):
         import check_update  # noqa: E402
         self.assertEqual(check_update.LINE_KEEP, rename_map.LINE_KEEP)
         self.assertEqual(check_update.FILE_KEEP, rename_map.FILE_KEEP)
+
+    def test_an_owners_own_folder_name_is_kept_and_named_not_counted_as_residue(self):
+        """The fixture's SOUL names the owner's own folder — that is correct.
+
+        Counting it as residue put a permanent failure in front of every friend
+        whose clone came through the update exactly right.
+        """
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        residue = next(p for p in json.loads(res.stdout)["probes"]
+                       if p["probe"] == "clone-residue")
+        self.assertEqual(residue["status"], "ok", residue["evidence"])
+        self.assertIn("name your own repository or folder", residue["evidence"])
+        self.assertIn("1 line", residue["evidence"])
+
+    def test_a_name_the_rename_damaged_is_reported_against_the_pre_migration_tree(self):
+        """1.0.0's map renamed the owner's own folder into a path that is not there.
+
+        Nothing in the tree says so afterwards: the line reads plausibly, and
+        the only witness is what the same file said before the migration ran.
+        """
+        _write(self.clone, "zettelkasten/_system/SOUL.md",
+               self.OWN_NAME_LINE.replace("minder-ztn-ivanov", "minder-memory-ivanov"))
+        _git(self.clone, "commit", "-qam", "what 1.0.0 did to the owner's own name")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        self.assertIn("own-name-damage", self._failed(res))
+        payload = res.stdout
+        self.assertIn("zettelkasten/_system/SOUL.md", payload)
+        self.assertIn("minder-ztn-ivanov", payload, "the report must carry the original text")
+        # And it changed nothing.
+        self.assertIn("minder-memory-ivanov",
+                      (self.clone / "zettelkasten/_system/SOUL.md").read_text(encoding="utf-8"))
+
+    def test_the_damage_probe_skips_when_the_ledger_was_never_committed(self):
+        """No ledger in history means no before-state — and a skip says so.
+
+        Silence would be the dangerous answer here: «no damage found» on a
+        clone where the question was never asked reads exactly like a clean
+        bill of health.
+        """
+        fresh = self.tmp / "no-ledger"
+        _write(fresh, "integrations/VERSION", "1.0.2\n")
+        _write(fresh, "zettelkasten/minder-memory.md", "# Minder Memory\n")
+        _git(fresh, "init", "-q", "-b", "main")
+        _git(fresh, "add", "-A")
+        _git(fresh, "commit", "-qm", "a clone whose ledger was never committed")
+        res = subprocess.run(
+            ["python3", str(CHECK), "--repo-root", str(fresh), "--json"],
+            capture_output=True, text=True, encoding="utf-8",
+            env={**os.environ, "CLAUDE_HOME": str(self.home)},
+        )
+        damage = next(p for p in json.loads(res.stdout)["probes"]
+                      if p["probe"] == "own-name-damage")
+        self.assertEqual(damage["status"], "skip")
+        self.assertIn("no before-state", damage["evidence"])
+
+    def test_the_own_name_pattern_matches_the_rename_map(self):
+        map_module = _REPO_ROOT / "scripts" / "migrations" / "_032_minder_memory_rebrand.py"
+        if not map_module.is_file():
+            self.skipTest("the rename map has been retired; the check keeps its own copy")
+        import sys as _sys
+        _sys.path.insert(0, str(map_module.parent))
+        _sys.path.insert(0, str(CHECK.parent))
+        import _032_minder_memory_rebrand as rename_map  # noqa: E402
+        import check_update  # noqa: E402
+        self.assertEqual(check_update.OWN_NAME_PATTERN, rename_map.OWN_NAME_PATTERN)
 
     # -- cannot run at all -------------------------------------------------- #
 

@@ -431,9 +431,13 @@ scheduler tool rather than the filesystem — do them yourself, here:
   former product namespace, and no environment KEY may still carry the former
   product name or its `_ROLES_KEY` spelling. Never read, print or quote a
   value — only key names.
-- Read each `role.md`. Anything in it that names the repository, a path, an
-  environment variable or an outside service by a former name is a nuance to
-  raise with the owner, not something to rewrite: a role's prose is theirs.
+- Read each `role.md`. The engine's own names inside a role — the credential
+  and base environment variables, the slash commands, the skeleton repository
+  name — were already rewritten by the rename migration, so they need nothing
+  from you. What is left for the owner is only what names THEIR repository,
+  THEIR folder, or an outside service: those the engine leaves whole on
+  purpose, and only the owner knows whether the thing on the other end still
+  answers to that name. Raise them; do not rewrite them.
 
 **Judgement.**
 

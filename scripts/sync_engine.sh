@@ -180,6 +180,37 @@ if [ ${#ENGINE_PATHS[@]} -eq 0 ]; then
   exit 2
 fi
 
+# ---------------------------------------------------------------------------
+# Converge `scripts/` DOWNWARDS, before the dirty guard reads it.
+#
+# The checkout loop below can only copy what upstream HAS; a file upstream has
+# since deleted — a retired migration, a helper that moved — simply stays. Then
+# `scripts/` differs from upstream in a direction no restore can close, and the
+# guard refuses the tree on every run, forever.
+#
+# It has to run HERE, unconditionally, and NOT inside `--self-heal`. A clone old
+# enough to need recovering runs its OWN copy of this script, and that copy's
+# self-heal checks `scripts/` out and re-execs the restored script WITHOUT
+# passing the flag on. Anything guarded by `--self-heal` in this file is
+# therefore unreachable from the only clone that needs it: the repaired script
+# arrives at the guard with the stale files still in place. Running it on the
+# ordinary path is what makes the recovery reachable at all.
+#
+# `scripts/` only, because the manifest declares that directory engine wholesale
+# — a file there is the engine's, and one upstream no longer ships has no owner
+# left. `--diff-filter=A` is «present here, absent there»: the ref is the diff's
+# OLD side and the working tree its new one. A dry run changes nothing.
+# ---------------------------------------------------------------------------
+if [ $DRY_RUN -eq 0 ]; then
+  git -c core.quotepath=false diff --name-only --diff-filter=A "$REMOTE/$BRANCH" -- scripts/ |
+    while IFS= read -r _stale; do
+      [ -n "$_stale" ] || continue
+      git rm -q --cached --ignore-unmatch -- "$_stale" >/dev/null 2>&1 || true
+      rm -f -- "$_stale"
+      echo "  - $_stale (upstream no longer ships it)"
+    done
+fi
+
 # Abort if any engine path has uncommitted local changes.
 #
 # The check exists to protect an owner's uncommitted customisation from being
@@ -201,6 +232,8 @@ for p in "${ENGINE_PATHS[@]}"; do
 done
 if [ $DIRTY -ne 0 ]; then
   echo "error: engine paths have uncommitted changes — commit or stash first." >&2
+  echo "  When the dirty path is scripts/, that is the update machinery having repaired itself." >&2
+  echo "  Commit scripts/ only (git add scripts && git commit) — your notes must not go into that commit." >&2
   exit 2
 fi
 

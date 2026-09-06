@@ -71,6 +71,12 @@ with `error: engine paths have uncommitted changes`. Commit or stash
 first, then re-run. A path that is dirty but already identical to
 upstream is not an abort — there is nothing there to lose.
 
+When the dirty path is `scripts/`, that is the update machinery having
+repaired itself, and the commit that clears it should contain nothing
+else: `git add scripts && git commit`. Your notes must not go into that
+commit — a `git add -A` here sweeps whatever you had open into a commit
+about the engine, and untangling it later costs more than the update did.
+
 ### When the sync itself is broken
 
 The update machinery ships through the update, so a clone carrying a
@@ -84,12 +90,18 @@ bash scripts/sync_engine.sh --self-heal  # the script equivalent
 ```
 
 Both restore `scripts/` from the remote before doing anything else, then
-proceed with the repaired copy. Restoring means making `scripts/` match
-upstream in both directions: what upstream ships is written, and what
-upstream has since dropped — a retired migration, a helper that moved —
-is removed. A copy-only restore would leave those behind, `scripts/`
-would differ from upstream forever, and the next run would refuse the
-tree as dirty on exactly the clone the recovery exists for.
+proceed with the repaired copy.
+
+Restoring means making `scripts/` match upstream in both directions:
+what upstream ships is written, and what upstream has since dropped — a
+retired migration, a helper that moved — is removed. The removal runs on
+**every** sync, not only under `--self-heal`, because a clone old enough
+to need recovering runs its own older updater: that one restores
+`scripts/` and re-runs the restored script without passing the flag on,
+so anything the new script did only under the flag would never happen on
+the clone that needs it. A copy-only restore leaves those files behind,
+`scripts/` then differs from upstream forever, and every later run
+refuses the tree as dirty.
 
 ## The version floor
 
