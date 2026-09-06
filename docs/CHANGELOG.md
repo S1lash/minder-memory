@@ -2,6 +2,29 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.0.3 — The self-check, taught the difference between your names and ours
+
+**It no longer fails on every clone.** The check that looks for names an earlier
+release renamed out from under you was reading the engine's own files too — its
+backup directory moved with the product, which looks identical to the damage it
+hunts for. It now reads only your own space: your notes, hubs, projects, roles,
+state and vault. An engine file cannot hold a folder of yours.
+
+**And it finds more of what is real.** Damage inside a note whose own file name
+moved with the product used to be invisible; the check follows the rename now.
+When several lines carry your name, the «before» it shows you is the line that
+actually changed, not the first one it found.
+
+**Your credential store is left alone, and proved so.** The rename no longer
+touches `secrets.enc.json` — a key there is your name for something outside the
+repository, and renaming one breaks its role with an error that names nothing.
+The check compares the store against its state before the rename rather than
+just reporting that nobody has touched it since.
+
+**Quieter where it was noisy.** A clone with nothing unsaved no longer hears
+that files were rewritten under it: what the installer seeds during the same
+update is the engine's doing, not your open work.
+
 ## 1.0.2 — What the rename update looks like from an old clone
 
 **The two-step path works from the updater you actually have.** 1.0.1 taught the

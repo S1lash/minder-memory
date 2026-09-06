@@ -94,6 +94,13 @@ RESIDUE_EXCLUDE: tuple[str, ...] = (
     ":!platform",
     ":!docs/upgrade-1.0.0.md",
     ":!zettelkasten/5_meta/help/CHANGELOG.md",
+    # The queue is where the engine RAISES a former name with the owner — an
+    # item that quotes one is the mechanism working, not a surface that missed
+    # a rename.
+    ":!zettelkasten/_system/state/CLARIFICATIONS.md",
+    # A pre-refresh backup of the vault help holds what the docs said before;
+    # it exists precisely so the former wording survives.
+    ":!zettelkasten/5_meta/help/.pre-refresh-backup",
 )
 
 # The two rename opt-outs. A line carrying LINE_KEEP is written as it is on
@@ -126,7 +133,60 @@ _RENAMED_OWN_NAME_RE = re.compile(r"(?<![\w-])minder-memory-([A-Za-z0-9][A-Za-z0
 # project identifier (the map renames it on purpose) and `minder-memory-mcp` is
 # an engine directory whose predecessor sits in the manifest's retired rows.
 # Both would otherwise answer the before/after test and read as damage.
-ENGINE_OWNED_SUFFIXES = frozenset({"platform", "mcp"})
+# `minder-memory-backup-<stamp>` is the directory the harness migration writes
+# its own backups into — the engine's name, renamed with the product.
+ENGINE_OWNED_SUFFIXES = frozenset({"platform", "mcp", "backup"})
+
+# --------------------------------------------------------------------------- #
+# Owner space — where an owner's own folder name can legitimately be written
+# --------------------------------------------------------------------------- #
+#
+# An engine file cannot hold an owner's directory name: everything in it is the
+# engine's, renamed by the engine on purpose. Reading one as an owner's path is
+# what made the damage probe fail on every clone in existence — the harness
+# migration's own backup directory matches every shape the detector looks for,
+# and its predecessor sits in the pre-rename tree exactly as real damage would.
+#
+# The prefixes below are the rename map's `owner-data` class verbatim
+# (`_032_minder_memory_rebrand.classify`), pinned equal to it by
+# `test_check_update.py`. The extras are surfaces the map has no reason to
+# classify but where an owner's own path plainly belongs: the append-only
+# state, the vault configuration, and the owner-curated system files by name.
+_OWNER_DATA_PREFIXES: tuple[str, ...] = (
+    "zettelkasten/_records/",
+    "zettelkasten/1_projects/",
+    "zettelkasten/2_areas/",
+    "zettelkasten/3_resources/",
+    "zettelkasten/4_archive/",
+    "zettelkasten/5_meta/mocs/",
+    "zettelkasten/6_posts/",
+    "zettelkasten/0_constitution/axiom/",
+    "zettelkasten/0_constitution/principle/",
+    "zettelkasten/0_constitution/rule/",
+    "zettelkasten/_system/roles/",
+)
+_OWNER_SPACE_EXTRA_PREFIXES: tuple[str, ...] = (
+    "zettelkasten/_system/state/",
+    "zettelkasten/.obsidian/",
+)
+_OWNER_SPACE_EXTRA_FILES: tuple[str, ...] = (
+    "zettelkasten/_system/SOUL.md",
+    "zettelkasten/_system/TASKS.md",
+    "zettelkasten/_system/CALENDAR.md",
+    "zettelkasten/_system/POSTS.md",
+    "zettelkasten/_system/registries/TAGS.md",
+    "zettelkasten/_system/registries/SOURCES.md",
+    "zettelkasten/_system/registries/AUDIENCES.md",
+    "zettelkasten/_system/registries/DOMAINS.md",
+    "zettelkasten/_system/registries/CONCEPTS.md",
+    "zettelkasten/minder-memory.md",
+)
+OWNER_SPACE_PREFIXES: tuple[str, ...] = _OWNER_DATA_PREFIXES + _OWNER_SPACE_EXTRA_PREFIXES
+
+
+def in_owner_space(rel: str) -> bool:
+    """True when a path is the owner's to write, and so theirs to name."""
+    return rel.startswith(OWNER_SPACE_PREFIXES) or rel in _OWNER_SPACE_EXTRA_FILES
 # The token a match sits in, so «is this a path?» can be asked of it.
 _TOKEN_CHARS = re.compile(r"[^\s`'\"()\[\],;<>|]+")
 # The ledger line whose first appearance dates the rename migration.
@@ -285,8 +345,30 @@ def _path_like_own_names(text: str) -> list[tuple[int, str, str]]:
     return out
 
 
+def _renames_since(repo: Path, ref: str) -> dict[str, str]:
+    """`new -> old` for every file git sees renamed between `ref` and HEAD.
+
+    30 %: a note whose body was rewritten by a product rename keeps well under
+    half its lines, and git's default 50 % then reports the move as a delete
+    plus an add — which is exactly the shape this map exists to see through.
+    """
+    diff = _git(repo, "diff", "--name-status", "-M30%", "--diff-filter=R", ref, "HEAD")
+    if diff.returncode != 0:
+        return {}
+    out: dict[str, str] = {}
+    for line in diff.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) == 3:
+            out[parts[2]] = parts[1]
+    return out
+
+
 def find_own_name_damage(repo: Path, before: str) -> list[dict]:
     """Names the rename turned into a path that does not exist.
+
+    Owner space only. An engine file cannot hold an owner's directory name —
+    everything in it was renamed by the engine, on purpose — and reading one as
+    an owner's path is what made this fail on every clone.
 
     One home for the detection: the post-update check reports it, and migration
     `033` raises it with the owner. The migration imports THIS function rather
@@ -297,24 +379,39 @@ def find_own_name_damage(repo: Path, before: str) -> list[dict]:
                   ":!zettelkasten/_sources", *RESIDUE_EXCLUDE)
     if listed.returncode != 0:
         return []
+    renames = _renames_since(repo, before)
     findings: list[dict] = []
     for rel in [p for p in listed.stdout.split("\0") if p.strip()]:
+        if not in_owner_space(rel):
+            continue
         current = _read(repo / rel)
         if not current:
             continue
         candidates = _path_like_own_names(current)
         if not candidates:
             continue
+        # The pre-rename text lives under the file's OLD path when the rename
+        # moved the file too — which is exactly the case for a note whose own
+        # name carried the product, and where an owner's path is most likely to
+        # have been written down.
         shown = _git(repo, "show", f"{before}:{rel}")
+        if shown.returncode != 0 and rel in renames:
+            shown = _git(repo, "show", f"{before}:{renames[rel]}")
         if shown.returncode != 0:
             continue  # the file did not exist before the migration — nothing to compare
         original = shown.stdout
         for lineno, suffix, line in candidates:
             was = f"minder-ztn-{suffix}"
-            if was not in original:
+            matcher = re.compile(re.escape(was) + r"(?![\w-])", re.IGNORECASE)
+            # Paired by the suffix, then by proximity: several lines may carry
+            # the owner's name, and quoting the first one as «what it was»
+            # shows the owner a line that never moved.
+            matches = [(index, text.rstrip())
+                       for index, text in enumerate(original.splitlines(), start=1)
+                       if matcher.search(text)]
+            if not matches:
                 continue
-            before_line = next(
-                (ln.rstrip() for ln in original.splitlines() if was in ln), was)
+            before_line = min(matches, key=lambda pair: abs(pair[0] - lineno))[1]
             findings.append({"path": rel, "line": lineno, "text": line,
                              "before": before_line, "name": was})
     return findings
@@ -415,17 +512,44 @@ def probe_roles(repo: Path, before: str | None) -> dict:
     nameless = [r for r in rows if not isinstance(r, dict) or not r.get("status")]
     if nameless:
         return _result("roles", FAIL, f"{len(nameless)} role(s) reported without a status")
-    if (repo / SECRETS).is_file():
-        dirty = _git(repo, "status", "--porcelain", "--", SECRETS).stdout.strip()
-        if dirty:
-            return _result("roles", FAIL, f"{SECRETS} was modified by the update")
-        if before:
-            moved = _git(repo, "diff", "--quiet", before, "--", SECRETS)
-            if moved.returncode not in (0, 128):
-                return _result("roles", FAIL,
-                               f"{SECRETS} differs from {before} — the credential store moved")
-    return _result("roles", OK,
-                   f"{len(rows)} role(s) listed with a status; credential store unchanged")
+    return _result("roles", OK, f"{len(rows)} role(s) listed with a status")
+
+
+def probe_credential_store(repo: Path, before: str | None) -> dict:
+    """The credential store must be byte-identical to what it was before the rename.
+
+    A clean `git status` proves only that nobody has touched it SINCE the
+    commit — and the rename ran inside that commit, so the one thing it cannot
+    see is the one thing worth knowing. The comparison is against the state
+    before the rename migration, or it is not made at all: a credential key is
+    the OWNER's name for something, and a role whose key was renamed under it
+    fails at its next tick with a lookup error that names nothing.
+    """
+    store = repo / SECRETS
+    if not store.is_file():
+        return _result("credential-store", SKIP, "no credential store in this clone")
+    dirty = _git(repo, "status", "--porcelain", "--", SECRETS).stdout.strip()
+    if dirty:
+        return _result("credential-store", FAIL, f"{SECRETS} has uncommitted changes")
+    baseline = before or pre_032_commit(repo)
+    if baseline is None:
+        return _result("credential-store", SKIP,
+                       "there is no pre-rename commit to compare the store against — "
+                       "unchanged-since-the-commit is not the same claim, so this is unanswered")
+    existed = _git(repo, "cat-file", "-e", f"{baseline}:{SECRETS}")
+    if existed.returncode != 0:
+        return _result("credential-store", SKIP,
+                       f"{SECRETS} did not exist before the rename — nothing to compare")
+    moved = _git(repo, "diff", "--quiet", baseline, "--", SECRETS)
+    if moved.returncode == 0:
+        return _result("credential-store", OK,
+                       f"{SECRETS} is byte-identical to what it was before the rename")
+    if moved.returncode == 1:
+        return _result("credential-store", FAIL,
+                       f"{SECRETS} differs from {baseline[:8]} — a credential key is the owner's "
+                       "name for something, and a renamed one breaks its role's lookup silently")
+    return _result("credential-store", SKIP,
+                   f"git could not compare {SECRETS} against {baseline[:8]}")
 
 
 # --------------------------------------------------------------------------- #
@@ -541,6 +665,7 @@ def run(repo: Path, home: Path, *, remote: str, branch: str, before: str | None)
         probe_sources(repo),
         probe_ledger(repo),
         probe_roles(repo, before),
+        probe_credential_store(repo, before),
         probe_managed_block(home),
         probe_harness_paths(home),
         probe_skill_count(home),

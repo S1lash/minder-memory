@@ -89,12 +89,12 @@ def render_item(findings: list[dict], *, today: str) -> str:
         lines.append(f"> before the rename: {f['before'].strip()}")
     lines += [
         "",
-        "**Context:** The 1.0.0 rename map could not yet tell the product from its owner, so "
-        f"a name shaped `{'minder-ztn'}-<your own tail>` was rewritten to `minder-memory-<tail>` "
-        "wherever it appeared — including where it named a directory, a repository or a host "
-        "of yours rather than the product. The line above still reads plausibly, which is why "
-        "nothing else has flagged it; the second line under each is what the same file said "
-        "at the commit before the rename migration ran.",
+        "**Context:** The 1.0.0 rename map could not yet tell the product from its owner. A "
+        "name that opened with the former product slug and continued with something of yours "
+        "— a repository, a folder, a host — was rewritten as though the whole of it named the "
+        "product, so the path now points somewhere that does not exist. The line still reads "
+        "plausibly, which is why nothing else has flagged it; the second line under each "
+        "quote is what the same file said at the commit before the rename migration ran.",
         "",
         "**Uncertainty:** Only you know what that path is on this machine now. The directory "
         "may still carry its original name, may have been renamed to match, or may never have "
@@ -104,7 +104,9 @@ def render_item(findings: list[dict], *, today: str) -> str:
         f"**To resolve:** {RESTORE_SENTENCE.capitalize()}. Check each path above, put back "
         "whichever spelling matches the directory as it actually is, and dismiss the item. "
         "The engine will not touch these names again: it renames what it owns and leaves "
-        "yours whole.",
+        "yours whole. If a path named here belongs to a file the engine ships rather than "
+        "one of yours, that is a defect of this check and not of your clone — report it, and "
+        "do not edit the shipped file.",
         "",
     ]
     return "\n".join(lines)

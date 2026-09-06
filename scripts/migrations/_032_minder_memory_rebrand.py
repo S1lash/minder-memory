@@ -252,9 +252,21 @@ def is_code_path(rel: str, name: str, suffix: str) -> bool:
     if rel.startswith(_PROSE_EVEN_IF_CODE):
         return False
     return suffix in CODE_SUFFIXES or name in ("install.sh", "uninstall.sh", "Dockerfile")
-# Untracked because the engine's own seeder just wrote them, never because the
-# owner has work in flight there.
-_SEEDED_UNTRACKED: tuple[str, ...] = ("zettelkasten/.obsidian/",)
+# Written by the engine's own installer, which runs (through migration 031)
+# earlier in the SAME update. Whatever it seeds arrives either tracked-and-
+# modified or brand new — the two shapes that are otherwise indistinguishable
+# from the owner having left work unsaved. Counting them told every owner their
+# notes had been rewritten when nothing of theirs had been touched, which is
+# both untrue and the fastest way to make a real warning unreadable.
+#
+# The dashboard is listed under both spellings because the counts are taken
+# against the path as it stood BEFORE this migration renamed it.
+_ENGINE_SEEDED: tuple[str, ...] = (
+    "zettelkasten/.obsidian/",
+    "zettelkasten/5_meta/help/",
+    "zettelkasten/minder-memory.md",
+    "zettelkasten/minder-ztn.md",
+)
 _COMPILED_PROTECTED: tuple[re.Pattern[str], ...] = tuple(
     re.compile(pat) for pat in PROTECTED_PATTERNS
 )
@@ -338,6 +350,11 @@ NEVER_TOUCH: tuple[str, ...] = (
     "docs/CHANGELOG.md",
     "zettelkasten/5_meta/DECISION_LOG.md",
     "zettelkasten/5_meta/help/",   # derived from docs/ by seed.sh --refresh-help; regenerated, never rewritten
+    # A credential key is the OWNER's name for something outside the repository.
+    # The engine renames what it owns; renaming a key here would break its
+    # role's lookup at the next tick, with an error naming nothing — and the
+    # value is encrypted, so nobody would spot the change by reading the file.
+    "zettelkasten/_system/state/secrets.enc.json",
     "integrations/claude-code/built/",
     "node_modules/",
     "__pycache__/",
@@ -598,16 +615,10 @@ def run(root: Path, *, dry_run: bool,
     # What the run rewrote while it was somebody's work in flight. The rename
     # applies to a clone whole — that is the contract — but an owner who has
     # unsaved notes open deserves to be told which ones moved under them.
-    changed = {c.path for c in report.changes}
+    changed = {c.path for c in report.changes
+               if not c.path.startswith(_ENGINE_SEEDED) and c.path not in _ENGINE_SEEDED}
     report.rewritten_dirty = sorted(p for p in changed & unsaved if p not in untracked)
-    # The vault configuration is seeded by `integrations/obsidian/seed.sh`, which
-    # the installer runs as part of the same update. Those files arrive untracked
-    # because the seeder just wrote them, not because the owner left work unsaved
-    # — counting them would put a number in front of the owner that is entirely
-    # the engine's own doing.
-    report.rewritten_unsaved = sorted(
-        p for p in changed & untracked if not p.startswith(_SEEDED_UNTRACKED)
-    )
+    report.rewritten_unsaved = sorted(changed & untracked)
     # Residue: what still matches after the run (or would, in a dry run).
     for rel in _candidates(root):
         if any(rel == e.rstrip("/") or rel.startswith(e.rstrip("/") + "/") for e in exclude) or rel in dirty:

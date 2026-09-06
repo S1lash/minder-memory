@@ -443,6 +443,11 @@ scheduler tool rather than the filesystem — do them yourself, here:
 
 - A `fail` is yours to fix once and re-run the script — that is the whole point
   of checking while the change is still in hand.
+- A `fail` that names an **engine** file — anything the manifest ships — is a
+  defect of the check, not of the clone. Report it and leave the file alone.
+  Editing a shipped file to satisfy a probe makes that path differ from
+  upstream forever, and the next sync refuses the tree; you would have traded a
+  wrong answer for a broken update channel.
 - Two exceptions you do not act on: a remote that did not answer (nothing local
   fixes an offline host), and a credential that lives outside the repository.
 - Never repoint a remote other than the one the engine syncs from.

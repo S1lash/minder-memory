@@ -595,6 +595,36 @@ nothing preceded it.
 
 ---
 
+### 3.12 Uncommitted work is destroyed quietly (HARD RULE)
+
+**`--force` is not the dangerous half.** `git checkout -- <path>`, `git restore
+<path>` and `git stash drop` carry no alarming flag, are never refused by git,
+and destroy uncommitted work exactly as irreversibly as `reset --hard` — with
+one difference that makes them worse: **nothing announces the loss.** The file
+simply reads as it did before the work existed, so there is no moment at which
+anyone notices something is gone.
+
+This is not a general caution: it is specific to how this engine is edited.
+Contributors change it through gates and mutation checks — deliberately breaking
+a rule to confirm the check catches it, then putting it back. That loop is a
+revert loop, and a revert takes the unrelated work sitting beside it.
+
+- **Break on purpose only AFTER committing, never revert afterwards.** Commit
+  first, then mutate, then discard the mutation by resetting to the commit. The
+  order is the whole rule: reverting to undo a deliberate break is the moment
+  everything else uncommitted disappears.
+- **Better still, mutate a throwaway copy.** A mutation harness that operates on
+  a copy of the tree removes the possibility rather than relying on remembering
+  the order.
+- **Treat the quiet three as the force list.** `checkout --`, `restore`, `stash
+  drop` need the same explicit in-the-moment approval as `--force`, or a commit
+  first.
+- **Never truncate a check's own output to decide whether it passed.** A verdict
+  read from a trimmed tail reports green while the run is red — the same class
+  of quiet failure, one layer up.
+
+---
+
 ## 4. Sacred state
 
 These files are the engine's load-bearing state. Every skill knows

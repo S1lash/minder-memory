@@ -64,26 +64,50 @@ class CheckUpdateTests(unittest.TestCase):
     # -- fixtures ---------------------------------------------------------- #
 
     OWN_NAME_LINE = "My base lives in ~/projects/minder-ztn-ivanov/zettelkasten.\n"
+    SOUL_BEFORE = (OWN_NAME_LINE
+                   + "\nSome prose in between.\n\n"
+                   + "Backups go to ~/backups/minder-ztn-ivanov/daily.\n")
+    NOTE_REL_BEFORE = "zettelkasten/1_projects/ztn-as-second-brain.md"
+    NOTE_REL_AFTER = "zettelkasten/1_projects/minder-memory-as-second-brain.md"
+    # Not three lines: git pairs a rename by content similarity, and a file too
+    # small to hash meaningfully is reported as a delete plus an add however low
+    # the threshold. A real note is this long or longer.
+    NOTE_BODY = ("# Second brain\n\n" + "A paragraph of ordinary prose.\n" * 20
+                 + "It is checked out at ~/projects/minder-ztn-ivanov.\n")
+    # The engine's OWN backup directory, renamed with the product. An engine
+    # file cannot hold an owner's folder name, and reading it as one is what
+    # made the damage probe fail on every clone.
+    INSTALLER_BEFORE = 'BACKUP="$CLAUDE_HOME/.minder-ztn-backup-$(date +%Y%m%d)"\n'
+    INSTALLER_AFTER = 'BACKUP="$CLAUDE_HOME/.minder-memory-backup-$(date +%Y%m%d)"\n'
+    SECRETS_REL = "zettelkasten/_system/state/secrets.enc.json"
 
     def _build_clone(self) -> None:
         """Two commits, because the damage probe needs a BEFORE to read.
 
         The first is the clone as it stood before the rename migration ran; the
         second is the update that recorded 032 in the ledger. The owner's own
-        folder name sits in SOUL across both — untouched, which is the correct
-        outcome and the fixture's baseline.
+        folder name survives both — untouched, which is the correct outcome and
+        this fixture's baseline — while the engine's own name moved with the
+        product, which must not read as damage.
         """
-        _write(self.clone, "integrations/VERSION", "1.0.2\n")
+        _write(self.clone, "integrations/VERSION", "1.0.3\n")
         _write(self.clone, "zettelkasten/minder-memory.md",
                "# Minder Memory\n\nMy own dashboard line.\n")
         _write(self.clone, "zettelkasten/_sources/inbox/.gitkeep", "")
         _write(self.clone, "zettelkasten/_records/observations/note.md",
                "An ordinary note about Minder Memory.\n")
-        _write(self.clone, "zettelkasten/_system/SOUL.md", self.OWN_NAME_LINE)
+        _write(self.clone, "zettelkasten/_system/SOUL.md", self.SOUL_BEFORE)
+        _write(self.clone, self.NOTE_REL_BEFORE, self.NOTE_BODY)
+        _write(self.clone, self.SECRETS_REL, '{"telegram_token":"<encrypted>"}\n')
+        _write(self.clone, "integrations/claude-code/install.sh", self.INSTALLER_BEFORE)
         _git(self.clone, "init", "-q", "-b", "main")
         _git(self.clone, "add", "-A")
         _git(self.clone, "commit", "-qm", "the clone before the rename migration ran")
 
+        # What the rename migration did: the engine's own name moved, the
+        # owner's did not, and one note's FILE NAME moved with the product.
+        _write(self.clone, "integrations/claude-code/install.sh", self.INSTALLER_AFTER)
+        _git(self.clone, "mv", self.NOTE_REL_BEFORE, self.NOTE_REL_AFTER)
         ledger = "".join(
             json.dumps({"name": name, "kind": kind, "rc": 0, "outcome": "applied",
                         "ts": "2026-01-01T00:00:00Z", "note": ""}, sort_keys=True) + "\n"
@@ -249,7 +273,6 @@ class CheckUpdateTests(unittest.TestCase):
                        if p["probe"] == "clone-residue")
         self.assertEqual(residue["status"], "ok", residue["evidence"])
         self.assertIn("name your own repository or folder", residue["evidence"])
-        self.assertIn("1 line", residue["evidence"])
 
     def test_a_name_the_rename_damaged_is_reported_against_the_pre_migration_tree(self):
         """1.0.0's map renamed the owner's own folder into a path that is not there.
@@ -278,7 +301,7 @@ class CheckUpdateTests(unittest.TestCase):
         bill of health.
         """
         fresh = self.tmp / "no-ledger"
-        _write(fresh, "integrations/VERSION", "1.0.2\n")
+        _write(fresh, "integrations/VERSION", "1.0.3\n")
         _write(fresh, "zettelkasten/minder-memory.md", "# Minder Memory\n")
         _git(fresh, "init", "-q", "-b", "main")
         _git(fresh, "add", "-A")
@@ -303,6 +326,92 @@ class CheckUpdateTests(unittest.TestCase):
         import _032_minder_memory_rebrand as rename_map  # noqa: E402
         import check_update  # noqa: E402
         self.assertEqual(check_update.OWN_NAME_PATTERN, rename_map.OWN_NAME_PATTERN)
+
+    def test_the_engines_own_renamed_name_is_not_read_as_damage(self):
+        """`.minder-memory-backup-` in the installer is the ENGINE's own name.
+
+        It matches every shape the damage detector looks for — path-like, and
+        its predecessor is in the pre-rename tree — so before this was scoped
+        to owner space the probe failed on every clone in existence.
+        """
+        res = self._run("--json")
+        damage = next(p for p in json.loads(res.stdout)["probes"]
+                      if p["probe"] == "own-name-damage")
+        self.assertEqual(damage["status"], "ok", damage["evidence"])
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+
+    def test_damage_inside_a_file_the_rename_renamed_is_still_found(self):
+        """The pre-rename text is under the file's OLD path, or nowhere.
+
+        A note whose own file name moved with the product is exactly where an
+        owner's path is most likely to be written down, so failing to follow
+        the rename loses the findings most worth having.
+        """
+        _write(self.clone, self.NOTE_REL_AFTER,
+               self.NOTE_BODY.replace("minder-ztn-ivanov", "minder-memory-ivanov"))
+        _git(self.clone, "commit", "-qam", "the same damage, in a file that was renamed")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        self.assertIn("own-name-damage", self._failed(res))
+        self.assertIn("minder-memory-as-second-brain.md", res.stdout)
+        self.assertIn("minder-ztn-ivanov", res.stdout)
+
+    def test_the_before_text_is_the_line_that_matches_not_the_first_one(self):
+        """Two lines carry the name; the evidence must quote the right one."""
+        _write(self.clone, "zettelkasten/_system/SOUL.md",
+               self.SOUL_BEFORE.replace("~/backups/minder-ztn-ivanov",
+                                        "~/backups/minder-memory-ivanov"))
+        _git(self.clone, "commit", "-qam", "the fourth line damaged, the first intact")
+        res = self._run("--json")
+        damage = next(p for p in json.loads(res.stdout)["probes"]
+                      if p["probe"] == "own-name-damage")
+        self.assertEqual(damage["status"], "fail")
+        self.assertIn("Backups go to ~/backups/minder-ztn-ivanov/daily.", damage["evidence"])
+        self.assertNotIn("My base lives in", damage["evidence"],
+                         "the first line carrying the token is not the one that moved")
+
+    def test_the_clarifications_queue_may_quote_former_names(self):
+        """The queue is where the engine RAISES an old name with the owner."""
+        _write(self.clone, "zettelkasten/_system/state/CLARIFICATIONS.md",
+               "# Clarifications Needed\n\n## Open Items\n\n"
+               "> now: ~/projects/minder-memory-ivanov, before: ~/projects/minder-ztn-ivanov\n")
+        _git(self.clone, "add", "-A")
+        _git(self.clone, "commit", "-qm", "a queue item quoting both spellings")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+
+    def test_the_credential_store_is_compared_against_the_pre_rename_commit(self):
+        """`git status` clean only means nobody has touched it SINCE the commit."""
+        res = self._run("--json")
+        store = next(p for p in json.loads(res.stdout)["probes"]
+                     if p["probe"] == "credential-store")
+        self.assertEqual(store["status"], "ok", store["evidence"])
+
+        _write(self.clone, self.SECRETS_REL, '{"telegram_token_renamed":"<encrypted>"}\n')
+        _git(self.clone, "commit", "-qam", "the rename reached the credential store")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        self.assertIn("credential-store", self._failed(res))
+
+    def test_the_owner_space_predicate_agrees_with_the_rename_map(self):
+        """Owner space is the map's own owner-data class, plus named extras."""
+        map_module = _REPO_ROOT / "scripts" / "migrations" / "_032_minder_memory_rebrand.py"
+        if not map_module.is_file():
+            self.skipTest("the rename map has been retired; the check keeps its own copy")
+        import sys as _sys
+        _sys.path.insert(0, str(map_module.parent))
+        _sys.path.insert(0, str(CHECK.parent))
+        import _032_minder_memory_rebrand as rename_map  # noqa: E402
+        import check_update  # noqa: E402
+        for prefix in check_update._OWNER_DATA_PREFIXES:
+            self.assertEqual(rename_map.classify(prefix + "thing.md"), "owner-data", prefix)
+            self.assertTrue(check_update.in_owner_space(prefix + "thing.md"), prefix)
+        for extra in check_update._OWNER_SPACE_EXTRA_FILES:
+            self.assertTrue(check_update.in_owner_space(extra), extra)
+        for engine in ("integrations/claude-code/install.sh", "scripts/check_update.py",
+                       "docs/CHANGELOG.md", "zettelkasten/_system/docs/SYSTEM_CONFIG.md"):
+            self.assertNotEqual(rename_map.classify(engine), "owner-data", engine)
+            self.assertFalse(check_update.in_owner_space(engine), engine)
 
     # -- cannot run at all -------------------------------------------------- #
 
