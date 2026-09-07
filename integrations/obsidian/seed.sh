@@ -169,17 +169,30 @@ if [ ! -f "$DASHBOARD_DST" ]; then
     # product slug is unambiguous anywhere it appears; `HOME` is not, so only
     # the file reference moves.
     case "$legacy_file" in
-      minder-ztn.md) sed_expr='s/minder-ztn/minder-memory/g' ;;  # rebrand:keep
-      HOME.md) sed_expr='s/HOME\.md/minder-memory.md/g' ;;
-      *) sed_expr='' ;;
+      # A blind product-slug substitution over the vault config rewrote
+      # `"vaultName": "minder-ztn-иванов"` — the owner's own vault, renamed to
+      # something that does not exist, in the file Obsidian reads at startup.
+      # The rename map knows which names are the engine's; the sed does not, so
+      # the map does this edit when it is present. The fallback is deliberately
+      # narrower than the old sed rather than equal to it: the exact dashboard
+      # file name, with a boundary after, and nothing else.
+      minder-ztn.md) sed_expr='s/minder-ztn\.md/minder-memory.md/g'; use_map=1 ;;  # rebrand:keep
+      HOME.md) sed_expr='s/HOME\.md/minder-memory.md/g'; use_map=0 ;;
+      *) sed_expr=''; use_map=0 ;;
     esac
     [ -n "$sed_expr" ] || break
     for cfg in bookmarks.json app.json workspace.json; do
       cfg_path="$VAULT/.obsidian/$cfg"
       [ -f "$cfg_path" ] || continue
       if grep -q "${legacy_file%.md}" "$cfg_path"; then
-        # `sed -i.bak` is the one form that works on both GNU and BSD sed.
-        sed -i.bak "$sed_expr" "$cfg_path" && rm -f "$cfg_path.bak"
+        if [ "$use_map" = 1 ] && \
+           [ -f "$REPO_ROOT/scripts/migrations/_032_minder_memory_rebrand.py" ]; then
+          python3 "$REPO_ROOT/scripts/lib/rebrand_file.py" "$cfg_path" \
+            || log "warning: could not rewrite .obsidian/$cfg — left as it was"
+        else
+          # `sed -i.bak` is the one form that works on both GNU and BSD sed.
+          sed -i.bak "$sed_expr" "$cfg_path" && rm -f "$cfg_path.bak"
+        fi
         log "pointed .obsidian/$cfg at minder-memory.md"
       fi
     done

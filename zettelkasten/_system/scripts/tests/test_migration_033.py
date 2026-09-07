@@ -63,6 +63,9 @@ class Migration033Tests(unittest.TestCase):
     QUEUE_BEFORE = ("# Clarifications Needed\n\n## How to use\n\n"
                     + PROSE_LINE
                     + "\n---\n\n## Open Items\n\n## an earlier item\n")
+    QUEUE_EMPTY = ("# Clarifications Needed\n\n## How to use\n\n"
+                   + PROSE_LINE
+                   + "\n---\n\n## Open Items\n\n_(empty — populates as skills run)_\n")
     DAMAGED = "My base lives in ~/projects/minder-memory-ivanov/zettelkasten.\n"
 
     def setUp(self):
@@ -143,6 +146,17 @@ class Migration033Tests(unittest.TestCase):
         self.assertLess(queue.index(self.PROSE_LINE), heading,
                         "the explanation still comes first")
         self.assertIn("## an earlier item", queue, "an existing item must survive")
+
+    def test_the_empty_placeholder_goes_when_the_first_item_arrives(self):
+        """A queue that says «empty» directly above an item is lying to its reader."""
+        self._base(damaged=True)
+        _write(self.root, CLARIFICATIONS, self.QUEUE_EMPTY)
+        _git(self.root, "add", "-A")
+        _git(self.root, "commit", "-qm", "an empty queue with its placeholder")
+        self._run()
+        queue = self._queue()
+        self.assertNotIn("_(empty", queue)
+        self.assertIn("033 ", queue)
 
     def test_a_second_run_appends_nothing(self):
         self._base(damaged=True)

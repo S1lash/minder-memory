@@ -55,6 +55,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from lib import ownership  # noqa: E402
 from lib.manifest import read_section_lite  # noqa: E402
 from lib.portable import configure_std_streams, read_text_utf8, write_text_utf8  # noqa: E402
 
@@ -63,15 +64,10 @@ LEGACY_END = "<!-- MINDER-ZTN END -->"
 BEGIN_MARK = "<!-- MINDER-MEMORY BEGIN — managed by install.sh, do not edit by hand -->"
 END_MARK = "<!-- MINDER-MEMORY END -->"
 
-# What the installer used to link, by directory. A `ztn-` prefix under skills/
-# covers every skill the engine ever shipped under the old namespace.
-LEGACY_LINK_NAMES: dict[str, tuple[str, ...]] = {
-    "rules": ("ztn.md", "ztn-engine-doctrine.md"),
-    "commands": ("ztn-recap.md", "ztn-search.md"),
-    "agents": ("ztn-role.md",),
-    "skills": (),
-}
-LEGACY_SKILL_PREFIX = "ztn-"
+# What the installer used to link is `lib.ownership`'s to say, by exact name.
+# A `ztn-` PREFIX was the old test, and it is wrong in the expensive direction:
+# an owner's own `skills/ztn-мой-скилл/` or `rules/my-ztn-notes.md` matched it,
+# and this migration deletes what it matches.
 
 OLD_REPO_NAME = "minder-ztn"
 NEW_REPO_NAME = "minder-memory"
@@ -144,9 +140,8 @@ def _points_into(link: Path, repo_root: Path) -> bool:
 
 
 def _is_legacy_name(subdir: str, name: str) -> bool:
-    if subdir == "skills":
-        return name.startswith(LEGACY_SKILL_PREFIX)
-    return name in LEGACY_LINK_NAMES.get(subdir, ())
+    """Did the ENGINE ship a harness entry under this exact name?"""
+    return ownership.is_engine_legacy_harness_entry(name, subdir)
 
 
 def prune_links(home: Path, repo_root: Path, *, dry_run: bool) -> tuple[list[str], list[str]]:
@@ -267,11 +262,22 @@ def sync_remote_and_branch(repo_root: Path) -> tuple[str | None, str]:
         if "upstream" in names:
             remote = "upstream"
         else:
+            qualifying = []
             for name in names:
                 url = _git(repo_root, "remote", "get-url", name).stdout.strip()
-                if _renamed_url(url) or url.rstrip("/").rstrip(".git").endswith(NEW_REPO_NAME):
-                    remote = name
-                    break
+                tail = url.rstrip("/").rstrip(".git").rsplit("/", 1)[-1].rsplit(":", 1)[-1]
+                if _renamed_url(url) or tail.lower() == NEW_REPO_NAME:
+                    qualifying.append(name)
+            # Exactly one, or none. Several remotes named after the skeleton is
+            # an owner with a fork and a mirror, and guessing which of them the
+            # engine syncs from would repoint one of theirs — the defect this
+            # whole family of fixes exists to stop.
+            if len(qualifying) == 1:
+                remote = qualifying[0]
+            elif len(qualifying) > 1:
+                print("031: several remotes are named after the skeleton "
+                      f"({', '.join(qualifying)}); none was repointed. Say which one the "
+                      "engine syncs from with ENGINE_SYNC_REMOTE, or name it `upstream`.")
     if remote is None:
         return None, branch or "main"
     if branch is None:
@@ -310,9 +316,9 @@ def _renamed_url(url: str) -> str | None:
         head, sep_found, last = stripped.rpartition(sep)
         if not sep_found:
             continue
-        if last == OLD_REPO_NAME:
+        if last.lower() == OLD_REPO_NAME:
             return head + sep + NEW_REPO_NAME
-        if last == OLD_REPO_NAME + ".git":
+        if last.lower() == OLD_REPO_NAME + ".git":
             return head + sep + NEW_REPO_NAME + ".git"
         break
     return None

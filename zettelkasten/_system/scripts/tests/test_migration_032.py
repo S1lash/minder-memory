@@ -286,6 +286,33 @@ class Migration032Tests(unittest.TestCase):
                         or not findings,
                         f"the role was never discovered, so nothing was checked: {out.stdout}")
 
+    def test_the_vault_config_rewrite_keeps_the_owners_vault_name(self):
+        """The seeder repoints the dashboard; it must not rename the vault.
+
+        `.obsidian/app.json` carries `"vaultName"` — the owner's own folder. A
+        blind product-slug substitution renamed it into something that does not
+        exist, in the file Obsidian reads at startup. The seeder routes this
+        edit through the rename map now, and the map asks `lib.ownership` whose
+        name each one is.
+        """
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "_rebrand_file", _REPO_ROOT / "scripts" / "lib" / "rebrand_file.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        vault_name = "minder-ztn-\u0438\u0432\u0430\u043d\u043e\u0432"
+        cfg = self.root / "app.json"
+        _write(self.root, "app.json",
+               '{"vaultName": "' + vault_name + '", "startupNote": "minder-ztn.md"}\n')
+        self.assertEqual(module.main([str(cfg)]), 0)
+
+        after = cfg.read_text(encoding="utf-8")
+        self.assertIn('"vaultName": "' + vault_name + '"', after,
+                      "the owner's vault name is theirs")
+        self.assertIn('"startupNote": "minder-memory.md"', after,
+                      "the dashboard the engine renamed is repointed")
+
     def test_second_run_is_a_no_op(self):
         self._clone()
         self.assertEqual(_run(self.mig, cwd=self.root).returncode, 0)

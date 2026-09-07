@@ -2,6 +2,15 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.0.7 — One place decides whose name it is
+
+Every «is this the engine's name or yours» answer now comes from one module, so
+the rule cannot be right in one file and wrong in another. Your vault
+configuration, your credentials, and your own files under `~/.claude` are yours
+— a skill or rule of yours that happens to carry the old word is left alone. And
+a note whose own name an earlier release renamed is now found and named, so you
+can put it back.
+
 ## 1.0.6 — Names in your own alphabet
 
 A folder of yours called `minder-ztn-иванов` is kept whole and read correctly,

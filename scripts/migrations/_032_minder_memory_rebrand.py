@@ -63,6 +63,7 @@ from pathlib import Path, PurePosixPath
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from lib import ownership  # noqa: E402
 from lib.portable import configure_std_streams  # noqa: E402
 
 # -----------------------------------------------------------------------------
@@ -87,29 +88,13 @@ ENV_PREFIX = "MINDER_MEMORY_"
 # failed with «declared secret ... is not in the credential store», naming a
 # variable the owner had never written. The engine renames the variables it
 # owns; everything else with the same shape is somebody's own name and is kept.
-ENGINE_ENV_NAMES: tuple[str, ...] = (
-    "BASE_PATH",              # longest-first, so `BASE` cannot shadow it
-    "BASE",
-    "CONCEPT_TYPE_JAVA",
-    "DEV",
-    "PATH",
-    "ROLES_AUTONOMOUS_ACK",
-    "ROLES_KEY",
-    "SECRET_MASTER_KEY",
-    "SYMLINK_REEXEC",
-)
-_ENGINE_ENV_ALT = "|".join(ENGINE_ENV_NAMES)
+_ENGINE_ENV_ALT = "|".join(ownership.ENGINE_ENV_NAMES)
 
-# The engine's skills and commands, by the bare name that follows the prefix.
-# Ordered longest-first so `role-add` is matched before `role`, `agent-lens-add`
-# before `agent-lens`. A name absent here falls through to the generic
-# `ztn-` → `minder-memory-` rule, which is what a non-skill artifact wants.
-SKILL_NAMES: tuple[str, ...] = (
-    "resolve-clarifications", "regen-constitution", "capture-candidate",
-    "agent-lens-add", "check-decision", "source-add", "agent-lens",
-    "bootstrap", "sync-data", "role-list", "role-edit", "role-add", "role-ask",
-    "maintain", "process", "content", "update", "roles", "role", "save", "lint",
-)
+# The engine's skills come from `lib.ownership` — the one home of every «is this
+# name ours» answer. Ordered longest-first there, so `role-add` is matched
+# before `role` and `agent-lens-add` before `agent-lens`. A name absent from it
+# falls through to the generic `ztn-` → `minder-memory-` rule, which is what a
+# non-skill artifact wants.
 
 # -----------------------------------------------------------------------------
 # Protected spans — replaced by sentinels before the map runs, restored after
@@ -119,44 +104,25 @@ PROTECTED_PATTERNS: tuple[str, ...] = (
     r"_sources/[^\s`'\")\]|>]*",           # a path into verbatim sources
 )
 
-# The owner's OWN name, not the engine's. `minder-ztn-<suffix>` is somebody's
-# repository, clone folder, deploy host or fork — the skeleton name with their
-# own tail on it. Renaming it produces a path that does not exist, in the one
-# place they would look to find their own files. The engine renames what it
-# owns and nothing else, so these spans survive the map whole and are reported
-# instead. The single exception is the engine's own retired project identifier
-# `minder-ztn-platform`, which has its own rule in the map and moves with the
-# product. Hyphen form only: the underscore spelling is how python identifiers
-# and config keys inside the engine are written, never how a repository is named.
-# The lookbehind is what separates a NAME from a slug: a repository or folder
-# name starts a token (`~/repos/minder-ztn-ivanov`, `- minder-ztn-mcp`), while
-# `20260519-reflection-minder-ztn-origin-story` is a note's own slug with the
-# product named inside it, and that one moves with the product.
-#
-# The tail is UNICODE. An owner names their folders in the alphabet they think
-# in, and an ASCII-only tail left `minder-ztn-иванов` unprotected: the generic
-# `ztn-` rule fired inside it and produced `minder-minder-memory-иванов`, a
-# doubled product name in a path that had been theirs. `[^\W_]` is «a letter or
-# digit, any script» — the leading character may not be `_` or `-`, so the rule
-# still cannot start mid-token.
-OWN_NAME_PATTERN = r"(?i)(?<![\w-])minder-ztn-(?!platform\b)[^\W_][\w-]*"
-
-# The owner's own CREDENTIAL name — the same distinction, one axis over. Any
-# `ZTN_*` that is not one of the engine's own (ENGINE_ENV_NAMES) is what the
-# owner called a secret of theirs, in their role and in their store. The map
-# leaves it alone; this pattern is what lets the residue report say so instead
-# of listing it as a surface the rename missed.
-OWN_CREDENTIAL_PATTERN = (
-    r"\bZTN_(?!(?:" + _ENGINE_ENV_ALT + r")\b)[A-Z][A-Z0-9_]*\b"
-)
-
 _SENTINEL = "@@PROTECT{}@@"
+
+# The base whose roles and credential store say which names the OWNER has
+# claimed. Set by `run()` for a real tree; `None` in a unit test, where the
+# engine's own lists are the only thing there is to go on.
+_OWNER_BASE = None
+
+# WHICH spans are the owner's is not decided here. `lib.ownership` is the one
+# home of that question — folders and repositories in any alphabet, credential
+# names a role declares or the store holds, an engine skill name with the
+# owner's own tail glued on — and every consumer of the answer imports it
+# rather than restating it. Seven walkthroughs' worth of defects were the same
+# rule drawn differently in three files; this is the fix for the class.
 
 # -----------------------------------------------------------------------------
 # Token map — ORDERED. Earlier rules win; each is applied over the whole text.
 # -----------------------------------------------------------------------------
 
-_SKILL_ALT = "|".join(re.escape(n) for n in SKILL_NAMES)
+_SKILL_ALT = "|".join(re.escape(n) for n in ownership.ENGINE_SKILL_NAMES)
 
 TOKEN_MAP: tuple[tuple[str, str], ...] = (
     # Composite product-name forms first, so the bare forms below never see them.
@@ -315,8 +281,6 @@ _ENGINE_SEEDED: tuple[str, ...] = (
 _COMPILED_PROTECTED: tuple[re.Pattern[str], ...] = tuple(
     re.compile(pat) for pat in PROTECTED_PATTERNS
 )
-_OWN_NAME_RE = re.compile(OWN_NAME_PATTERN)
-_OWN_CREDENTIAL_RE = re.compile(OWN_CREDENTIAL_PATTERN)
 # Anything that still smells of the old name after the map ran.
 _RESIDUE_RE = re.compile(r"ztn|ЗТН|зтн", re.IGNORECASE)
 
@@ -348,8 +312,14 @@ def _rebrand_span(text: str, *, code: bool = False) -> str:
         kept.append(m.group(0))
         return _SENTINEL.format(len(kept) - 1)
 
-    for pat in (*_COMPILED_PROTECTED, _OWN_NAME_RE):
+    for pat in _COMPILED_PROTECTED:
         text = pat.sub(_protect, text)
+    # The owner's own names — folders, credentials, their extensions of a skill
+    # name — come from `lib.ownership`, which is the one place that answers «is
+    # this name ours». Replaced from the end so earlier offsets stay valid.
+    for start, end in reversed(ownership.own_name_spans(text, _OWNER_BASE)):
+        kept.append(text[start:end])
+        text = text[:start] + _SENTINEL.format(len(kept) - 1) + text[end:]
     for pat, repl in (_COMPILED_CODE_MAP if code else _COMPILED_MAP):
         text = pat.sub(repl, text)
     for index, original in enumerate(kept):
@@ -594,6 +564,9 @@ def _git_unsaved(root: Path) -> tuple[set[str], set[str]]:
 def run(root: Path, *, dry_run: bool,
         exclude: tuple[str, ...] = (), skip_dirty: bool = False) -> Report:
     root = root.resolve()
+    global _OWNER_BASE
+    base = root / "zettelkasten"
+    _OWNER_BASE = base if base.is_dir() else None
     report = Report(root=str(root), dry_run=dry_run)
     use_git = _git_tracked(root) is not None
     # Read BEFORE anything is rewritten — afterwards every file is dirty and
@@ -694,7 +667,7 @@ def run(root: Path, *, dry_run: bool,
         # An own-name span carries exactly one old-name match and is EXPLAINED:
         # it is subtracted from the residue so that residue keeps meaning
         # «still unaccounted for», and reported on its own axis instead.
-        own = len(_OWN_NAME_RE.findall(probe)) + len(_OWN_CREDENTIAL_RE.findall(probe))
+        own = len(ownership.own_name_spans(probe, _OWNER_BASE))
         if own:
             report.own_name[key] = own
         n = len(_RESIDUE_RE.findall(probe)) - own

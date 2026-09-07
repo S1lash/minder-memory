@@ -18,11 +18,12 @@ a visible wrong path with an invisible one. So each finding becomes ONE
 clarification for the owner, with the current text and the text from before the
 rename beside each other, and the file is left exactly as it is.
 
-Detection is not restated here: it is `find_own_name_damage` in
-`scripts/check_update.py`, which the post-update check also uses. The import
-runs in that direction on purpose — a migration is transient and may import a
-permanent script; the reverse would take the check down when the chain floor
-moves past this migration.
+Nothing here is restated. Detection is `find_own_name_damage` and
+`find_own_name_file_renames` in `scripts/check_update.py`, which the post-update
+check also uses; whose name or file a thing is comes from `scripts/lib/ownership.py`,
+the one home of that question. Both imports run migration → permanent module on
+purpose: a migration is transient, and the reverse direction would take the check
+down with it when the chain floor moves past this one.
 
 `heal`: a clone where this never ran is not broken, only unwarned, and a notice
 must never be able to block a future update.
@@ -41,7 +42,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from check_update import find_own_name_damage, pre_032_commit  # noqa: E402
+from check_update import (  # noqa: E402
+    find_own_name_damage,
+    find_own_name_file_renames,
+    pre_032_commit,
+)
+from lib import ownership  # noqa: E402
 from lib.portable import configure_std_streams, read_text_utf8, write_text_utf8  # noqa: E402
 
 CLARIFICATIONS = Path("zettelkasten/_system/state/CLARIFICATIONS.md")
@@ -87,6 +93,10 @@ def render_item(findings: list[dict], *, today: str) -> str:
     for f in findings:
         lines.append(f"> `{f['path']}:{f['line']}` now: {f['text'].strip()}")
         lines.append(f"> before the rename: {f['before'].strip()}")
+        if f.get("kind") == "file-name":
+            lines.append("> your own note NAME was renamed; restore with `git mv` plus the "
+                         "`id:` and wikilinks, or keep the new name — either is fine, but "
+                         "the file and the links that point at it must agree")
     lines += [
         "",
         "**Context:** The 1.0.0 rename map could not yet tell the product from its owner. A "
@@ -123,6 +133,22 @@ def run(repo_root: Path, *, dry_run: bool) -> dict:
         return result
     result["before"] = before
     findings = find_own_name_damage(repo_root, before)
+    # A file whose own NAME was renamed is the same question one level up: the
+    # note is still there and still readable, but every `id:` and wikilink that
+    # named it now names something the owner never chose. One finding per file.
+    findings += find_own_name_file_renames(repo_root, before)
+    # Belt and braces before anything reaches the owner's queue: a finding that
+    # names a file the ENGINE ships is a defect of the detector, not something
+    # the owner can act on — and an item they cannot act on is worse than none
+    # at all. `lib.ownership` is the one place that answers whose file it is.
+    misfired = [f for f in findings
+                if not ownership.in_owner_space(f["path"], repo_root)]
+    if misfired:
+        named = ", ".join(sorted({f["path"] for f in misfired})[:5])
+        print(f"033: ignoring {len(misfired)} finding(s) naming engine files — that is a "
+              f"defect of the check, not of this clone: {named}", file=sys.stderr)
+        findings = [f for f in findings if f not in misfired]
+    findings.sort(key=lambda f: (f["path"], f["line"]))
     result["findings"] = findings
     if not findings:
         result["action"] = "nothing-to-raise"
@@ -151,7 +177,15 @@ def run(repo_root: Path, *, dry_run: bool) -> dict:
     at = text.find(marker)
     if at != -1:
         cut = at + len(marker)
-        new_text = text[:cut] + item + text[cut:]
+        head, tail = text[:cut], text[cut:]
+        # The seeded queue carries a placeholder saying it is empty. Leaving it
+        # above the first real item makes the queue say «empty» directly over
+        # something that is not — so the placeholder goes when the first item
+        # arrives, which is exactly what it was there to announce.
+        placeholder = "_(empty — populates as skills run)_"
+        if placeholder in tail:
+            tail = tail.replace(placeholder + "\n", "", 1).replace(placeholder, "", 1)
+        new_text = head + item + tail
     else:
         new_text = text.rstrip("\n") + "\n\n" + OPEN_ITEMS + "\n" + item
     target.parent.mkdir(parents=True, exist_ok=True)

@@ -43,6 +43,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from lib import ownership  # noqa: E402
 from lib.portable import configure_std_streams  # noqa: E402
 
 # --------------------------------------------------------------------------- #
@@ -122,96 +123,21 @@ RESIDUE_EXCLUDE: tuple[str, ...] = (
 LINE_KEEP = "rebrand:keep"
 FILE_KEEP = "minder-memory-rebrand: keep-legacy-tokens"
 
-# The owner's own name — the skeleton name with their tail on it, which the
-# rename map leaves whole. Restated from the same home and for the same reason
-# as the two markers above; `test_check_update.py` pins it equal to the map's.
-# The tail is UNICODE — an owner names their folders in the alphabet they think
-# in, and an ASCII-only tail left `minder-ztn-иванов` both unprotected and
-# invisible to the detector below.
-OWN_NAME_PATTERN = r"(?i)(?<![\w-])minder-ztn-(?!platform\b)[^\W_][\w-]*"
-_OWN_NAME_RE = re.compile(OWN_NAME_PATTERN)
-
-# The same distinction one axis over: a `ZTN_*` that is not one of the engine's
-# own is what the OWNER called a credential of theirs, in their role and in
-# their store. Restated from the map for the same reason as everything above,
-# and pinned to it by `test_check_update.py`.
-ENGINE_ENV_NAMES: tuple[str, ...] = (
-    "BASE_PATH", "BASE", "CONCEPT_TYPE_JAVA", "DEV", "PATH",
-    "ROLES_AUTONOMOUS_ACK", "ROLES_KEY", "SECRET_MASTER_KEY", "SYMLINK_REEXEC",
-)
-OWN_CREDENTIAL_PATTERN = (
-    r"\bZTN_(?!(?:" + "|".join(ENGINE_ENV_NAMES) + r")\b)[A-Z][A-Z0-9_]*\b"
-)
-_OWN_CREDENTIAL_RE = re.compile(OWN_CREDENTIAL_PATTERN)
+# Ownership is not restated here. `lib.ownership` is the one home of «is this
+# name the engine's or the owner's» — folders and repositories in any alphabet,
+# credential names a role declares or the store holds, harness entries the
+# engine actually shipped, and which paths are the owner's to write. Every
+# consumer imports it; seven walkthroughs' worth of defects were the same rule
+# drawn differently in three files.
 
 # What 1.0.0's map did before it learned the distinction: an owner's own
-# repository or folder rewritten to a path that does not exist. Found by
-# reading what the SAME file said before the rename migration ran — nothing in
-# the tree afterwards betrays it, because the damaged line reads plausibly.
-# `minder-minder-memory-<tail>` is the SAME damage in its 1.0.0-era shape: that
-# release's map doubled the product name inside an owner's path instead of
-# leaving it whole. Both spellings point at a directory that does not exist, and
-# both had `minder-ztn-<tail>` in the tree before the rename, so one pattern
-# finds them and one `was` reconstructs the original.
+# repository or folder rewritten to a path that does not exist. Found by reading
+# what the SAME file said before the rename migration ran — nothing in the tree
+# afterwards betrays it, because the damaged line reads plausibly.
+# `minder-minder-memory-<tail>` is the same damage in that release's doubled
+# shape.
 _RENAMED_OWN_NAME_RE = re.compile(r"(?<![\w-])(?:minder-)?minder-memory-([^\W_][\w-]*)")
-# Suffixes the ENGINE owns: `minder-memory-platform` is this base's retired
-# project identifier (the map renames it on purpose) and `minder-memory-mcp` is
-# an engine directory whose predecessor sits in the manifest's retired rows.
-# Both would otherwise answer the before/after test and read as damage.
-# `minder-memory-backup-<stamp>` is the directory the harness migration writes
-# its own backups into — the engine's name, renamed with the product.
-ENGINE_OWNED_SUFFIXES = frozenset({"platform", "mcp", "backup"})
 
-# --------------------------------------------------------------------------- #
-# Owner space — where an owner's own folder name can legitimately be written
-# --------------------------------------------------------------------------- #
-#
-# An engine file cannot hold an owner's directory name: everything in it is the
-# engine's, renamed by the engine on purpose. Reading one as an owner's path is
-# what made the damage probe fail on every clone in existence — the harness
-# migration's own backup directory matches every shape the detector looks for,
-# and its predecessor sits in the pre-rename tree exactly as real damage would.
-#
-# The prefixes below are the rename map's `owner-data` class verbatim
-# (`_032_minder_memory_rebrand.classify`), pinned equal to it by
-# `test_check_update.py`. The extras are surfaces the map has no reason to
-# classify but where an owner's own path plainly belongs: the append-only
-# state, the vault configuration, and the owner-curated system files by name.
-_OWNER_DATA_PREFIXES: tuple[str, ...] = (
-    "zettelkasten/_records/",
-    "zettelkasten/1_projects/",
-    "zettelkasten/2_areas/",
-    "zettelkasten/3_resources/",
-    "zettelkasten/4_archive/",
-    "zettelkasten/5_meta/mocs/",
-    "zettelkasten/6_posts/",
-    "zettelkasten/0_constitution/axiom/",
-    "zettelkasten/0_constitution/principle/",
-    "zettelkasten/0_constitution/rule/",
-    "zettelkasten/_system/roles/",
-)
-_OWNER_SPACE_EXTRA_PREFIXES: tuple[str, ...] = (
-    "zettelkasten/_system/state/",
-    "zettelkasten/.obsidian/",
-)
-_OWNER_SPACE_EXTRA_FILES: tuple[str, ...] = (
-    "zettelkasten/_system/SOUL.md",
-    "zettelkasten/_system/TASKS.md",
-    "zettelkasten/_system/CALENDAR.md",
-    "zettelkasten/_system/POSTS.md",
-    "zettelkasten/_system/registries/TAGS.md",
-    "zettelkasten/_system/registries/SOURCES.md",
-    "zettelkasten/_system/registries/AUDIENCES.md",
-    "zettelkasten/_system/registries/DOMAINS.md",
-    "zettelkasten/_system/registries/CONCEPTS.md",
-    "zettelkasten/minder-memory.md",
-)
-OWNER_SPACE_PREFIXES: tuple[str, ...] = _OWNER_DATA_PREFIXES + _OWNER_SPACE_EXTRA_PREFIXES
-
-
-def in_owner_space(rel: str) -> bool:
-    """True when a path is the owner's to write, and so theirs to name."""
-    return rel.startswith(OWNER_SPACE_PREFIXES) or rel in _OWNER_SPACE_EXTRA_FILES
 # The token a match sits in, so «is this a path?» can be asked of it.
 _TOKEN_CHARS = re.compile(r"[^\s`'\"()\[\],;<>|]+")
 # The ledger line whose first appearance dates the rename migration.
@@ -308,9 +234,11 @@ def probe_clone_residue(repo: Path) -> dict:
         # The owner's own names — a repository, a folder, a credential — are
         # kept BY DESIGN, so their spans come out of the line before what is
         # left is judged.
-        stripped, hits = _OWN_NAME_RE.subn("", text)
-        stripped, credential_hits = _OWN_CREDENTIAL_RE.subn("", stripped)
-        own += hits + credential_hits
+        found = ownership.own_name_spans(text, repo / BASE_DIR)
+        stripped = text
+        for span_start, span_end in reversed(found):
+            stripped = stripped[:span_start] + stripped[span_end:]
+        own += len(found)
         if not re.search(r"ztn|ЗТН", stripped, re.IGNORECASE):
             continue
         counts[path] = counts.get(path, 0) + 1
@@ -347,29 +275,41 @@ def pre_032_commit(repo: Path) -> str | None:
     return parent.stdout.strip()
 
 
-def _path_like_own_names(text: str) -> list[tuple[int, str, str]]:
-    """(line number, suffix, the whole line) for every path-like `minder-memory-<suffix>`.
+def _admissible_own_names(text: str, root: Path | None = None) -> list[tuple[int, str, str]]:
+    """(line number, tail, whole line) for every `minder-memory-<tail>` that names a THING.
 
-    Path-like is decided by the token the match sits in: a name inside
-    something containing a `/` — `~/projects/…`, `/Users/…`, `projects/…` — is
-    being used as a location, and a location that does not exist is the damage
-    this looks for. The same name in prose is just the product.
+    A path was the original test, and it was too narrow by half. The audit found
+    the same dead name in a JSON scalar (`"vaultName": "minder-memory-иванов"`),
+    a YAML scalar (`vault: minder-memory-иванов`), an `id:` field and a
+    `[[wikilink]]` — none of which contain a slash, and every one of which names
+    something that has to exist. What is excluded is the name appearing in
+    ordinary prose, where it is just the product being talked about.
     """
     out: list[tuple[int, str, str]] = []
     for index, line in enumerate(text.splitlines(), start=1):
         for match in _RENAMED_OWN_NAME_RE.finditer(line):
-            suffix = match.group(1)
-            if suffix.lower() in ENGINE_OWNED_SUFFIXES:
-                continue
+            tail = match.group(1)
             token = ""
             for candidate in _TOKEN_CHARS.finditer(line):
                 if candidate.start() <= match.start() < candidate.end():
                     token = candidate.group(0)
                     break
-            if "/" not in token:
+            if ownership.is_engine_owned_name(token, root):
                 continue
-            out.append((index, suffix, line.rstrip()))
+            before = line[:match.start()].rstrip()
+            # A path is admissible by its slash. Everything else is admissible
+            # by what introduces it: a key, an assignment, a quote, a list
+            # bullet, a wikilink. What is NOT admissible is the name in running
+            # prose, where the product is being talked about rather than
+            # something being named — and prose is what a preceding WORD marks.
+            if "/" in token or not before or before[-1] in ":=\"'[|(,-":
+                out.append((index, tail, line.rstrip()))
     return out
+
+
+def _path_like_own_names(text: str) -> list[tuple[int, str, str]]:
+    """Kept as the narrow shape, for callers that only want paths."""
+    return [row for row in _admissible_own_names(text) if "/" in row[2]]
 
 
 def _renames_by_map(repo: Path, ref: str) -> tuple[dict[str, str], str]:
@@ -416,9 +356,9 @@ def _renames_by_map(repo: Path, ref: str) -> tuple[dict[str, str], str]:
 def _renames_since(repo: Path, ref: str) -> dict[str, str]:
     """`new -> old` for every file git sees renamed between `ref` and HEAD.
 
-    The fallback, used only when the map cannot be loaded. 30 %: a note whose
-    body was rewritten by a product rename keeps well under half its lines, and
-    git's default 50 % then reports the move as a delete plus an add.
+    The similarity answer. 30 %: a note whose body was rewritten by a product
+    rename keeps well under half its lines, and git's default 50 % then reports
+    the move as a delete plus an add.
     """
     diff = _git(repo, "diff", "--name-status", "-M30%", "--diff-filter=R", ref, "HEAD")
     if diff.returncode != 0:
@@ -428,6 +368,67 @@ def _renames_since(repo: Path, ref: str) -> dict[str, str]:
         parts = line.split("\t")
         if len(parts) == 3:
             out[parts[2]] = parts[1]
+    return out
+
+
+_TREE_CACHE: dict[tuple[str, str], frozenset[str]] = {}
+
+
+def _tree_paths(repo: Path, ref: str) -> frozenset[str]:
+    key = (str(repo), ref)
+    if key not in _TREE_CACHE:
+        listed = _git(repo, "ls-tree", "-r", "--name-only", ref)
+        paths = frozenset(ln.strip() for ln in listed.stdout.splitlines() if ln.strip()) \
+            if listed.returncode == 0 else frozenset()
+        _TREE_CACHE[key] = paths
+    return _TREE_CACHE[key]
+
+
+def _own_name_predecessor(repo: Path, before: str, rel: str) -> str | None:
+    """`minder-ztn-<tail>` for a `minder-memory-<tail>` path, if the tree had it.
+
+    Exact and first, ahead of both the map inversion and similarity. When an
+    earlier release renamed a file BY the owner's own name, the predecessor is
+    that name — no threshold, no inference, just: did the pre-rename tree
+    contain it.
+    """
+    candidates = [
+        re.sub(r"(?<![\w-])minder-memory-", "minder-ztn-", rel, count=1),
+        re.sub(r"(?<![\w-])minder-minder-memory-", "minder-ztn-", rel, count=1),
+    ]
+    tree = _tree_paths(repo, before)
+    for candidate in candidates:
+        if candidate != rel and candidate in tree:
+            return candidate
+    return None
+
+
+def find_own_name_file_renames(repo: Path, before: str) -> list[dict]:
+    """Files whose OWN NAME an earlier release renamed.
+
+    The line-level finder answers «this path inside a file points nowhere». This
+    one answers the same question one level up: the FILE is the thing that was
+    named, and every `id:` and wikilink that pointed at it now names something
+    the owner never chose. One finding per file, never a rewrite — whether to
+    move it back or keep the new name is theirs, and both are fine as long as
+    the file and its links agree.
+    """
+    listed = _git(repo, "ls-files", "-z", "--", ".", ":!zettelkasten/_sources", *RESIDUE_EXCLUDE)
+    if listed.returncode != 0:
+        return []
+    out: list[dict] = []
+    for rel in [p for p in listed.stdout.split("\0") if p.strip()]:
+        if not ownership.in_owner_space(rel, repo):
+            continue
+        if not _RENAMED_OWN_NAME_RE.search(Path(rel).name):
+            continue
+        if ownership.is_engine_owned_name(rel, repo):
+            continue
+        predecessor = _own_name_predecessor(repo, before, rel)
+        if not predecessor:
+            continue
+        out.append({"path": rel, "line": 0, "text": rel, "before": predecessor,
+                    "name": Path(predecessor).name, "kind": "file-name"})
     return out
 
 
@@ -460,12 +461,12 @@ def find_own_name_damage(repo: Path, before: str) -> list[dict]:
     similar = _renames_since(repo, before)
     findings: list[dict] = []
     for rel in [p for p in listed.stdout.split("\0") if p.strip()]:
-        if not in_owner_space(rel):
+        if not ownership.in_owner_space(rel, repo):
             continue
         current = _read(repo / rel)
         if not current:
             continue
-        candidates = _path_like_own_names(current)
+        candidates = _admissible_own_names(current, repo)
         if not candidates:
             continue
         # The pre-rename text lives under the file's OLD path when the rename
@@ -474,7 +475,8 @@ def find_own_name_damage(repo: Path, before: str) -> list[dict]:
         # have been written down.
         shown = _git(repo, "show", f"{before}:{rel}")
         if shown.returncode != 0:
-            for predecessor in (renames.get(rel), similar.get(rel)):
+            for predecessor in (_own_name_predecessor(repo, before, rel),
+                                renames.get(rel), similar.get(rel)):
                 if not predecessor:
                     continue
                 shown = _git(repo, "show", f"{before}:{predecessor}")
@@ -506,6 +508,11 @@ def probe_own_name_damage(repo: Path) -> dict:
         return _result("own-name-damage", SKIP,
                        "the ledger was never committed here — there is no before-state to read")
     findings = find_own_name_damage(repo, before)
+    # A file whose own NAME was renamed is the same question one level up: the
+    # note is still readable, but every `id:` and wikilink that named it now
+    # names something the owner never chose.
+    findings += find_own_name_file_renames(repo, before)
+    findings.sort(key=lambda f: (f["path"], f["line"]))
     if not findings:
         return _result("own-name-damage", OK,
                        "no name of yours was renamed into a path that does not exist")
@@ -713,19 +720,26 @@ def probe_legacy_harness_entries(home: Path) -> dict:
     if not home.is_dir():
         return _result("legacy-harness-entries", SKIP, f"no harness home at {home}")
     hits: list[str] = []
+    theirs: list[str] = []
     for sub in HARNESS_SUBDIRS:
         d = home / sub
         if not d.is_dir():
             continue
         for dirpath, dirnames, filenames in os.walk(d, followlinks=False):
             for name in list(dirnames) + list(filenames):
-                if LEGACY_TOKEN in name.lower():
+                if LEGACY_TOKEN not in name.lower():
+                    continue
+                if ownership.is_engine_legacy_harness_entry(name, sub):
                     hits.append(os.path.join(dirpath, name))
+                else:
+                    theirs.append(os.path.join(dirpath, name))
+    mine = (f"; {len(theirs)} entr(y/ies) carrying that word are yours, not the "
+            "engine's, and were left alone" if theirs else "")
     if not hits:
         return _result("legacy-harness-entries", OK,
-                       "nothing under the harness home is named after the former product")
+                       "no harness entry the engine shipped under its former name remains" + mine)
     return _result("legacy-harness-entries", FAIL,
-                   f"{len(hits)} leftover entr(y/ies): " + ", ".join(sorted(hits)[:8]))
+                   f"{len(hits)} leftover entr(y/ies): " + ", ".join(sorted(hits)[:8]) + mine)
 
 
 def probe_foreign_dangling(home: Path, repo: Path) -> dict:

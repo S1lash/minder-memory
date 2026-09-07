@@ -547,6 +547,23 @@ POINTER and a refusal clause («if this cannot be read, do nothing»), never a
 duplicate. Applies to prose as much as to code: the class is *the same fact
 stated twice*, whatever the medium.
 
+**The engine/owner name boundary has one home: `scripts/lib/ownership.py`.**
+Which environment variables the engine owns, which spans of a text are names the
+owner chose, which harness entries the engine ever shipped, which paths are the
+owner's to write, and whether a token names something the engine owns — all five
+are answered there and nowhere else. Every consumer imports it: the rename map,
+the post-update check, the harness-wiring and own-names migrations, the vault
+seeder. The reason it exists is worth keeping, because the failure it prevents
+is not obvious: the rule had lived in three files, held together by tests that
+asserted the copies equal — which makes drift *detectable* rather than
+impossible, and every one of the copies was correct on the day it was written.
+When a rule decides whether the engine may rewrite or delete something of the
+owner's, «detectable drift» is the wrong guarantee. The bias inside that module
+is equally load-bearing and equally deliberate: **when a name could be either,
+it is the owner's** — renaming something of theirs produces a path that does not
+exist, silently, in the one place they would look for their own files, while
+leaving one of ours alone produces a stale word.
+
 **A step nothing detects is a step that will stop happening.** Every engine
 behaviour is either enforced by something that fails loudly, or watched by a
 check that notices its absence. A step described in a prompt but implemented

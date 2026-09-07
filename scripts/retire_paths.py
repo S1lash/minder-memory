@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -80,13 +81,44 @@ def guard(retired: list, excluded: list) -> list:
     ]
 
 
-def retire(root: Path, retired: list, dry_run: bool = False) -> list:
-    """Delete each listed path that exists. Returns what was (or would be) removed."""
+def untracked_inside(root: Path, relpath: str) -> list:
+    """Files inside a directory that git does not track — the owner's, not ours.
+
+    A retired path names a directory the ENGINE shipped. What the engine put
+    there, git tracks. Anything else was put there by the owner, and a recursive
+    delete would take it with the module it was sitting beside — silently, in
+    the one step of the update whose whole job is deletion. So the directory is
+    reported instead, and the owner decides.
+    """
+    try:
+        listed = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--others", "--exclude-standard", "-z",
+             "--", relpath],
+            capture_output=True, check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return []
+    return [p.decode("utf-8", "surrogateescape")
+            for p in listed.split(b"\0") if p.strip()]
+
+
+def retire(root: Path, retired: list, dry_run: bool = False) -> tuple:
+    """Delete each listed path that exists.
+
+    Returns `(removed, kept)` — `kept` naming every retired directory left in
+    place because it holds files the owner put there.
+    """
     removed = []
+    kept = []
     for relpath in retired:
         target = root / relpath
         if not target.exists() and not target.is_symlink():
             continue
+        if target.is_dir() and not target.is_symlink():
+            strays = untracked_inside(root, relpath)
+            if strays:
+                kept.append((relpath, strays))
+                continue
         removed.append(relpath)
         if dry_run:
             continue
@@ -94,7 +126,7 @@ def retire(root: Path, retired: list, dry_run: bool = False) -> list:
             shutil.rmtree(target)
         else:
             target.unlink()
-    return removed
+    return removed, kept
 
 
 def main() -> int:
@@ -124,9 +156,16 @@ def main() -> int:
               file=sys.stderr)
         return 2
 
-    removed = retire(root, retired, dry_run=args.dry_run)
+    removed, kept = retire(root, retired, dry_run=args.dry_run)
+    for path, strays in kept:
+        print(f"retire: kept {path} — it holds {len(strays)} file(s) the engine did not put "
+              "there, and a recursive delete would take them with it:")
+        for stray in strays[:8]:
+            print(f"    {stray}")
+        print("    Move what you want to keep, then re-run the update.")
     if not removed:
-        print(f"retire: clean ({len(retired)} listed, none present)")
+        print(f"retire: clean ({len(retired)} listed, "
+              f"{len(kept)} kept for your files, none else present)")
         return 0
     verb = "would remove" if args.dry_run else "removed"
     print(f"retire: {verb} {len(removed)} retired path(s)")

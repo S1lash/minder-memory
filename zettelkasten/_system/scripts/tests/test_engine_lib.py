@@ -208,10 +208,10 @@ class RetirementTests(unittest.TestCase):
             live.write_text("stays\n", encoding="utf-8")
 
             listed = ["zettelkasten/_system/scripts/dead.py"]
-            self.assertEqual(rp.retire(root, listed), listed)
+            self.assertEqual(rp.retire(root, listed)[0], listed)
             self.assertFalse(dead.exists())
             self.assertTrue(live.exists(), "an unlisted neighbour must survive")
-            self.assertEqual(rp.retire(root, listed), [], "second run is a no-op")
+            self.assertEqual(rp.retire(root, listed)[0], [], "second run is a no-op")
 
     def test_dry_run_deletes_nothing(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -219,7 +219,7 @@ class RetirementTests(unittest.TestCase):
             (root / "a").mkdir()
             target = root / "a/gone.py"
             target.write_text("x\n", encoding="utf-8")
-            self.assertEqual(rp.retire(root, ["a/gone.py"], dry_run=True), ["a/gone.py"])
+            self.assertEqual(rp.retire(root, ["a/gone.py"], dry_run=True)[0], ["a/gone.py"])
             self.assertTrue(target.exists())
 
 
