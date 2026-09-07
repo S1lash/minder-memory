@@ -247,43 +247,15 @@ def converge_engine_paths(repo_root: Path, *, dry_run: bool) -> dict:
 
 
 def sync_remote_and_branch(repo_root: Path) -> tuple[str | None, str]:
-    """The remote and branch the engine syncs from.
+    """The remote and branch the engine syncs from — `lib.ownership`'s answer.
 
-    The sync exports what it was invoked with (`ENGINE_SYNC_REMOTE`,
-    `ENGINE_SYNC_BRANCH`) so a migration it runs follows the same pair — a
-    fork, a release branch, a remote not called `upstream`. Outside a sync:
-    `upstream` if it exists, else the remote whose URL names the skeleton;
-    the branch is the remote's HEAD when known, else `main`.
+    Kept as a name here because this module's steps read well with it, but the
+    rule lives in the one home: the retirement step reads exactly this remote's
+    history to decide whether the engine ever shipped a file, and step D below
+    repoints exactly this remote and no other. Two answers would let one step
+    protect what the other deletes.
     """
-    remote = os.environ.get("ENGINE_SYNC_REMOTE", "").strip() or None
-    branch = os.environ.get("ENGINE_SYNC_BRANCH", "").strip() or None
-    names = _git(repo_root, "remote").stdout.split()
-    if remote is None:
-        if "upstream" in names:
-            remote = "upstream"
-        else:
-            qualifying = []
-            for name in names:
-                url = _git(repo_root, "remote", "get-url", name).stdout.strip()
-                tail = url.rstrip("/").rstrip(".git").rsplit("/", 1)[-1].rsplit(":", 1)[-1]
-                if _renamed_url(url) or tail.lower() == NEW_REPO_NAME:
-                    qualifying.append(name)
-            # Exactly one, or none. Several remotes named after the skeleton is
-            # an owner with a fork and a mirror, and guessing which of them the
-            # engine syncs from would repoint one of theirs — the defect this
-            # whole family of fixes exists to stop.
-            if len(qualifying) == 1:
-                remote = qualifying[0]
-            elif len(qualifying) > 1:
-                print("031: several remotes are named after the skeleton "
-                      f"({', '.join(qualifying)}); none was repointed. Say which one the "
-                      "engine syncs from with ENGINE_SYNC_REMOTE, or name it `upstream`.")
-    if remote is None:
-        return None, branch or "main"
-    if branch is None:
-        head = _git(repo_root, "symbolic-ref", "--short", f"refs/remotes/{remote}/HEAD")
-        branch = head.stdout.strip().split("/", 1)[-1] if head.returncode == 0 and head.stdout.strip() else "main"
-    return remote, branch
+    return ownership.sync_remote_and_branch(repo_root)
 
 
 # -----------------------------------------------------------------------------

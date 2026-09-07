@@ -187,7 +187,7 @@ if [ ! -f "$DASHBOARD_DST" ]; then
       if grep -q "${legacy_file%.md}" "$cfg_path"; then
         if [ "$use_map" = 1 ] && \
            [ -f "$REPO_ROOT/scripts/migrations/_032_minder_memory_rebrand.py" ]; then
-          python3 "$REPO_ROOT/scripts/lib/rebrand_file.py" "$cfg_path" \
+          python3 "$REPO_ROOT/scripts/lib/rebrand_file.py" --base "$VAULT" "$cfg_path" \
             || log "warning: could not rewrite .obsidian/$cfg — left as it was"
         else
           # `sed -i.bak` is the one form that works on both GNU and BSD sed.

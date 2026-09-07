@@ -9,6 +9,7 @@ only an improvement if the owner is pinned.
 from __future__ import annotations
 
 import io
+import os
 import subprocess
 import sys
 import tempfile
@@ -225,3 +226,97 @@ class RetirementTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RetirementOwnerFileTests(unittest.TestCase):
+    """A retired engine directory must never take the owner's files with it.
+
+    The guard used to be «is this file untracked», and the update itself
+    defeats it: the closing block tells the owner `git add -A && git commit`,
+    so a file of theirs is untracked on the first sync and tracked on the
+    second — and on the second the directory was deleted with their file inside.
+    A guard that a documented step disarms is not a guard.
+
+    What settles it is the ENGINE's own history: a path the engine ever shipped
+    is in the sync remote's log, and a path it never shipped is not, whoever has
+    committed it since.
+    """
+    # minder-memory-rebrand: keep-legacy-tokens
+
+    ENV = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid"}
+
+    def _git(self, root, *args):
+        return subprocess.run(["git", "-C", str(root), *args], capture_output=True,
+                              text=True, encoding="utf-8", env=self.ENV)
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        tmp = Path(self._tmp.name)
+        # The engine, as upstream: it ships a subsystem directory.
+        self.up = tmp / "upstream"
+        (self.up / "scripts" / "old_subsystem").mkdir(parents=True)
+        (self.up / "scripts" / "old_subsystem" / "engine_mod.py").write_text(
+            "# engine\n", encoding="utf-8")
+        (self.up / "scripts" / "old_subsystem" / "engine_two.py").write_text(
+            "# engine\n", encoding="utf-8")
+        self._git(self.up, "init", "-q", "-b", "main")
+        self._git(self.up, "add", "-A")
+        self._git(self.up, "commit", "-qm", "the engine ships the subsystem")
+
+        self.root = tmp / "clone"
+        subprocess.run(["git", "clone", "-q", str(self.up), str(self.root)],
+                       capture_output=True, env=self.ENV)
+        self._git(self.root, "remote", "rename", "origin", "upstream")
+        self._git(self.root, "fetch", "-q", "upstream", "main")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _retire(self):
+        return rp.retire(self.root, ["scripts/old_subsystem"])
+
+    def test_an_owner_file_inside_keeps_the_directory(self):
+        (self.root / "scripts/old_subsystem/my-notes.md").write_text("mine\n", encoding="utf-8")
+        removed, kept = self._retire()
+        self.assertEqual(removed, [])
+        self.assertEqual(len(kept), 1)
+        self.assertIn("scripts/old_subsystem/my-notes.md", kept[0][1])
+        self.assertNotIn("scripts/old_subsystem/engine_mod.py", kept[0][1],
+                         "an engine file is not reported as the owner's")
+        self.assertTrue((self.root / "scripts/old_subsystem/my-notes.md").is_file())
+
+    def test_it_still_keeps_after_the_owner_commits_as_instructed(self):
+        """The defect: the update's own advice disarmed the guard."""
+        (self.root / "scripts/old_subsystem/my-notes.md").write_text("mine\n", encoding="utf-8")
+        self._retire()
+        self._git(self.root, "add", "-A")
+        self._git(self.root, "commit", "-qm", "engine update")
+
+        removed, kept = self._retire()
+        self.assertEqual(removed, [], "committing does not make the owner's file the engine's")
+        self.assertIn("scripts/old_subsystem/my-notes.md", kept[0][1])
+        self.assertTrue((self.root / "scripts/old_subsystem/my-notes.md").is_file())
+        self.assertTrue((self.root / "scripts/old_subsystem").is_dir())
+
+    def test_a_directory_of_only_engine_files_is_removed(self):
+        removed, kept = self._retire()
+        self.assertEqual(removed, ["scripts/old_subsystem"], kept)
+        self.assertFalse((self.root / "scripts/old_subsystem").exists())
+
+    def test_an_empty_directory_is_removed(self):
+        for stale in (self.root / "scripts/old_subsystem").iterdir():
+            stale.unlink()
+        self._git(self.root, "add", "-A")
+        self._git(self.root, "commit", "-qm", "emptied")
+        removed, kept = self._retire()
+        self.assertEqual(removed, ["scripts/old_subsystem"], kept)
+        self.assertFalse((self.root / "scripts/old_subsystem").exists())
+
+    def test_no_engine_history_keeps_and_says_why(self):
+        """Silence is the dangerous answer; «I could not tell» is the safe one."""
+        self._git(self.root, "remote", "remove", "upstream")
+        removed, kept = self._retire()
+        self.assertEqual(removed, [])
+        self.assertIsNotNone(kept[0][2])
+        self.assertIn("engine history", kept[0][2])

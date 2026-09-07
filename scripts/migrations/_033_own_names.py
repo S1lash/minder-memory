@@ -90,7 +90,14 @@ def render_item(findings: list[dict], *, today: str) -> str:
         "",
         "**Quote:**",
     ]
+    # One row per line, not per finding: two damaged names on the same line are
+    # the same line, and quoting it twice makes the item read like two problems.
+    seen_rows: set = set()
     for f in findings:
+        row = (f["path"], f["line"], f["text"].strip(), f["before"].strip())
+        if row in seen_rows:
+            continue
+        seen_rows.add(row)
         lines.append(f"> `{f['path']}:{f['line']}` now: {f['text'].strip()}")
         lines.append(f"> before the rename: {f['before'].strip()}")
         if f.get("kind") == "file-name":

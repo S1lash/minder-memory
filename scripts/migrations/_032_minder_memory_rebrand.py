@@ -89,6 +89,11 @@ ENV_PREFIX = "MINDER_MEMORY_"
 # variable the owner had never written. The engine renames the variables it
 # owns; everything else with the same shape is somebody's own name and is kept.
 _ENGINE_ENV_ALT = "|".join(ownership.ENGINE_ENV_NAMES)
+# The engine's own `minder[-_]ztn[-_]<tail>` identifiers, from the same one
+# home that decides they are not the owner's. Longest-first so a tail that is a
+# prefix of another cannot shadow it.
+_ENGINE_SLUG_ALT = "|".join(
+    re.escape(t) for t in sorted(ownership.ENGINE_SLUG_TAILS, key=len, reverse=True))
 
 # The engine's skills come from `lib.ownership` — the one home of every «is this
 # name ours» answer. Ordered longest-first there, so `role-add` is matched
@@ -145,8 +150,13 @@ TOKEN_MAP: tuple[tuple[str, str], ...] = (
     (r"\btoZTN\b", "to-Minder-Memory"),
     (r"\bZtn\b", PRODUCT_NAME),
     (r"\bztn-(check-content|sync-pull|backfill-concepts)\b", SKILL_PREFIX + r"\1"),
-    (r"\bminder-ztn-platform\b", "minder-memory-platform"),   # this base's retired project identifier moves with the product
-    (r"\bminder_ztn_platform\b", "minder_memory_platform"),
+    # The engine's own slug identifiers, renamed whole and EARLY — before the
+    # generic `ztn-` rule can splice the product into the middle of one and
+    # leave `minder-minder-memory-env` behind. Keyed on `lib.ownership`, the same
+    # constant that tells `own_name_spans` these are not the owner's, so the two
+    # answers cannot disagree.
+    (r"\bminder-ztn-(" + _ENGINE_SLUG_ALT + r")\b", "minder-memory-" + r"\1"),
+    (r"\bminder_ztn_(" + _ENGINE_SLUG_ALT + r")\b", "minder_memory_" + r"\1"),
     (r"\bztn-platform\b", "minder-memory-platform"),
     (r"\bztn_platform\b", "minder_memory_platform"),
     (r"\bminder-minder-memory\b", "minder-memory"),          # a double prefix an earlier run of the rules above left behind
@@ -233,7 +243,7 @@ _CODE_SAFE_RULES = frozenset({
     r"\bztn_(search|get|query|recent|save)\b", r"\bztn\.recall\b", r"-ztn\.minder\.host\b",
     r"\bztn\.([A-Za-z0-9_-]+)\.minder\.host\b", r"\bztn_per_ip\b", r"\bsync-ztn-",
     r"\bztn-deploy-key\b", r"\bztn_deploy_key\b", r"\bA0-ZTN\b",
-    r"\bztn-(check-content|sync-pull|backfill-concepts)\b", r"\bminder-ztn-platform\b", r"\bminder_ztn_platform\b", r"\bztn-platform\b", r"\bztn_platform\b", r"\bminder-minder-memory\b", r"\bminder_minder_memory\b",
+    r"\bztn-(check-content|sync-pull|backfill-concepts)\b", r"\bminder-ztn-(" + _ENGINE_SLUG_ALT + r")\b", r"\bminder_ztn_(" + _ENGINE_SLUG_ALT + r")\b", r"\bztn-platform\b", r"\bztn_platform\b", r"\bminder-minder-memory\b", r"\bminder_minder_memory\b",
     r"\bZTNVault\b", r"\bZTNAgentRunner\b", r"\bztn-bridge\b", r"\bsync-ztn\.sh\b", r"\bsearchZtn\b",
     r"\bMinder[ \-]Minder Memory\b", r"\bminder Minder Memory\b", r"(?i)\bмайндер Minder Memory\b",
 })

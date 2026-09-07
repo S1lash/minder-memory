@@ -2,6 +2,19 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.0.8 — Nothing of yours is swept up
+
+A file of yours sitting inside a folder the engine retires is now recognised by
+whether the ENGINE ever shipped it, not by whether you have committed it — the
+update told you to commit, and committing used to be what disarmed the guard.
+The folder is kept and your files are named.
+
+Your own names hold in every alphabet: a folder called `ztn-process-ivanov` is
+kept exactly as `ztn-process-иванов` already was. The engine's own folders
+(`minder-ztn-env` and its siblings) rename cleanly instead of doubling. And the
+check now finds every shape 1.0.0 left behind, including the ones written with
+underscores or quoted in backticks.
+
 ## 1.0.7 — One place decides whose name it is
 
 Every «is this the engine's name or yours» answer now comes from one module, so

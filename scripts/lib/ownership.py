@@ -41,6 +41,11 @@ __all__ = [
     "ENGINE_ENV_NAMES",
     "ENGINE_SKILL_NAMES",
     "ENGINE_LEGACY_HARNESS",
+    "ENGINE_SLUG_TAILS",
+    "ENGINE_EXTENDED_SKILL_TOKENS",
+    "ENGINE_EXTENDED_SKILL_SUFFIXES",
+    "former_spellings",
+    "sync_remote_and_branch",
     "OWNER_DATA_PREFIXES",
     "OWNER_DATA_FILES",
     "is_engine_env_name",
@@ -179,7 +184,7 @@ _OWN_SLUG_RE = re.compile(r"(?i)(?<![\w-])minder[-_]ztn[-_][^\W_][\w-]*")
 # indistinguishable from one by shape alone, `minder_ztn_ivanov` against
 # `minder_ztn_session`. So the engine's are named here, and everything else with
 # a tail is the owner's.
-_ENGINE_SLUG_TAILS = frozenset({
+ENGINE_SLUG_TAILS = frozenset({
     "platform", "session", "constitution", "env", "deploy_key", "rebrand",
 })
 # Any `ZTN_` name at all — no `[A-Z]` anchor after the underscore, because
@@ -190,9 +195,29 @@ _ENV_CANDIDATE_RE = re.compile(r"(?<![\w-])ZTN_\w+")
 # with something of the owner's glued on falls through to the generic `ztn-`
 # rule and gets the product spliced into the middle of a name they chose.
 _SKILLISH_RE = re.compile(r"(?<![\w-])ztn-([\w-]+)")
-# `ztn-roles-<suffix>` is the roles tick's own temp-directory prefix and has its
-# own rule in the map. It is the one skill name the engine itself extends.
+# `ztn-roles-<suffix>` is the roles tick's own temp-directory prefix, generated
+# at run time and never written down, so it is matched by its HEAD.
 _SKILLISH_EXCLUDE = frozenset({"roles"})
+# The engine's own forms that extend a skill name. Everything else shaped like
+# one is the owner's — whatever alphabet it is in.
+#
+# The earlier rule claimed only non-ASCII tails, which made the answer depend on
+# what alphabet a friend's name happens to use: `ztn-process-иванов` was kept and
+# `ztn-process-ivanov` was renamed. Latin-named friends are the majority, so the
+# rule was wrong for most of the people it exists to protect.
+#
+# Derived by grepping the shipped tree for what a skill-extending engine name
+# looks like today (`minder-mem-<skill>-<tail>` / `minder-memory-<skill>-<tail>`)
+# and mapping it back. `test_ownership.py` re-runs that derivation and fails when
+# a new engine form appears unlisted, so the list cannot go stale in silence.
+ENGINE_EXTENDED_SKILL_SUFFIXES: tuple[str, ...] = (
+    "-skill",          # the quick-reference card ids: `ztn-<skill>-skill`
+)
+ENGINE_EXTENDED_SKILL_TOKENS: tuple[str, ...] = (
+    # A note slug in which `update` is the English word and not the skill. It
+    # names the product, so it moves with the product.
+    "ztn-update-distribution-mechanism",
+)
 
 
 def own_name_spans(text: str, base: Path | None = None) -> list[tuple[int, int]]:
@@ -201,7 +226,7 @@ def own_name_spans(text: str, base: Path | None = None) -> list[tuple[int, int]]
     for match in _OWN_SLUG_RE.finditer(text):
         token = match.group(0)
         tail = re.split(r"[-_]", token, maxsplit=2)[2].lower()
-        if tail in _ENGINE_SLUG_TAILS:
+        if tail in ENGINE_SLUG_TAILS:
             continue
         # `MINDER_ZTN_BASE` is the engine's own environment variable wearing the
         # same shape. The env question answers it — in one place, as everything
@@ -216,22 +241,15 @@ def own_name_spans(text: str, base: Path | None = None) -> list[tuple[int, int]]
         tail = match.group(1)
         if tail in ENGINE_SKILL_NAMES:
             continue                      # the skill itself — the engine's
+        token = match.group(0)
+        if token in ENGINE_EXTENDED_SKILL_TOKENS:
+            continue
+        if token.endswith(ENGINE_EXTENDED_SKILL_SUFFIXES):
+            continue
         parts = tail.split("-")
         for length in range(len(parts) - 1, 0, -1):
             head = "-".join(parts[:length])
             if head not in ENGINE_SKILL_NAMES or head in _SKILLISH_EXCLUDE:
-                continue
-            remainder = "-".join(parts[length:])
-            # The engine extends its own skill names with ASCII words it owns —
-            # `ztn-process-skill` is a quick-reference card, and
-            # `ztn-update-distribution-mechanism` is a document slug. Those are
-            # indistinguishable by shape from an ASCII tail of the owner's, so
-            # the claim is made only for a tail carrying a character the engine
-            # never uses in its own identifiers. It is a narrower rule than the
-            # ideal one, and narrow in the safe direction: the cost is that
-            # `ztn-process-ivanov` is still renamed, not that an engine name is
-            # frozen.
-            if remainder.isascii():
                 continue
             spans.append(match.span())
             break
@@ -243,6 +261,50 @@ def own_name_spans(text: str, base: Path | None = None) -> list[tuple[int, int]]
         else:
             merged.append((start, end))
     return merged
+
+
+# --------------------------------------------------------------------------- #
+# (b2) what a name USED to be called
+# --------------------------------------------------------------------------- #
+
+# Every shape the 1.0.0 map could turn an owner's name into. Both the single
+# form and the doubled one it produced by splicing the product into the middle,
+# in the hyphen and the underscore spelling.
+# Both separators are captured, because they need not be the same one. A real
+# clone carried `minder-ztn_ивaнов`; 1.0.0's underscore rule fired inside it and
+# left `minder-minder_memory_ивaнов` — a hyphen in front, underscores behind.
+# Rebuilding it with a single separator produces a name that never existed, the
+# lookup fails, and the finding is dropped in silence.
+_DAMAGED_FORMS = (
+    re.compile(r"^minder([-_])minder([-_])memory([-_])(.+)$"),
+    re.compile(r"^minder([-_])()memory([-_])(.+)$"),
+)
+
+
+def former_spellings(token: str) -> list[str]:
+    """What this token could have been called before the rename, best first.
+
+    One home for the inversion. The damage check and migration 033 both need to
+    ask «what did this used to say», and a second regex set answering it beside
+    the map's is exactly the drift this module exists to remove. The candidates
+    are proposed here; what decides between them is the pre-rename text itself,
+    which is the only authority that cannot be wrong.
+    """
+    out: list[str] = []
+    for pattern in _DAMAGED_FORMS:
+        hit = pattern.match(token)
+        if not hit:
+            continue
+        lead, inner, tail = hit.group(1), hit.group(3), hit.group(4)
+        out.append("minder" + lead + "ztn" + inner + tail)
+        # `minder-memory-process-иванов` came from `ztn-process-иванов`: the map
+        # rewrote a skill name the owner had extended, not the product slug.
+        head = re.split(r"[-_]", tail)[0]
+        if head in ENGINE_SKILL_NAMES:
+            out.append("ztn" + inner + tail)
+        break
+    seen: set[str] = set()
+    return [c for c in out if not (c in seen or seen.add(c))]
 
 
 # --------------------------------------------------------------------------- #
@@ -334,6 +396,67 @@ def is_engine_path(rel: str, root: Path | None = None) -> bool:
 # than by suffix, because it is a directory the ENGINE creates outside the
 # repository, where no manifest can speak for it.
 _ENGINE_BACKUP = re.compile(r"\.minder[-_](?:ztn|memory)-backup-")
+
+
+def _git(repo_root: Path, *args: str) -> "subprocess.CompletedProcess":
+    import subprocess  # noqa: PLC0415 — only the remote question needs a subprocess
+    return subprocess.run(["git", "-C", str(repo_root), *args],
+                          capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+
+def _renamed_url(url: str) -> str | None:
+    """The same URL with its last path segment renamed, or None when it is not the old name."""
+    stripped = url.rstrip("/")
+    for sep in ("/", ":"):
+        head, sep_found, last = stripped.rpartition(sep)
+        if not sep_found:
+            continue
+        if last.lower() == "minder-ztn":
+            return head + sep + "minder-memory"
+        if last.lower() == "minder-ztn.git":
+            return head + sep + "minder-memory.git"
+        break
+    return None
+
+
+def sync_remote_and_branch(repo_root: Path) -> tuple[str | None, str]:
+    """The remote and branch the ENGINE syncs from — whose remote is ours.
+
+    An ownership question like the rest of this module, and it has to have one
+    answer: the harness migration repoints exactly this remote and no other,
+    and the retirement step reads exactly this remote's history to decide
+    whether the engine ever shipped a file. Two answers to it would let one step
+    protect what the other deletes.
+
+    The sync exports what it was invoked with (`ENGINE_SYNC_REMOTE`,
+    `ENGINE_SYNC_BRANCH`) so anything it runs follows the same pair — a fork, a
+    release branch, a remote not called `upstream`. Outside a sync: `upstream`
+    if it exists, else the single remote whose URL names the skeleton. Several
+    qualifying remotes means an owner with a fork and a mirror, and guessing
+    between them would repoint one of theirs.
+    """
+    import os as _os  # noqa: PLC0415
+    remote = _os.environ.get("ENGINE_SYNC_REMOTE", "").strip() or None
+    branch = _os.environ.get("ENGINE_SYNC_BRANCH", "").strip() or None
+    names = _git(repo_root, "remote").stdout.split()
+    if remote is None:
+        if "upstream" in names:
+            remote = "upstream"
+        else:
+            qualifying = []
+            for name in names:
+                url = _git(repo_root, "remote", "get-url", name).stdout.strip()
+                tail = url.rstrip("/").rstrip(".git").rsplit("/", 1)[-1].rsplit(":", 1)[-1]
+                if _renamed_url(url) or tail.lower() == "minder-memory":
+                    qualifying.append(name)
+            if len(qualifying) == 1:
+                remote = qualifying[0]
+    if remote is None:
+        return None, branch or "main"
+    if branch is None:
+        head = _git(repo_root, "symbolic-ref", "--short", f"refs/remotes/{remote}/HEAD")
+        branch = head.stdout.strip().split("/", 1)[-1] if head.returncode == 0 and head.stdout.strip() else "main"
+    return remote, branch
 
 
 def is_engine_owned_name(token: str, root: Path | None = None) -> bool:

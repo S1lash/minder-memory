@@ -122,6 +122,12 @@ class CheckUpdateTests(unittest.TestCase):
                "---\nid: digest\n---\n\n"
                "Read from ~/projects/minder-ztn-"
                "\u0438\u0432\u0430\u043d\u043e\u0432/inbox each morning.\n")
+        # Every shape 1.0.0 could damage, in the state that precedes it.
+        _write(self.clone, "zettelkasten/_records/observations/own-shapes.md",
+               "---\nid: own-shapes\n---\n"
+               "Backup in ~/minder-ztn_\u0438\u0432\u0430\u043d\u043e\u0432.\n"
+               "Scripts in ~/scripts/ztn-process-"
+               "\u0438\u0432\u0430\u043d\u043e\u0432/run.sh.\n")
         _write(self.clone, self.NOTE_REL_BEFORE, self.NOTE_BODY)
         # A note whose own file name is the OWNER's: today's map leaves it
         # alone, so a predecessor cannot be found by inverting the map, and
@@ -467,6 +473,9 @@ class CheckUpdateTests(unittest.TestCase):
             ("id field", "id: minder-memory-" + self.NA),
             ("wikilink", "See [[minder-memory-" + self.NA + "]] for the setup."),
             ("path", "Checked out at ~/projects/minder-memory-" + self.IV + "."),
+            # A backtick introduces a name as surely as a colon does, and an
+            # owner writing notes in Markdown reaches for it constantly.
+            ("backtick", "- \u043a\u043e\u043f\u0438\u044f: `minder-memory-ivanov`"),
         ):
             found = check_update._admissible_own_names(line + "\n")
             self.assertTrue(found, f"{label} was not admitted: {line}")
@@ -490,6 +499,31 @@ class CheckUpdateTests(unittest.TestCase):
         self.assertIn(f"minder-memory-{self.NA}.md", damage["evidence"])
         self.assertIn(f"minder-ztn-{self.NA}.md", damage["evidence"],
                       "the name it used to have is what makes the finding actionable")
+
+    def test_the_shapes_1_0_0_left_behind_are_all_inverted(self):
+        """Two shapes the check could not see, both from a real 1.0.0 clone.
+
+        `minder-ztn_<tail>` became `minder-minder_memory_<tail>` — an underscore
+        spelling the hyphen-only pattern never matched. And
+        `~/scripts/ztn-process-<tail>/run.sh` became
+        `minder-memory-process-<tail>`, whose predecessor was reconstructed as
+        `minder-ztn-process-<tail>` — a name that never existed, so the finding
+        was silently dropped.
+        """
+        _write(self.clone, "zettelkasten/_records/observations/own-shapes.md",
+               "---\nid: own-shapes\n---\n"
+               f"Backup in ~/minder-minder_memory_{self.IV}.\n"
+               f"Scripts in ~/scripts/minder-memory-process-{self.IV}/run.sh.\n")
+        _git(self.clone, "commit", "-qam", "what 1.0.0 made of the owner's names")
+
+        res = self._run("--json")
+        damage = next(p for p in json.loads(res.stdout)["probes"]
+                      if p["probe"] == "own-name-damage")
+        self.assertEqual(damage["status"], "fail", damage["evidence"])
+        self.assertIn(f"minder-ztn_{self.IV}", damage["evidence"],
+                      "the underscore shape and its before/now pair")
+        self.assertIn(f"ztn-process-{self.IV}", damage["evidence"],
+                      "the skill-extension shape and its before/now pair")
 
     # -- cannot run at all -------------------------------------------------- #
 

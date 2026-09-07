@@ -136,7 +136,8 @@ FILE_KEEP = "minder-memory-rebrand: keep-legacy-tokens"
 # afterwards betrays it, because the damaged line reads plausibly.
 # `minder-minder-memory-<tail>` is the same damage in that release's doubled
 # shape.
-_RENAMED_OWN_NAME_RE = re.compile(r"(?<![\w-])(?:minder-)?minder-memory-([^\W_][\w-]*)")
+_RENAMED_OWN_NAME_RE = re.compile(
+    r"(?<![\w-])(?:minder[-_])?minder[-_]memory[-_][^\W_][\w-]*")
 
 # The token a match sits in, so «is this a path?» can be asked of it.
 _TOKEN_CHARS = re.compile(r"[^\s`'\"()\[\],;<>|]+")
@@ -276,7 +277,7 @@ def pre_032_commit(repo: Path) -> str | None:
 
 
 def _admissible_own_names(text: str, root: Path | None = None) -> list[tuple[int, str, str]]:
-    """(line number, tail, whole line) for every `minder-memory-<tail>` that names a THING.
+    """(line number, matched token, whole line) for every renamed own name that names a THING.
 
     A path was the original test, and it was too narrow by half. The audit found
     the same dead name in a JSON scalar (`"vaultName": "minder-memory-иванов"`),
@@ -288,7 +289,7 @@ def _admissible_own_names(text: str, root: Path | None = None) -> list[tuple[int
     out: list[tuple[int, str, str]] = []
     for index, line in enumerate(text.splitlines(), start=1):
         for match in _RENAMED_OWN_NAME_RE.finditer(line):
-            tail = match.group(1)
+            matched = match.group(0)
             token = ""
             for candidate in _TOKEN_CHARS.finditer(line):
                 if candidate.start() <= match.start() < candidate.end():
@@ -302,8 +303,8 @@ def _admissible_own_names(text: str, root: Path | None = None) -> list[tuple[int
             # bullet, a wikilink. What is NOT admissible is the name in running
             # prose, where the product is being talked about rather than
             # something being named — and prose is what a preceding WORD marks.
-            if "/" in token or not before or before[-1] in ":=\"'[|(,-":
-                out.append((index, tail, line.rstrip()))
+            if "/" in token or not before or before[-1] in ":=\"'`[|(,-":
+                out.append((index, matched, line.rstrip()))
     return out
 
 
@@ -385,21 +386,19 @@ def _tree_paths(repo: Path, ref: str) -> frozenset[str]:
 
 
 def _own_name_predecessor(repo: Path, before: str, rel: str) -> str | None:
-    """`minder-ztn-<tail>` for a `minder-memory-<tail>` path, if the tree had it.
+    """The path this file had before the rename, if the pre-rename tree had it.
 
-    Exact and first, ahead of both the map inversion and similarity. When an
-    earlier release renamed a file BY the owner's own name, the predecessor is
-    that name — no threshold, no inference, just: did the pre-rename tree
-    contain it.
+    Exact and first, ahead of both the map inversion and similarity. The
+    candidate spellings come from `lib.ownership.former_spellings` — the one
+    home for «what could this have been called» — and the pre-rename TREE
+    decides between them. No threshold, no inference: did it exist.
     """
-    candidates = [
-        re.sub(r"(?<![\w-])minder-memory-", "minder-ztn-", rel, count=1),
-        re.sub(r"(?<![\w-])minder-minder-memory-", "minder-ztn-", rel, count=1),
-    ]
     tree = _tree_paths(repo, before)
-    for candidate in candidates:
-        if candidate != rel and candidate in tree:
-            return candidate
+    for match in _RENAMED_OWN_NAME_RE.finditer(rel):
+        for was in ownership.former_spellings(match.group(0)):
+            candidate = rel[:match.start()] + was + rel[match.end():]
+            if candidate != rel and candidate in tree:
+                return candidate
     return None
 
 
@@ -485,18 +484,30 @@ def find_own_name_damage(repo: Path, before: str) -> list[dict]:
         if shown.returncode != 0:
             continue  # the file did not exist before the migration — nothing to compare
         original = shown.stdout
-        for lineno, suffix, line in candidates:
-            was = f"minder-ztn-{suffix}"
-            matcher = re.compile(re.escape(was) + r"(?![\w-])", re.IGNORECASE)
-            # Paired by the suffix, then by proximity: several lines may carry
-            # the owner's name, and quoting the first one as «what it was»
-            # shows the owner a line that never moved.
-            matches = [(index, text.rstrip())
-                       for index, text in enumerate(original.splitlines(), start=1)
-                       if matcher.search(text)]
-            if not matches:
+        for lineno, matched, line in candidates:
+            # What the name could have been is `lib.ownership`'s answer; which
+            # of those it WAS is decided by the pre-rename text, the only
+            # authority that cannot be wrong. Paired by proximity after that:
+            # several lines may carry the owner's name, and quoting the first
+            # one as «what it was» shows them a line that never moved.
+            picked = None
+            for was in ownership.former_spellings(matched):
+                # Was the FORMER name the owner's at all? `~/minder-ztn-env` is
+                # the engine's own slug, and the engine renaming its own name is
+                # not damage. The same one home that decides the map may touch a
+                # name decides whether its rename is worth reporting.
+                if not ownership.own_name_spans(was, repo / BASE_DIR):
+                    continue
+                matcher = re.compile(re.escape(was) + r"(?![\w-])", re.IGNORECASE)
+                matches = [(index, text.rstrip())
+                           for index, text in enumerate(original.splitlines(), start=1)
+                           if matcher.search(text)]
+                if matches:
+                    picked = (was, min(matches, key=lambda pair: abs(pair[0] - lineno))[1])
+                    break
+            if picked is None:
                 continue
-            before_line = min(matches, key=lambda pair: abs(pair[0] - lineno))[1]
+            was, before_line = picked
             findings.append({"path": rel, "line": lineno, "text": line,
                              "before": before_line, "name": was})
     return findings

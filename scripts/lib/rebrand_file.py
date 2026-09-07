@@ -16,8 +16,13 @@ in `sed`.
 Exits 0 having changed nothing when the map is not present — a retired
 migration is not a failure, and the caller has a narrower fallback.
 
+The base matters. Which `ZTN_*` names are the OWNER's depends on what their
+roles declare and what their credential store holds, so the base has to reach
+the map — without it a role's own `ZTN_DEV` is renamed on this path even though
+the map protects it everywhere else.
+
 Usage:
-  python3 scripts/lib/rebrand_file.py <path> [<path> ...]
+  python3 scripts/lib/rebrand_file.py --base <vault> <path> [<path> ...]
 """
 
 from __future__ import annotations
@@ -32,16 +37,28 @@ from lib.portable import configure_std_streams  # noqa: E402
 
 def main(argv: list[str] | None = None) -> int:
     configure_std_streams()
-    paths = [Path(p) for p in (argv if argv is not None else sys.argv[1:])]
+    args = list(argv if argv is not None else sys.argv[1:])
+    base = None
+    if "--base" in args:
+        at = args.index("--base")
+        if at + 1 < len(args):
+            base = Path(args[at + 1])
+            del args[at:at + 2]
+    paths = [Path(p) for p in args]
     if not paths:
         print("rebrand_file: nothing to rewrite", file=sys.stderr)
         return 2
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "migrations"))
-        from _032_minder_memory_rebrand import rebrand_text  # noqa: PLC0415
+        import _032_minder_memory_rebrand as rename_map  # noqa: PLC0415
+        rebrand_text = rename_map.rebrand_text
     except Exception:  # noqa: BLE001 — the map is a migration and may be retired
         print("rebrand_file: the rename map is not present; nothing rewritten")
         return 0
+    # Teach the map whose base it is looking at, so a credential name the owner
+    # declared is recognised as theirs here exactly as it is everywhere else.
+    if base is not None and base.is_dir():
+        rename_map._OWNER_BASE = base
     for path in paths:
         if not path.is_file():
             continue

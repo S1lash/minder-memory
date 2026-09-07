@@ -73,13 +73,86 @@ class OwnNameSpanTests(unittest.TestCase):
         for engine in ("minder_ztn_session", "minder-ztn-platform", "MINDER_ZTN_BASE"):
             self.assertEqual(_spans(engine), [], engine)
 
-    def test_a_skill_name_with_the_owners_tail_is_theirs(self):
-        self.assertEqual(_spans(f"ztn-process-{IV}"), [f"ztn-process-{IV}"])
+    def test_a_skill_name_with_the_owners_tail_is_theirs_in_any_alphabet(self):
+        """The old rule claimed only non-ASCII tails, so it protected a Cyrillic
+        friend and renamed a Latin one — wrong for most of the people it exists
+        for, and wrong on a property that has nothing to do with ownership."""
+        for token in (f"ztn-process-{IV}", "ztn-process-ivanov", "ztn-lint-mine"):
+            self.assertEqual(_spans(token), [token], token)
 
     def test_the_engines_own_compounds_are_not(self):
         for engine in ("ztn-process", "ztn-agent-lens-add", "ztn-process-skill",
                        "ztn-update-distribution-mechanism", "ztn-roles-abc123"):
             self.assertEqual(_spans(engine), [], engine)
+
+    def test_the_engine_extension_list_is_re_derived_from_the_shipped_tree(self):
+        """A list nothing re-derives is a list that goes stale in silence.
+
+        Any engine artifact that extends a skill name reads today as
+        `minder-mem-<skill>-<tail>` or `minder-memory-<skill>-<tail>`; its
+        old-name equivalent must stay renameable, or the map will read it as the
+        owner's and freeze it. This re-runs that derivation over the shipped
+        tree and fails when a new one appears unlisted.
+        """
+        import re as _re
+        sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+        from lib.manifest import read_section_lite  # noqa: PLC0415
+
+        pattern = _re.compile(r"(?<![\w-])minder-(?:mem|memory)-([a-z][\w-]*)")
+        derived = set()
+        for entry in read_section_lite(_REPO_ROOT / ".engine-manifest.yml", "engine"):
+            target = _REPO_ROOT / entry.rstrip("/")
+            files = ([q for q in target.rglob("*") if q.is_file()] if target.is_dir()
+                     else ([target] if target.is_file() else []))
+            for f in files:
+                if "__pycache__" in f.parts:
+                    continue
+                try:
+                    text = f.read_bytes().decode("utf-8")
+                except (OSError, UnicodeDecodeError):
+                    continue
+                # A file that opts out of the rename is declaring that its
+                # old- and new-name tokens are INPUTS — a test fixture, a
+                # matcher, an example in a docstring — not artifacts the engine
+                # names. Counting those would make every example a rule.
+                if "minder-memory-rebrand: keep-legacy-tokens" in text:
+                    continue
+                for hit in pattern.finditer(text):
+                    tail = hit.group(1).rstrip("-")
+                    if not tail or tail in ownership.ENGINE_SKILL_NAMES:
+                        continue
+                    parts = tail.split("-")
+                    for n in range(len(parts) - 1, 0, -1):
+                        if "-".join(parts[:n]) in ownership.ENGINE_SKILL_NAMES:
+                            derived.add("ztn-" + tail)
+                            break
+
+        self.assertTrue(derived, "the derivation found nothing — it has stopped working")
+        unlisted = [tok for tok in sorted(derived) if _spans(tok) != []]
+        self.assertEqual(unlisted, [],
+                         "engine forms the map would now freeze as the owner's: "
+                         f"{unlisted}. Add them to ENGINE_EXTENDED_SKILL_TOKENS "
+                         "or ENGINE_EXTENDED_SKILL_SUFFIXES.")
+
+
+class FormerSpellingTests(unittest.TestCase):
+    """What a damaged name used to be — proposed here, decided by the old text."""
+
+    def test_both_separators_and_the_doubled_shape(self):
+        self.assertEqual(ownership.former_spellings(f"minder-memory-{IV}"),
+                         [f"minder-ztn-{IV}"])
+        self.assertEqual(ownership.former_spellings(f"minder-minder-memory-{IV}"),
+                         [f"minder-ztn-{IV}"])
+        # What 1.0.0 made of `minder-ztn_<tail>`: the underscore rule fired
+        # inside a name it should never have entered.
+        self.assertEqual(ownership.former_spellings(f"minder-minder_memory_{IV}"),
+                         [f"minder-ztn_{IV}"],
+                         "both separators are captured; they need not be the same")
+
+    def test_a_renamed_skill_extension_offers_its_real_predecessor(self):
+        """`minder-memory-process-x` was `ztn-process-x`, not `minder-ztn-process-x`."""
+        self.assertEqual(ownership.former_spellings(f"minder-memory-process-{IV}"),
+                         [f"minder-ztn-process-{IV}", f"ztn-process-{IV}"])
 
 
 class HarnessEntryTests(unittest.TestCase):

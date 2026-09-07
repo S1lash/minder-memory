@@ -44,6 +44,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from lib import ownership  # noqa: E402
 from lib.manifest import load_manifest, repo_root  # noqa: E402
 from lib.portable import configure_stdout  # noqa: E402
 
@@ -81,25 +82,65 @@ def guard(retired: list, excluded: list) -> list:
     ]
 
 
-def untracked_inside(root: Path, relpath: str) -> list:
-    """Files inside a directory that git does not track — the owner's, not ours.
+def _engine_ref(root: Path) -> str | None:
+    """The ref whose history says what the ENGINE has ever shipped.
 
-    A retired path names a directory the ENGINE shipped. What the engine put
-    there, git tracks. Anything else was put there by the owner, and a recursive
-    delete would take it with the module it was sitting beside — silently, in
-    the one step of the update whose whole job is deletion. So the directory is
-    reported instead, and the owner decides.
+    Which remote that is comes from `lib.ownership` — the same answer the
+    harness migration uses to decide which remote to repoint. Two answers to
+    «whose remote is this» would let one step protect what another deletes.
+    `sync_engine.sh` has already fetched it by the time retirement runs.
     """
-    try:
-        listed = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "--others", "--exclude-standard", "-z",
-             "--", relpath],
-            capture_output=True, check=True,
-        ).stdout
-    except (OSError, subprocess.CalledProcessError):
-        return []
-    return [p.decode("utf-8", "surrogateescape")
-            for p in listed.split(b"\0") if p.strip()]
+    remote, branch = ownership.sync_remote_and_branch(root)
+    if remote is None:
+        return None
+    for ref in (f"{remote}/{branch}", "FETCH_HEAD"):
+        probe = subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "-q", ref],
+                               capture_output=True, text=True)
+        if probe.returncode == 0 and probe.stdout.strip():
+            return ref
+    return None
+
+
+def _engine_ever_shipped(root: Path, ref: str, relpath: str) -> bool:
+    """Did this exact path ever exist in the engine's own history?"""
+    probe = subprocess.run(
+        ["git", "-C", str(root), "rev-list", "-n", "1", ref, "--", relpath],
+        capture_output=True, text=True, encoding="utf-8", errors="replace")
+    return probe.returncode == 0 and bool(probe.stdout.strip())
+
+
+def owner_files_inside(root: Path, relpath: str) -> tuple:
+    """(files the OWNER put in this directory, why we could not tell).
+
+    A retired path names a directory the ENGINE shipped, and the question is
+    which files inside it are the engine's. Git-tracked-ness cannot answer it:
+    the update tells the owner to `git add -A && git commit`, so a file of
+    theirs is untracked on the first sync and tracked on the second — and the
+    directory got deleted with their file inside it on the second.
+
+    What settles it is the engine's own history. A path the engine ever shipped
+    appears in the sync remote's log; a path it never shipped does not, whoever
+    has committed it since. No reachable history means no answer, and no answer
+    means keep — the cost of keeping a dead directory is a stale folder, the
+    cost of guessing wrong is the owner's file.
+    """
+    listed = subprocess.run(
+        ["git", "-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard",
+         "-z", "--", relpath],
+        capture_output=True, text=True, encoding="utf-8", errors="replace")
+    inside = [q for q in listed.stdout.split("\0") if q.strip()] if listed.returncode == 0 else []
+    for path in (root / relpath).rglob("*"):
+        if path.is_file():
+            rel = path.relative_to(root).as_posix()
+            if rel not in inside:
+                inside.append(rel)
+    if not inside:
+        return [], None
+    ref = _engine_ref(root)
+    if ref is None:
+        return sorted(inside), ("no engine history is reachable here, so which files are the "
+                                "engine's cannot be answered")
+    return sorted(q for q in inside if not _engine_ever_shipped(root, ref, q)), None
 
 
 def retire(root: Path, retired: list, dry_run: bool = False) -> tuple:
@@ -115,9 +156,9 @@ def retire(root: Path, retired: list, dry_run: bool = False) -> tuple:
         if not target.exists() and not target.is_symlink():
             continue
         if target.is_dir() and not target.is_symlink():
-            strays = untracked_inside(root, relpath)
-            if strays:
-                kept.append((relpath, strays))
+            strays, unanswerable = owner_files_inside(root, relpath)
+            if strays or unanswerable:
+                kept.append((relpath, strays, unanswerable))
                 continue
         removed.append(relpath)
         if dry_run:
@@ -157,9 +198,12 @@ def main() -> int:
         return 2
 
     removed, kept = retire(root, retired, dry_run=args.dry_run)
-    for path, strays in kept:
-        print(f"retire: kept {path} — it holds {len(strays)} file(s) the engine did not put "
-              "there, and a recursive delete would take them with it:")
+    for path, strays, unanswerable in kept:
+        if unanswerable:
+            print(f"retire: kept {path} — {unanswerable}. Nothing was deleted.")
+            continue
+        print(f"retire: kept {path} — it holds {len(strays)} file(s) the engine never "
+              "shipped, and a recursive delete would take them with it:")
         for stray in strays[:8]:
             print(f"    {stray}")
         print("    Move what you want to keep, then re-run the update.")

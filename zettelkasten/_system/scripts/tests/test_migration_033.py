@@ -158,6 +158,20 @@ class Migration033Tests(unittest.TestCase):
         self.assertNotIn("_(empty", queue)
         self.assertIn("033 ", queue)
 
+    def test_two_names_on_one_line_are_quoted_once(self):
+        """Two dead names on the same line are one line, not two problems."""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "_m33", _MIGRATIONS / HELPER)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        findings = [
+            {"path": "a.md", "line": 3, "text": "one line, two names", "before": "before"},
+            {"path": "a.md", "line": 3, "text": "one line, two names", "before": "before"},
+        ]
+        item = mod.render_item(findings, today="2026-09-07")
+        self.assertEqual(item.count("> `a.md:3`"), 1)
+
     def test_a_second_run_appends_nothing(self):
         self._base(damaged=True)
         self.assertEqual(self._run().returncode, 0)

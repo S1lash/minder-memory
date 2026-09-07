@@ -313,6 +313,31 @@ class Migration032Tests(unittest.TestCase):
         self.assertIn('"startupNote": "minder-memory.md"', after,
                       "the dashboard the engine renamed is repointed")
 
+    def test_the_seeder_path_knows_which_credentials_the_owner_declared(self):
+        """Which `ZTN_*` names are the owner's depends on THEIR roles and store.
+
+        Without the base, this path answered the question with the engine's
+        list alone — so a role's own `ZTN_DEV`, protected everywhere else, was
+        renamed here. A rule that holds in four places and not the fifth is not
+        a rule.
+        """
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "_rebrand_file2", _REPO_ROOT / "scripts" / "lib" / "rebrand_file.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        base = self.root / "zettelkasten"
+        (base / "_system" / "roles" / "ops").mkdir(parents=True, exist_ok=True)
+        (base / "_system" / "roles" / "ops" / "role.md").write_text(
+            "---\nid: ops\nsecrets:\n  - ZTN_DEV\n---\n", encoding="utf-8")
+        cfg = self.root / "conf.json"
+        _write(self.root, "conf.json", '{"k": "ZTN_DEV"}\n')
+
+        self.assertEqual(module.main(["--base", str(base), str(cfg)]), 0)
+        self.assertIn('"ZTN_DEV"', cfg.read_text(encoding="utf-8"),
+                      "a credential the owner declared keeps its name here too")
+
     def test_second_run_is_a_no_op(self):
         self._clone()
         self.assertEqual(_run(self.mig, cwd=self.root).returncode, 0)

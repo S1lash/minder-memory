@@ -72,8 +72,19 @@ class TokenMapTests(unittest.TestCase):
             "deploy@box:/srv/minder-ztn-\u0438\u0432\u0430\u043d\u043e\u0432",
         "minder-ztn-\u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430.md":
             "minder-ztn-\u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430.md",
-        # ...except the engine's own retired project identifier, which is ours.
+        # ...except the engine's own slug identifiers, which are ours and move
+        # whole. Before this they were spliced into
+        # `minder-minder-memory-env`: only `platform` had an early rule, and the
+        # repair for the doubled form runs before the generic rule that makes it.
         "minder-ztn-platform": "minder-memory-platform",
+        "~/minder-ztn-env": "~/minder-memory-env",
+        "~/minder-ztn-session": "~/minder-memory-session",
+        "~/minder-ztn-rebrand": "~/minder-memory-rebrand",
+        "~/minder-ztn-constitution": "~/minder-memory-constitution",
+        "~/minder-ztn-deploy_key": "~/minder-memory-deploy_key",
+        # ...and a skill name the owner extended is theirs, in any alphabet.
+        "ztn-process-ivanov": "ztn-process-ivanov",
+        "ztn-lint-mine": "ztn-lint-mine",
         "/ztn:process": "/minder:mem:process", "ztn:role:add": "minder:mem:role:add",
         "name: ztn:process": "name: minder:mem:process",
         "ztn-process": "minder-mem-process", "ztn-role": "minder-mem-role", "ztn-roles-": "minder-mem-roles-",
