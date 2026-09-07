@@ -170,7 +170,8 @@ class Migration033Tests(unittest.TestCase):
             {"path": "a.md", "line": 3, "text": "one line, two names", "before": "before"},
         ]
         item = mod.render_item(findings, today="2026-09-07")
-        self.assertEqual(item.count("> `a.md:3`"), 1)
+        self.assertEqual(item.count("> a.md:3"), 1, "one quote row per line")
+        self.assertIn("(1 line(s)", item, "the count is of LINES, not of findings")
 
     def test_a_second_run_appends_nothing(self):
         self._base(damaged=True)

@@ -924,6 +924,32 @@ class CoverageTests(unittest.TestCase):
             self.assertIsNotNone(rule, rel)
             self.assertEqual(rule.surface_class, expected, rel)
 
+    def test_an_owners_own_file_is_not_an_unclassified_region(self):
+        """A friend's note is not an engine defect, and they must never be told
+        to edit engine source because of one.
+
+        This is the file the walkthrough found: `_system/plugins/мой-плагин.md`,
+        kept on purpose when the engine retired the directory around it. The
+        audit demanded a CLASSIFICATION row for it — by name, in engine source —
+        on a clone whose owner had done nothing wrong, and the update's own
+        closing text is what told them to run this suite.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "zettelkasten"
+            (base / "_system" / "plugins").mkdir(parents=True)
+            # A real clone always has one; it is what says which paths the
+            # ENGINE ships, and so which are the owner's.
+            (Path(tmp) / ".engine-manifest.yml").write_text(
+                "version: 1\nengine:\n  - zettelkasten/_system/docs/\n"
+                "  - zettelkasten/_system/scripts/\ntemplate: []\nexclude: []\n",
+                encoding="utf-8")
+            (base / "_system" / "plugins" / "\u043c\u043e\u0439-\u043f\u043b\u0430\u0433\u0438\u043d.md").write_text(
+                "my own plugin note\n", encoding="utf-8")
+            _files, unclassified = ia.walk_base(base)
+            self.assertEqual(
+                [u["path"] for u in unclassified], [],
+                "the owner's own file was reported as an unclassified region")
+
     def test_real_base_has_no_unclassified_region(self):
         """The detector. A region added to the real base without a decision
         about what it is fails HERE, at the moment it is added, rather than

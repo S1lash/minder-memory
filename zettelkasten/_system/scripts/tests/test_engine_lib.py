@@ -163,12 +163,25 @@ class RetirementTests(unittest.TestCase):
     def test_the_manifests_retired_paths_are_all_gone_from_this_repo(self):
         """A path listed as retired and still present here means the removal
         was never finished on the authoring side — friends would then be told
-        to delete something the maintainer still ships."""
+        to delete something the maintainer still ships.
+
+        A path that survives because it holds files of the OWNER's is a
+        different thing entirely, and it is the correct outcome: retirement
+        keeps such a directory on purpose. This test ran on a friend's clone —
+        the update's own closing text asks them to run the suite — and told
+        them their notes were an engine defect. The ownership question has one
+        home; this asks it there rather than counting files.
+        """
         manifest = lm.load_manifest(REPO_ROOT)
-        still_here = [
-            path for path in (manifest.get("retired") or [])
-            if (REPO_ROOT / path).exists()
-        ]
+        still_here = []
+        for path in (manifest.get("retired") or []):
+            target = REPO_ROOT / path
+            if not target.exists():
+                continue
+            strays, unanswerable = rp.owner_files_inside(REPO_ROOT, path)
+            if strays or unanswerable:
+                continue      # kept for the owner's files, by design
+            still_here.append(path)
         self.assertEqual(still_here, [], "retired but still shipped")
 
     def test_a_retired_path_inside_owner_space_is_refused(self):

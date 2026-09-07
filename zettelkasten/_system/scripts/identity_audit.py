@@ -363,6 +363,24 @@ class ClassifiedFile:
     rule: SurfaceRule
 
 
+def _is_owners_own(rel: str, base: Path) -> bool:
+    """True when this path is the OWNER's, per `scripts/lib/ownership.py`.
+
+    `rel` is relative to the base; the ownership question is asked in repository
+    terms, so it is re-rooted first — against the repository of the base being
+    WALKED, never this module's own. Reading the wrong manifest would exempt
+    whatever the authoring tree happens not to ship, in a temp fixture that has
+    no manifest at all, and the detector's whole job is to notice a new region.
+    """
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))
+        from lib import ownership  # noqa: PLC0415
+    except Exception:  # noqa: BLE001 — no ownership module means no exemption
+        return False
+    return ownership.in_owner_space("zettelkasten/" + rel.lstrip("/"), base.parent)
+
+
 def walk_base(root: Path) -> tuple[list[ClassifiedFile], list[dict]]:
     """Every markdown file in the base, classified — plus the ones no rule
     claims, as findings.
@@ -378,6 +396,14 @@ def walk_base(root: Path) -> tuple[list[ClassifiedFile], list[dict]]:
         if any(part.startswith(".") for part in rel.split("/")):
             continue
         rule = classify(rel)
+        if rule is None and _is_owners_own(rel, root):
+            # A file of the OWNER's, sitting where the engine has no rule —
+            # typically inside a directory the engine retired and kept for
+            # exactly this file. Demanding a CLASSIFICATION row for it tells a
+            # friend that their own note is an engine defect and asks them to
+            # edit engine source to silence it. Whose file it is has one home;
+            # this asks it there. Not scanned, not reported, not their problem.
+            continue
         if rule is None:
             unclassified.append({
                 "identity": None,

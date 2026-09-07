@@ -49,10 +49,50 @@ def two_step_message(version: str) -> str:
         f"Update to {MIN_UPDATABLE_VERSION} first:\n"
         f"    bash scripts/sync_engine.sh --self-heal --branch {FLOOR_BRANCH}\n"
         f"commit what it applied (\"/minder:mem:update\" does that for you), then run the\n"
-        f"update again. (`--self-heal` puts that release's own update machinery in\n"
-        f"place first; without it scripts/ holds the newer copy and the sync refuses\n"
-        f"the tree as dirty.)"
+        f"update again. `--self-heal` is what puts that release's own update machinery\n"
+        f"in place first — without it the step runs the newer script against a clone it\n"
+        f"was never meant to touch."
     )
+
+
+def version_at_head(repo_root) -> str:
+    """The engine version this clone had BEFORE the sync overwrote the file.
+
+    A sync copies `integrations/VERSION` early, so by the time anything in the
+    NEW tree runs, the file already says the new number. What the clone was is
+    in `HEAD` — it has not committed yet, and it is about to be asked to.
+    """
+    import subprocess  # noqa: PLC0415
+    from pathlib import Path as _Path  # noqa: PLC0415
+    shown = subprocess.run(
+        ["git", "-C", str(repo_root), "show", "HEAD:integrations/VERSION"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if shown.returncode != 0:
+        local = _Path(repo_root) / "integrations/VERSION"
+        return local.read_text(encoding="utf-8").strip() if local.is_file() else ""
+    return shown.stdout.strip()
+
+
+def refuse_if_below_floor(repo_root) -> str | None:
+    """The two-step message when this clone jumped the floor, else None.
+
+    Called from `retire_paths.py`, which is the FIRST thing a sync executes out
+    of the newly-copied tree — and that is the point. A pre-floor clone runs its
+    OWN `sync_engine.sh`, so a refusal written only in the new shell script is
+    never reached: the old script copies the new engine over itself and carries
+    on. Reaching this code AT ALL means a tree carrying it was copied in, and a
+    tree carrying it is above the floor by construction — so a clone below the
+    floor at HEAD is, by definition, the jump this refuses.
+    """
+    version = version_at_head(repo_root)
+    if not version:
+        return None
+    try:
+        if not below_floor(version):
+            return None
+    except ValueError:
+        return None
+    return two_step_message(version)
 
 
 def main(argv: list[str] | None = None) -> int:

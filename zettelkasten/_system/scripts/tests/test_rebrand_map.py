@@ -77,11 +77,20 @@ class TokenMapTests(unittest.TestCase):
         # `minder-minder-memory-env`: only `platform` had an early rule, and the
         # repair for the doubled form runs before the generic rule that makes it.
         "minder-ztn-platform": "minder-memory-platform",
-        "~/minder-ztn-env": "~/minder-memory-env",
-        "~/minder-ztn-session": "~/minder-memory-session",
-        "~/minder-ztn-rebrand": "~/minder-memory-rebrand",
-        "~/minder-ztn-constitution": "~/minder-memory-constitution",
-        "~/minder-ztn-deploy_key": "~/minder-memory-deploy_key",
+        # ...and a HYPHEN tail is an ordinary owner folder. The engine's only
+        # hyphen identifier is `platform`; the underscore forms below are the
+        # python identifiers, and applying one list to both separators rewrote
+        # `~/minder-ztn-env` into a path that does not exist — leaving no trace,
+        # because the engine renaming its own slug is not damage.
+        "~/minder-ztn-env": "~/minder-ztn-env",
+        "~/minder-ztn-session": "~/minder-ztn-session",
+        "~/minder-ztn-rebrand": "~/minder-ztn-rebrand",
+        "~/minder-ztn-constitution": "~/minder-ztn-constitution",
+        "~/minder-ztn-deploy_key": "~/minder-ztn-deploy_key",
+        "~/minder-ztn-mcp": "~/minder-ztn-mcp",
+        "~/minder-ztn-backup": "~/minder-ztn-backup",
+        "minder_ztn_session": "minder_memory_session",
+        "minder_ztn_platform": "minder_memory_platform",
         # ...and a skill name the owner extended is theirs, in any alphabet.
         "ztn-process-ivanov": "ztn-process-ivanov",
         "ztn-lint-mine": "ztn-lint-mine",

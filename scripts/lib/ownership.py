@@ -41,7 +41,8 @@ __all__ = [
     "ENGINE_ENV_NAMES",
     "ENGINE_SKILL_NAMES",
     "ENGINE_LEGACY_HARNESS",
-    "ENGINE_SLUG_TAILS",
+    "ENGINE_SLUG_TAILS_HYPHEN",
+    "ENGINE_SLUG_TAILS_UNDERSCORE",
     "ENGINE_EXTENDED_SKILL_TOKENS",
     "ENGINE_EXTENDED_SKILL_SUFFIXES",
     "former_spellings",
@@ -178,13 +179,28 @@ def is_engine_legacy_harness_entry(name: str, kind: str) -> bool:
 # `20260519-reflection-minder-ztn-origin-story` is a note's own slug with the
 # product named inside it, and that one moves with the product.
 _OWN_SLUG_RE = re.compile(r"(?i)(?<![\w-])minder[-_]ztn[-_][^\W_][\w-]*")
-# Tails the ENGINE owns. The hyphen form is a repository or folder name and the
-# engine has exactly one of those; the underscore form is how the engine writes
-# its own python identifiers and config keys — and an owner's folder name is
-# indistinguishable from one by shape alone, `minder_ztn_ivanov` against
-# `minder_ztn_session`. So the engine's are named here, and everything else with
-# a tail is the owner's.
-ENGINE_SLUG_TAILS = frozenset({
+# Tails the ENGINE owns — SEPARATELY per separator, because the two are
+# different kinds of thing, and one list serving both was wrong in the expensive
+# direction. A hyphen form is a repository or project identifier, and the engine
+# has exactly one: `minder-ztn-platform`, its retired project id. An underscore
+# form is how the engine writes python identifiers and config keys, and an
+# owner's folder name is indistinguishable from one by shape alone —
+# `minder_ztn_ivanov` against `minder_ztn_session`.
+#
+# Applying the underscore list to hyphens meant `~/minder-ztn-env`, an ordinary
+# owner folder, was rewritten to `~/minder-memory-env` — and since the engine
+# renaming its own slug is not damage, it left no trace anywhere for the owner
+# to find.
+#
+# Derived from the tree as it stood BEFORE the rename (`git grep -oE
+# 'minder[-_]ztn[-_][A-Za-z0-9][A-Za-z0-9_-]*'` over the engine paths), which is
+# the only place these forms ever lived: hyphen gave `mcp`, `skeleton` and the
+# `backup-` prefix, none of which the engine needs renamed — `minder-ztn-mcp`
+# survives on purpose in the manifest's `retired:` row, and the backup directory
+# is matched by name in `is_engine_owned_name`. `test_ownership.py` re-derives
+# the underscore side from the shipped tree and fails when a new one appears.
+ENGINE_SLUG_TAILS_HYPHEN = frozenset({"platform"})
+ENGINE_SLUG_TAILS_UNDERSCORE = frozenset({
     "platform", "session", "constitution", "env", "deploy_key", "rebrand",
 })
 # Any `ZTN_` name at all — no `[A-Z]` anchor after the underscore, because
@@ -225,8 +241,11 @@ def own_name_spans(text: str, base: Path | None = None) -> list[tuple[int, int]]
     spans: list[tuple[int, int]] = []
     for match in _OWN_SLUG_RE.finditer(text):
         token = match.group(0)
-        tail = re.split(r"[-_]", token, maxsplit=2)[2].lower()
-        if tail in ENGINE_SLUG_TAILS:
+        pieces = re.split(r"([-_])", token, maxsplit=4)
+        separator, tail = pieces[3], pieces[4].lower()
+        engine_tails = (ENGINE_SLUG_TAILS_HYPHEN if separator == "-"
+                        else ENGINE_SLUG_TAILS_UNDERSCORE)
+        if tail in engine_tails:
             continue
         # `MINDER_ZTN_BASE` is the engine's own environment variable wearing the
         # same shape. The env question answers it — in one place, as everything
@@ -341,6 +360,8 @@ OWNER_DATA_FILES: tuple[str, ...] = (
     "zettelkasten/minder-memory.md",
 )
 
+BASE_PREFIX = "zettelkasten/"
+
 _MANIFEST_CACHE: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {}
 
 
@@ -382,8 +403,21 @@ def in_owner_space(rel: str, root: Path | None = None) -> bool:
     """
     if rel.startswith(OWNER_DATA_PREFIXES) or rel in OWNER_DATA_FILES:
         return True
-    _engine, excluded = _manifest_sections(root)
-    return any(_under(rel, entry) for entry in excluded)
+    engine, excluded = _manifest_sections(root)
+    if any(_under(rel, entry) for entry in excluded):
+        return True
+    # Inside the BASE, what the engine does not ship is the owner's. The engine
+    # writes only what it declares, so a path under the base that the manifest
+    # neither ships nor excludes was put there by them — a folder of notes the
+    # engine has no name for, or a file left behind when a directory it shipped
+    # was retired and kept for exactly that reason.
+    #
+    # Only inside the base, and only when the manifest could actually be read:
+    # an empty engine list means «unknown», and unknown must not turn the whole
+    # tree into owner space.
+    if engine and rel.startswith(BASE_PREFIX):
+        return not any(_under(rel, entry) for entry in engine)
+    return False
 
 
 def is_engine_path(rel: str, root: Path | None = None) -> bool:

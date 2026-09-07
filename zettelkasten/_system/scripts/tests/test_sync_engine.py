@@ -13,6 +13,7 @@ contents.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import textwrap
@@ -104,6 +105,10 @@ def _seed_upstream(tmp: Path, version: str = "1.0.2") -> Path:
     (up / "integrations").mkdir(parents=True)
     (up / "integrations" / "VERSION").write_text(f"{version}\n", encoding="utf-8")
     (up / "engine-doc.md").write_text("current\n", encoding="utf-8")
+    # A path upstream once shipped. Retirement asks the engine's own history
+    # before removing anything, so a retired path that upstream never had is
+    # the owner's — correctly — and would test the guard instead of the sweep.
+    (up / "old-doc.md").write_text("to be retired\n", encoding="utf-8")
     # `__pycache__` is regenerated with different bytes the moment python runs,
     # which would make `scripts/` legitimately dirty and abort every sync here.
     shutil.copytree(_SCRIPTS, up / "scripts",
@@ -113,6 +118,57 @@ def _seed_upstream(tmp: Path, version: str = "1.0.2") -> Path:
     _git(up, "add", "-A")
     _git(up, "commit", "-q", "-m", "engine")
     return up
+
+
+# What a clone BELOW the floor carries as its own `sync_engine.sh`: it copies the
+# engine paths over itself and then runs the NEW tree's `retire_paths.py` and
+# migration runner. It has never heard of a floor, so a refusal written only in
+# the new shell script is never read by the one clone that needs it.
+_PRE_FLOOR_SCRIPT = """#!/usr/bin/env bash
+set -euo pipefail
+REMOTE="upstream"
+BRANCH="main"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --remote) REMOTE="$2"; shift ;;
+    --branch) BRANCH="$2"; shift ;;
+    *) ;;
+  esac
+  shift
+done
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+git fetch -q "$REMOTE" "$BRANCH"
+for p in $(python3 scripts/manifest_paths.py --section engine); do
+  git checkout "$REMOTE/$BRANCH" -- "$p" 2>/dev/null || true
+done
+python3 "$REPO_ROOT/scripts/retire_paths.py" || exit 2
+python3 "$REPO_ROOT/scripts/run_migrations.py" || exit 2
+echo "[old] done"
+"""
+
+def _seed_floor_branch(up: Path) -> None:
+    """`release/0.69.0`, as the skeleton really publishes it.
+
+    The floor release carries the owner-file guard but NOT the floor refusal:
+    the refusal is enforced from the tree a sync copies IN, and a floor release
+    that refuses would abort step one of the very two-step path it exists to
+    serve. A fixture that branches the current tree unchanged models a floor
+    release that refuses itself — and would have hidden that.
+    """
+    _git(up, "checkout", "-q", "-b", "release/0.69.0")
+    retire = up / "scripts" / "retire_paths.py"
+    text = retire.read_text(encoding="utf-8")
+    text = re.sub(r"    # The floor, enforced from the tree that just landed\..*?        return 2\n\n",
+                  "", text, flags=re.S)
+    text = text.replace(
+        "from lib.version_floor import refuse_if_below_floor  # noqa: E402\n", "", 1)
+    with open(retire, "w", encoding="utf-8", newline="") as handle:
+        handle.write(text)
+    # A tree that never carried the refusal has nothing to strip; committing
+    # nothing is not an error here.
+    _git(up, "commit", "-q", "-am", "the floor release does not refuse itself", check=False)
+    _git(up, "checkout", "-q", "main")
 
 
 def _clone(tmp: Path, up: Path, *, version: str) -> Path:
@@ -147,7 +203,7 @@ class SyncEngineTests(unittest.TestCase):
         """A friend below the floor runs the skill, which self-heals from the
         current branch first; the refusal must not leave the floor release's
         sync facing files it does not have (it would refuse the tree as dirty)."""
-        _git(self.up, "branch", "release/0.69.0")
+        _seed_floor_branch(self.up)
         clone = _clone(self.tmp, self.up, version="0.60.0")
         _git(clone, "rm", "-q", "scripts/lib/version_floor.py")
         # ...and an older copy of something the restore will overwrite, so the
@@ -172,8 +228,31 @@ class SyncEngineTests(unittest.TestCase):
         step_one = _run(clone, "--self-heal", "--branch", "release/0.69.0")
         self.assertEqual(step_one.returncode, 0, step_one.stdout + step_one.stderr)
 
+    def test_a_pre_floor_clone_running_its_own_script_is_still_refused(self):
+        """A refusal in the new shell script is never read by the clone it stops.
+
+        A pre-floor clone runs its OWN `sync_engine.sh`, which copies the new
+        engine over itself and carries on — so the jump the floor exists to
+        prevent happened anyway and reported success, and after the new script's
+        own refusal restored `scripts/` from HEAD, the next plain run did it
+        again. The refusal has to live in the first thing the sync executes out
+        of the tree it copies IN, and leave the clone as it found it.
+        """
+        clone = _clone(self.tmp, self.up, version="0.65.0")
+        (clone / "scripts" / "sync_engine.sh").write_text(_PRE_FLOOR_SCRIPT, encoding="utf-8")
+        _git(clone, "commit", "-q", "-am", "the updater a pre-floor clone actually carries")
+
+        result = _run(clone)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("below 0.69.0", result.stdout + result.stderr)
+        self.assertEqual((clone / "integrations" / "VERSION").read_text(encoding="utf-8").strip(),
+                         "0.65.0", "the refused jump must not have landed")
+        left = [ln for ln in _git(clone, "status", "--porcelain").stdout.splitlines()
+                if ln.strip() and "__pycache__" not in ln]
+        self.assertEqual(left, [], "a refusal leaves the clone as it found it")
+
     def test_the_floor_branch_itself_is_the_first_step_and_is_not_refused(self):
-        _git(self.up, "branch", "release/0.69.0")
+        _seed_floor_branch(self.up)
         clone = _clone(self.tmp, self.up, version="0.60.0")
         result = _run(clone, "--self-heal", "--branch", "release/0.69.0")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -204,11 +283,12 @@ class SyncEngineTests(unittest.TestCase):
             + "\nretired:\n  - old-doc.md\n",
             encoding="utf-8",
         )
+        (self.up / "old-doc.md").unlink()
         _git(self.up, "add", "-A")
         _git(self.up, "commit", "-q", "-m", "add new-doc, retire old-doc")
-        (clone / "old-doc.md").write_text("to be retired\n", encoding="utf-8")
-        _git(clone, "add", "-A")
-        _git(clone, "commit", "-q", "-m", "clone carries the old doc")
+        # The clone already carries it: upstream shipped it before retiring it,
+        # which is what a retired path IS.
+        self.assertTrue((clone / "old-doc.md").is_file())
 
         result = _run(clone)
         self.assertEqual(result.returncode, 0, result.stderr)

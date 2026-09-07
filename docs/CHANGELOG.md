@@ -2,6 +2,18 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.0.9 — The floor holds, and your folders are yours
+
+If your clone is older than 0.69.0 the update refuses and stays refused. It used
+to refuse once and then, on the very next plain run, do the jump anyway and
+report success — and the first step it sends you to could delete a folder of
+yours without naming it. Both are fixed, the second on the 0.69.0 release itself,
+because that is the code that runs for you.
+
+A folder like `~/minder-ztn-env` is yours and stays exactly as you wrote it; only
+the engine's own identifiers move. And when the check finds names an earlier
+release damaged, it lists each line once and tells you where the full list is.
+
 ## 1.0.8 — Nothing of yours is swept up
 
 A file of yours sitting inside a folder the engine retires is now recognised by

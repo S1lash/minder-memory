@@ -70,6 +70,7 @@ VERSION_FILE = "integrations/VERSION"
 DASHBOARD = "zettelkasten/minder-memory.md"
 LEGACY_DASHBOARD = "zettelkasten/minder-ztn.md"
 LEDGER = ".engine-migrations.jsonl"
+CLARIFICATIONS = "zettelkasten/_system/state/CLARIFICATIONS.md"
 SECRETS = "zettelkasten/_system/state/secrets.enc.json"
 ROLES_RUNNER = "zettelkasten/_system/scripts/roles_run.py"
 BASE_DIR = "zettelkasten"
@@ -513,6 +514,32 @@ def find_own_name_damage(repo: Path, before: str) -> list[dict]:
     return findings
 
 
+def own_name_rows(findings: list[dict]) -> list[str]:
+    """One row per damaged LINE, in the order found. The one home for both readers.
+
+    Two damaged names on the same line are the same line, not two problems. The
+    check and migration 033 render the same findings and drifted apart on this:
+    033 deduped, the check did not, so its list filled with repeats and — being
+    truncated to five — never reached the shapes that mattered. A count of
+    findings is not a count of lines either, and the two disagree exactly when
+    the duplicates are worst.
+    """
+    rows: list[str] = []
+    seen: set = set()
+    for f in findings:
+        key = (f["path"], f["line"], f["text"].strip(), f["before"].strip())
+        if key in seen:
+            continue
+        seen.add(key)
+        if f.get("kind") == "file-name":
+            rows.append(f"{f['path']} — your own note NAME was renamed; it was "
+                        f"{f['before']}")
+        else:
+            rows.append(f"{f['path']}:{f['line']} now «{f['text'].strip()}», "
+                        f"was «{f['before'].strip()}»")
+    return rows
+
+
 def probe_own_name_damage(repo: Path) -> dict:
     before = pre_032_commit(repo)
     if before is None:
@@ -527,12 +554,14 @@ def probe_own_name_damage(repo: Path) -> dict:
     if not findings:
         return _result("own-name-damage", OK,
                        "no name of yours was renamed into a path that does not exist")
-    shown = "; ".join(f"{f['path']}:{f['line']} now «{f['text'].strip()}», was «{f['before'].strip()}»"
-                      for f in findings[:5])
+    rows = own_name_rows(findings)
+    shown = "; ".join(rows[:5])
+    more = (f" …and {len(rows) - 5} more — migration 033 files the full list as a "
+            f"clarification in {CLARIFICATIONS}" if len(rows) > 5 else "")
     return _result("own-name-damage", FAIL,
-                   f"{len(findings)} line(s) where your own name was renamed by an earlier "
+                   f"{len(rows)} line(s) where your own name was renamed by an earlier "
                    f"release into a path that does not exist — restore by hand, nothing here "
-                   f"rewrites them: {shown}")
+                   f"rewrites them: {shown}{more}")
 
 
 def probe_dashboard(repo: Path) -> dict:

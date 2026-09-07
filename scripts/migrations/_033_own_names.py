@@ -45,6 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from check_update import (  # noqa: E402
     find_own_name_damage,
     find_own_name_file_renames,
+    own_name_rows,
     pre_032_commit,
 )
 from lib import ownership  # noqa: E402
@@ -77,7 +78,7 @@ def render_item(findings: list[dict], *, today: str) -> str:
     lines = [
         "",
         f"## 033 {today} own-names-after-the-rename "
-        f"({len(findings)} line(s) — 1 process-compatibility)",
+        f"({len(own_name_rows(findings))} line(s) — 1 process-compatibility)",
         "",
         f"### {today} — process-compatibility: a name of yours was renamed by an earlier release",
         "",
@@ -90,20 +91,14 @@ def render_item(findings: list[dict], *, today: str) -> str:
         "",
         "**Quote:**",
     ]
-    # One row per line, not per finding: two damaged names on the same line are
-    # the same line, and quoting it twice makes the item read like two problems.
-    seen_rows: set = set()
-    for f in findings:
-        row = (f["path"], f["line"], f["text"].strip(), f["before"].strip())
-        if row in seen_rows:
-            continue
-        seen_rows.add(row)
-        lines.append(f"> `{f['path']}:{f['line']}` now: {f['text'].strip()}")
-        lines.append(f"> before the rename: {f['before'].strip()}")
-        if f.get("kind") == "file-name":
-            lines.append("> your own note NAME was renamed; restore with `git mv` plus the "
-                         "`id:` and wikilinks, or keep the new name — either is fine, but "
-                         "the file and the links that point at it must agree")
+    # The rows come from the one home the post-update check renders with, so the
+    # two readers of the same findings cannot drift apart on what a row is.
+    for row in own_name_rows(findings):
+        lines.append(f"> {row}")
+        if "note NAME was renamed" in row:
+            lines.append("> restore with `git mv` plus the `id:` and wikilinks, or keep the "
+                         "new name — either is fine, but the file and the links that point "
+                         "at it must agree")
     lines += [
         "",
         "**Context:** The 1.0.0 rename map could not yet tell the product from its owner. A "

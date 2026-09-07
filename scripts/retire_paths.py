@@ -46,6 +46,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from lib import ownership  # noqa: E402
 from lib.manifest import load_manifest, repo_root  # noqa: E402
+from lib.version_floor import refuse_if_below_floor  # noqa: E402
 from lib.portable import configure_stdout  # noqa: E402
 
 
@@ -160,6 +161,19 @@ def retire(root: Path, retired: list, dry_run: bool = False) -> tuple:
             if strays or unanswerable:
                 kept.append((relpath, strays, unanswerable))
                 continue
+        elif not target.is_symlink():
+            # A retired FILE gets the same question, with a deliberately
+            # different answer on doubt. Unlinking one named path is not a
+            # recursive sweep: the manifest naming it IS the engine's statement
+            # that the path is its own, and refusing whenever history happens to
+            # be unreachable would make retirement a no-op on any clone that has
+            # not fetched. So doubt does not stop a file — only a positive
+            # «the engine never shipped this» does, which catches a mistyped
+            # retired row or an owner file sitting at that exact name.
+            ref = _engine_ref(root)
+            if ref is not None and not _engine_ever_shipped(root, ref, relpath):
+                kept.append((relpath, [relpath], None))
+                continue
         removed.append(relpath)
         if dry_run:
             continue
@@ -168,6 +182,42 @@ def retire(root: Path, retired: list, dry_run: bool = False) -> tuple:
         else:
             target.unlink()
     return removed, kept
+
+
+def _restore_engine_paths(root: Path, engine: list) -> int:
+    """Put the engine paths back to HEAD, additions included. Returns how many.
+
+    Reverting what the copy CHANGED is only half of it: the new release also
+    brings files the old one never had, and `git checkout HEAD -- <dir>` cannot
+    remove what HEAD does not know about. Leaving those behind keeps every
+    engine directory dirty, and the two-step path's first step then refuses the
+    tree — the same dead end, one step further along.
+    """
+    restored = 0
+    for path in engine:
+        rel = path.rstrip("/")
+        # `--cached`: the copy STAGES what it writes, and a staged addition whose
+        # worktree copy is gone is invisible to a worktree-vs-HEAD diff — it
+        # differs from neither side. The index is where «this path is new» is
+        # recorded, and it is the form the sync's own floor refusal already uses.
+        added = subprocess.run(
+            ["git", "-C", str(root), "-c", "core.quotepath=false", "diff", "--cached",
+             "--name-only", "--diff-filter=A", "HEAD", "--", rel],
+            capture_output=True, text=True, encoding="utf-8", errors="replace")
+        for extra in added.stdout.splitlines():
+            extra = extra.strip()
+            if not extra:
+                continue
+            subprocess.run(["git", "-C", str(root), "rm", "-q", "--cached",
+                            "--ignore-unmatch", "--", extra], capture_output=True)
+            try:
+                (root / extra).unlink()
+            except OSError:
+                pass
+        undo = subprocess.run(["git", "-C", str(root), "checkout", "HEAD", "--", rel],
+                              capture_output=True, text=True)
+        restored += 1 if undo.returncode == 0 else 0
+    return restored
 
 
 def main() -> int:
@@ -182,6 +232,25 @@ def main() -> int:
     manifest = load_manifest(root)
     retired = [str(p) for p in (manifest.get("retired") or [])]
     excluded = [str(p) for p in (manifest.get("exclude") or [])]
+
+    # The floor, enforced from the tree that just landed. A clone below it runs
+    # its OWN sync script, which never sees the new script's refusal — it copies
+    # the new engine over itself and keeps going, and the jump the floor exists
+    # to prevent happens anyway, reporting success. This is the first thing that
+    # sync runs out of the new tree, so it is where the refusal has to live.
+    refusal = refuse_if_below_floor(root)
+    if refusal is not None:
+        print(refusal, file=sys.stderr)
+        # Leave the tree as it was found. By the time anything in the new tree
+        # runs, the sync has already copied every engine path over — so an abort
+        # that only stops here leaves the clone holding a half-applied engine:
+        # files from the new release, migrations never run, and the two-step
+        # path's first step then refusing the tree as dirty. The clone has not
+        # committed, so HEAD is exactly the state before this sync.
+        restored = _restore_engine_paths(root, [str(p) for p in (manifest.get("engine") or [])])
+        print(f"retire: nothing was removed, and the {restored} engine path(s) this sync "
+              "had already copied were put back. Your clone is as it was.", file=sys.stderr)
+        return 2
 
     if not retired:
         print("retire: nothing listed")
