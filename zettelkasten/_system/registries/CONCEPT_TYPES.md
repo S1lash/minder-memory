@@ -169,7 +169,7 @@ explicitly excludes them from the assignable set.
 Minder's `ConceptType.fromCode(code)` accepts any of the 18 codes
 verbatim and falls back to `OTHER` on unknown. Minder Memory's emission
 guarantees codes are always in the 16 emit set, so downstream never
-hits the `OTHER` fallback for a Minder Memory-emitted entry — `OTHER` rows in
+hits the `OTHER` fallback for an entry the engine emitted — `OTHER` rows in
 Minder come from external sources or owner manual edits.
 
 When Minder's enum evolves:

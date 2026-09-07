@@ -2,6 +2,13 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.0.12 — Two words, not one
+
+Three sentences the engine ships had the product's name welded to the next word
+by a hyphen (`Minder Memory-emitted`, `Minder Memory-side`), a shape the rename
+left behind where the old name had been a single word. They read as two words
+now. Your own notes are yours and were not touched.
+
 ## 1.0.11 — Refusals that actually refuse
 
 The update tells you apart from your manifest again. A refusal because your

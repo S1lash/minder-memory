@@ -296,7 +296,7 @@ the boundary.
 
 The Minder enum is mirrored as `_common.py::MINDER_CONCEPT_DOMAIN`
 for documentation and downstream consumer reference; it does NOT
-participate in Minder Memory-side validation of `domains:` values.
+participate in engine-side validation of `domains:` values.
 
 ---
 
