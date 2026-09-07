@@ -47,6 +47,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import ownership  # noqa: E402
 from lib.manifest import load_manifest, repo_root  # noqa: E402
 from lib.version_floor import refuse_if_below_floor  # noqa: E402
+
+# Two refusals leave this script, and they ask the caller for opposite things:
+# one says the ENGINE's manifest is wrong and wants it reported, the other says
+# THIS CLONE is too old and wants the two-step path. A single exit code made
+# the sync print «fix the manifest's retired: section» at a friend whose
+# manifest was fine, and the update skill call it an engine bug. The numbers
+# are defined here, once, and `sync_engine.sh` branches on them by name.
+EXIT_OK = 0
+EXIT_GUARD_REFUSED = 2      # a retired path falls inside owner space
+EXIT_FLOOR_REFUSED = 3      # this clone is below the version floor
 from lib.portable import configure_stdout  # noqa: E402
 
 
@@ -250,7 +260,7 @@ def main() -> int:
         restored = _restore_engine_paths(root, [str(p) for p in (manifest.get("engine") or [])])
         print(f"retire: nothing was removed, and the {restored} engine path(s) this sync "
               "had already copied were put back. Your clone is as it was.", file=sys.stderr)
-        return 2
+        return EXIT_FLOOR_REFUSED
 
     if not retired:
         print("retire: nothing listed")
@@ -264,7 +274,7 @@ def main() -> int:
             print(f"  {path}", file=sys.stderr)
         print("  Retire an owner-produced artifact with a migration that says so.",
               file=sys.stderr)
-        return 2
+        return EXIT_GUARD_REFUSED
 
     removed, kept = retire(root, retired, dry_run=args.dry_run)
     for path, strays, unanswerable in kept:

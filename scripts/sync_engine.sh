@@ -323,7 +323,18 @@ done
 export ENGINE_SYNC_REMOTE="$REMOTE"
 export ENGINE_SYNC_BRANCH="$BRANCH"
 
-if ! python3 "$REPO_ROOT/scripts/retire_paths.py"; then
+# Two refusals come out of `retire_paths.py` and they want opposite things from
+# the reader. Their codes are defined there (EXIT_GUARD_REFUSED=2,
+# EXIT_FLOOR_REFUSED=3); printing one trailer for both told a friend whose
+# manifest was perfectly fine to go and fix it.
+python3 "$REPO_ROOT/scripts/retire_paths.py"
+RETIRE_RC=$?
+if [ $RETIRE_RC -eq 3 ]; then
+  # The floor. The refusal itself printed the two-step path; adding anything
+  # about the manifest here would send them looking for a fault that is not
+  # theirs and does not exist.
+  exit 2
+elif [ $RETIRE_RC -ne 0 ]; then
   echo >&2
   echo "error: retirement refused — see the paths above." >&2
   echo "  Nothing was deleted. Fix the manifest's retired: section and re-run." >&2

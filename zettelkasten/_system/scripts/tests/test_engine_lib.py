@@ -23,6 +23,8 @@ from lib import manifest as lm  # noqa: E402
 from lib import portable as lp  # noqa: E402
 import retire_paths as rp  # noqa: E402
 
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+
 
 class PortableTests(unittest.TestCase):
     def test_emit_lines_writes_lf_only(self):
@@ -333,3 +335,40 @@ class RetirementOwnerFileTests(unittest.TestCase):
         self.assertEqual(removed, [])
         self.assertIsNotNone(kept[0][2])
         self.assertIn("engine history", kept[0][2])
+
+
+class TwoStepPathTests(unittest.TestCase):
+    """The floor's instructions, and the trailers around them."""
+    # minder-memory-rebrand: keep-legacy-tokens
+
+    def test_the_doc_quotes_the_block_the_refusal_prints(self):
+        """Two copies of a journey's commands drift, and the friend follows one.
+
+        The published doc had a third step without `--self-heal`, so a clone that
+        followed it ran the 0.69.0 script it had just committed and finished with
+        that release's closing text — no self-check, no commit line, four hundred
+        paths left uncommitted with nothing saying so.
+        """
+        import sys as _sys
+        _sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+        from lib import version_floor  # noqa: PLC0415
+
+        doc = (_REPO_ROOT / "docs/upstream-sync.md").read_text(encoding="utf-8")
+        printed = list(version_floor.TWO_STEP_COMMANDS)
+        start = doc.index("## The version floor")
+        fenced = doc[doc.index("```bash", start) + len("```bash"):]
+        fenced = fenced[:fenced.index("```")].strip().splitlines()
+        self.assertEqual([line.rstrip() for line in fenced], printed,
+                         "the doc block and the printed block must be the same block")
+        self.assertIn("--self-heal", printed[-1],
+                      "the last step runs the machinery of the release it syncs FROM")
+        self.assertIn(printed[0], version_floor.two_step_message("0.65.0"))
+
+    def test_the_two_refusals_have_different_exit_codes(self):
+        """One code made the sync print «fix the manifest» at a blameless friend."""
+        self.assertNotEqual(rp.EXIT_GUARD_REFUSED, rp.EXIT_FLOOR_REFUSED)
+        self.assertEqual(rp.EXIT_GUARD_REFUSED, 2)
+        self.assertEqual(rp.EXIT_FLOOR_REFUSED, 3)
+        sync = (_REPO_ROOT / "scripts/sync_engine.sh").read_text(encoding="utf-8")
+        self.assertIn(f"-eq {rp.EXIT_FLOOR_REFUSED}", sync,
+                      "the sync must branch on the floor code, not on any non-zero")

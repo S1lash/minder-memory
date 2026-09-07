@@ -138,7 +138,7 @@ FILE_KEEP = "minder-memory-rebrand: keep-legacy-tokens"
 # `minder-minder-memory-<tail>` is the same damage in that release's doubled
 # shape.
 _RENAMED_OWN_NAME_RE = re.compile(
-    r"(?<![\w-])(?:minder[-_])?minder[-_]memory[-_][^\W_][\w-]*")
+    r"(?<![\w-])(?:minder[-_.])?minder[-_.]memory[-_.][^\W_][\w-]*")
 
 # The token a match sits in, so «is this a path?» can be asked of it.
 _TOKEN_CHARS = re.compile(r"[^\s`'\"()\[\],;<>|]+")
@@ -426,6 +426,13 @@ def find_own_name_file_renames(repo: Path, before: str) -> list[dict]:
             continue
         predecessor = _own_name_predecessor(repo, before, rel)
         if not predecessor:
+            continue
+        # Was the FORMER name the owner's at all? `zettelkasten/minder-ztn.md`
+        # is the dashboard — the engine renamed its own file, on purpose, and
+        # reporting that as damage sends the owner to undo the update. The line
+        # finder has asked this since 1.0.8; this one had not, and only a dot
+        # tail made the gap visible.
+        if not ownership.own_name_spans(Path(predecessor).name, repo / BASE_DIR):
             continue
         out.append({"path": rel, "line": 0, "text": rel, "before": predecessor,
                     "name": Path(predecessor).name, "kind": "file-name"})

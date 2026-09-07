@@ -113,12 +113,18 @@ steps, and the refusal prints them:
 ```bash
 bash scripts/sync_engine.sh --self-heal --branch release/0.69.0   # to the floor release
 git add -A && git commit -m "engine 0.69.0"                       # what /minder:mem:update does for you
-bash scripts/sync_engine.sh                                       # then to the current one
+bash scripts/sync_engine.sh --self-heal                           # then to the current one
 ```
 
-`--self-heal` on the first step matters: it puts that release's own update
-machinery in `scripts/` before running it. Without it `scripts/` holds the
-newer copy from the refused attempt, and the sync refuses the tree as dirty.
+This block is the one the refusal prints — `scripts/lib/version_floor.py` owns
+it and a test pins the two equal, so nobody is handed two different sets of
+commands for the same journey.
+
+`--self-heal` on BOTH sync steps, for the same reason each time: the step has to
+run the update machinery of the release it is syncing FROM. Without it on the
+last step the clone runs the 0.69.0 script it committed a moment earlier, which
+finishes with that release's own closing text — no self-check, no commit line —
+and leaves four hundred paths changed with nothing telling you to commit them.
 
 ## After a sync
 

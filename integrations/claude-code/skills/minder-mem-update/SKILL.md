@@ -233,12 +233,20 @@ dead modules beside live ones, dead tests still collected, a log nothing writes
 that still reads as one that stopped.
 
 The helper removes only what `.engine-manifest.yml` lists under `retired:`, and
-refuses outright if any of it falls under `exclude:` (owner space). A non-zero
-exit means the manifest is wrong, not the clone: nothing was deleted, so report
-it and stop rather than proceeding with a half-applied update.
+it can refuse for two different reasons that want opposite things from you. The
+exit code says which:
+
+| Exit | What happened | What you do |
+|---|---|---|
+| `2` | a retired path falls inside owner space — the ENGINE's manifest is wrong, not the clone | nothing was deleted; report it and stop rather than proceeding with a half-applied update |
+| `3` | this clone is below the version floor | NOT a bug. The refusal printed the two-step path; walk the owner through it. Say nothing about the manifest — theirs is fine, and sending them to look at it wastes their evening |
 
 Report what it removed in the closing digest — a file disappearing from an
-owner's clone is something they should read about, not discover.
+owner's clone is something they should read about, not discover. Report what it
+KEPT too, and why: a `retire: kept …` line means a directory the engine retired
+holds files the engine never shipped, so it was left in place with those files
+named. That is the guard working, and it is the only notice the owner gets that
+something of theirs is sitting in a directory the engine has abandoned.
 
 ### Step 6 — Apply migrations
 
@@ -608,9 +616,12 @@ each one is a thing the owner would otherwise discover by something failing.
 1. **The product has its own name now.** Same notes, same repository, same
    folder — nothing of theirs moved.
 2. **Old → new, for the commands they actually use.** A two-column table built
-   from what is on disk — `ls ~/.claude/commands/minder/mem/` and the skill
-   list — not from memory. Listing a command that does not exist is worse than
-   listing none.
+   from what is on disk — `ls ~/.claude/commands/minder/mem/` for the two
+   commands AND `ls ~/.claude/skills/ | grep '^minder-mem-'` for the twenty
+   skills — not from memory. Reading only the commands directory names two of
+   the twenty-two things that moved, which reads as «almost nothing changed»
+   about the release whose whole subject is that everything did. Listing a
+   command that does not exist is still worse than listing none.
 3. **`ztn` / `зтн` / `ЗТН` still work when they speak to the assistant.** <!-- rebrand:keep -->
    They are aliases in the hot rule and stay so permanently; only the slash
    commands changed. (The line above keeps the former spellings on purpose —
@@ -625,6 +636,16 @@ each one is a thing the owner would otherwise discover by something failing.
    Step 7.1's reconciliation, by name.
 7. **A loader-style routine prompt keeps working unchanged**, because the
    prompt FILE names did not change — only what is inside them.
+8. **If this update took two steps, say so.** A clone below the floor updates to
+   `0.69.0` first, and that leaves an `engine 0.69.0` commit sitting in their
+   history that they did not write and will not recognise later. Tell them it is
+   theirs, that it was the first half of this update, and that nothing further
+   is owed on it. Condition the beat on evidence, never on a guess: the ledger
+   (`.engine-migrations.jsonl`) carries no entry from before the floor, so read
+   `git log --oneline -- integrations/VERSION` and include this beat only when a
+   commit landing `0.69.0` appears between `version_before` and now. No such
+   commit, no beat — a friend who updated in one step being told they did it in
+   two will go looking for the step they missed.
 
 The block below is an ILLUSTRATION of the stance, not a required
 layout — adapt freely per update:

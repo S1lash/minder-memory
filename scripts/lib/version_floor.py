@@ -43,15 +43,40 @@ def below_floor(version: str) -> bool:
     return parse(version) < parse(MIN_UPDATABLE_VERSION)
 
 
+# The two-step path, as ONE block. It is printed by the refusal and quoted by
+# `docs/upstream-sync.md`; `test_engine_lib.py` pins the doc equal to this, so a
+# friend cannot be handed two different sets of commands for the same journey.
+#
+# `--self-heal` on BOTH sync steps, and for the same reason each time: the step
+# must run the update machinery of the release it is syncing FROM, not whatever
+# the clone happens to be carrying. Without it on the last step the clone runs
+# the 0.69.0 script it just committed, which finishes with that release's own
+# closing text — no self-check, no commit line — and leaves the update
+# uncommitted with nothing saying so.
+TWO_STEP_COMMANDS: tuple[str, ...] = (
+    f"bash scripts/sync_engine.sh --self-heal --branch {FLOOR_BRANCH}   # to the floor release",
+    'git add -A && git commit -m "engine 0.69.0"                       # what /minder:mem:update does for you',
+    "bash scripts/sync_engine.sh --self-heal                           # then to the current one",
+)
+
+
+def two_step_block() -> str:
+    """The three commands, one per line, as both the refusal and the doc show them."""
+    return "\n".join(f"    {line}" for line in TWO_STEP_COMMANDS)
+
+
 def two_step_message(version: str) -> str:
     return (
         f"version_floor: this clone is at {version or '<no VERSION file>'}, below {MIN_UPDATABLE_VERSION}. "
-        f"Update to {MIN_UPDATABLE_VERSION} first:\n"
-        f"    bash scripts/sync_engine.sh --self-heal --branch {FLOOR_BRANCH}\n"
-        f"commit what it applied (\"/minder:mem:update\" does that for you), then run the\n"
-        f"update again. `--self-heal` is what puts that release's own update machinery\n"
-        f"in place first — without it the step runs the newer script against a clone it\n"
-        f"was never meant to touch."
+        f"Update to {MIN_UPDATABLE_VERSION} first, in three steps:\n"
+        f"{two_step_block()}\n"
+        f"`--self-heal` on both sync steps is what puts the machinery of the release "
+        f"being synced FROM in place before it runs.\n"
+        f"Nothing is wrong with your clone or with the engine's manifest. If the lines "
+        f"after this one mention fixing a `retired:` section, they come from the older "
+        f"update script this clone still carries — the refusal cannot reach into a "
+        f"script it did not write, so it says this instead. Ignore them and follow the "
+        f"three steps above."
     )
 
 

@@ -13,7 +13,6 @@ contents.
 from __future__ import annotations
 
 import os
-import re
 import shutil
 import subprocess
 import textwrap
@@ -159,10 +158,14 @@ def _seed_floor_branch(up: Path) -> None:
     _git(up, "checkout", "-q", "-b", "release/0.69.0")
     retire = up / "scripts" / "retire_paths.py"
     text = retire.read_text(encoding="utf-8")
-    text = re.sub(r"    # The floor, enforced from the tree that just landed\..*?        return 2\n\n",
-                  "", text, flags=re.S)
+    # Neutralise the refusal rather than cutting the block out. Deleting it meant
+    # matching its last line, which a later release renamed — leaving the import
+    # stripped and the CALL behind, so the fixture failed with a NameError that
+    # said nothing about the floor. A stub cannot go stale.
     text = text.replace(
-        "from lib.version_floor import refuse_if_below_floor  # noqa: E402\n", "", 1)
+        "from lib.version_floor import refuse_if_below_floor  # noqa: E402",
+        "def refuse_if_below_floor(_root):  # the floor release does not refuse itself\n"
+        "    return None", 1)
     with open(retire, "w", encoding="utf-8", newline="") as handle:
         handle.write(text)
     # A tree that never carried the refusal has nothing to strip; committing

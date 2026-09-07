@@ -2,6 +2,17 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.0.10 — The instructions match what happens
+
+When the update refuses because your clone is too old, it now says only that,
+and gives you the three commands as one block — the same block the docs show,
+because they come from the same place. The last of them keeps the update's own
+closing checks instead of falling back to the older release's.
+
+A folder of yours called `~/minder-ztn.bak` or `~/minder-ztn.2024` is yours and
+stays as you wrote it. And when a retired folder is kept because your files are
+inside it, the update tells you that too, not only what it removed.
+
 ## 1.0.9 — The floor holds, and your folders are yours
 
 If your clone is older than 0.69.0 the update refuses and stays refused. It used
@@ -22,10 +33,10 @@ update told you to commit, and committing used to be what disarmed the guard.
 The folder is kept and your files are named.
 
 Your own names hold in every alphabet: a folder called `ztn-process-ivanov` is
-kept exactly as `ztn-process-иванов` already was. The engine's own folders
-(`minder-ztn-env` and its siblings) rename cleanly instead of doubling. And the
-check now finds every shape 1.0.0 left behind, including the ones written with
-underscores or quoted in backticks.
+kept exactly as `ztn-process-иванов` already was. The engine's own identifiers
+— `minder-ztn-platform`, and the underscore ones like `minder_ztn_session` —
+rename cleanly instead of doubling. And the check now finds every shape 1.0.0
+left behind, including the ones written with underscores or quoted in backticks.
 
 ## 1.0.7 — One place decides whose name it is
 

@@ -42,6 +42,7 @@ __all__ = [
     "ENGINE_SKILL_NAMES",
     "ENGINE_LEGACY_HARNESS",
     "ENGINE_SLUG_TAILS_HYPHEN",
+    "ENGINE_SLUG_TAILS_DOT",
     "ENGINE_SLUG_TAILS_UNDERSCORE",
     "ENGINE_EXTENDED_SKILL_TOKENS",
     "ENGINE_EXTENDED_SKILL_SUFFIXES",
@@ -178,7 +179,7 @@ def is_engine_legacy_harness_entry(name: str, kind: str) -> bool:
 # what separates a NAME from a slug: a name starts a token, while
 # `20260519-reflection-minder-ztn-origin-story` is a note's own slug with the
 # product named inside it, and that one moves with the product.
-_OWN_SLUG_RE = re.compile(r"(?i)(?<![\w-])minder[-_]ztn[-_][^\W_][\w-]*")
+_OWN_SLUG_RE = re.compile(r"(?i)(?<![\w-])minder[-_.]?ztn[-_.][^\W_][\w-]*")
 # Tails the ENGINE owns — SEPARATELY per separator, because the two are
 # different kinds of thing, and one list serving both was wrong in the expensive
 # direction. A hyphen form is a repository or project identifier, and the engine
@@ -200,6 +201,10 @@ _OWN_SLUG_RE = re.compile(r"(?i)(?<![\w-])minder[-_]ztn[-_][^\W_][\w-]*")
 # is matched by name in `is_engine_owned_name`. `test_ownership.py` re-derives
 # the underscore side from the shipped tree and fails when a new one appears.
 ENGINE_SLUG_TAILS_HYPHEN = frozenset({"platform"})
+# A DOT tail is a file extension or a suffix an owner appends — `~/minder-ztn.bak`,
+# `~/minder-ztn.2024` are theirs. The engine has three of its own, from the same
+# pre-rename grep: the repository URL suffix, the dashboard file, and a template.
+ENGINE_SLUG_TAILS_DOT = frozenset({"git", "md", "template"})
 ENGINE_SLUG_TAILS_UNDERSCORE = frozenset({
     "platform", "session", "constitution", "env", "deploy_key", "rebrand",
 })
@@ -241,10 +246,11 @@ def own_name_spans(text: str, base: Path | None = None) -> list[tuple[int, int]]
     spans: list[tuple[int, int]] = []
     for match in _OWN_SLUG_RE.finditer(text):
         token = match.group(0)
-        pieces = re.split(r"([-_])", token, maxsplit=4)
+        pieces = re.split(r"([-_.])", token, maxsplit=4)
         separator, tail = pieces[3], pieces[4].lower()
-        engine_tails = (ENGINE_SLUG_TAILS_HYPHEN if separator == "-"
-                        else ENGINE_SLUG_TAILS_UNDERSCORE)
+        engine_tails = {"-": ENGINE_SLUG_TAILS_HYPHEN,
+                        "_": ENGINE_SLUG_TAILS_UNDERSCORE,
+                        ".": ENGINE_SLUG_TAILS_DOT}[separator]
         if tail in engine_tails:
             continue
         # `MINDER_ZTN_BASE` is the engine's own environment variable wearing the
@@ -295,8 +301,8 @@ def own_name_spans(text: str, base: Path | None = None) -> list[tuple[int, int]]
 # Rebuilding it with a single separator produces a name that never existed, the
 # lookup fails, and the finding is dropped in silence.
 _DAMAGED_FORMS = (
-    re.compile(r"^minder([-_])minder([-_])memory([-_])(.+)$"),
-    re.compile(r"^minder([-_])()memory([-_])(.+)$"),
+    re.compile(r"^minder([-_.])minder([-_.])memory([-_.])(.+)$"),
+    re.compile(r"^minder([-_.])()memory([-_.])(.+)$"),
 )
 
 
@@ -318,7 +324,7 @@ def former_spellings(token: str) -> list[str]:
         out.append("minder" + lead + "ztn" + inner + tail)
         # `minder-memory-process-иванов` came from `ztn-process-иванов`: the map
         # rewrote a skill name the owner had extended, not the product slug.
-        head = re.split(r"[-_]", tail)[0]
+        head = re.split(r"[-_.]", tail)[0]
         if head in ENGINE_SKILL_NAMES:
             out.append("ztn" + inner + tail)
         break

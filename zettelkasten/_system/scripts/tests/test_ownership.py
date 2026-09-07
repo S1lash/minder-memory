@@ -69,6 +69,23 @@ class OwnNameSpanTests(unittest.TestCase):
         self.assertEqual(_spans(f"~/minder-ztn-{IV}/zettelkasten"), [f"minder-ztn-{IV}"])
         self.assertEqual(_spans(f"deploy@box:/srv/minder_ztn_{IV}"), [f"minder_ztn_{IV}"])
 
+    def test_a_dot_tail_is_the_owners_too(self):
+        """`~/minder-ztn.bak` is a backup they made, not a name the engine owns.
+
+        The split ran on `-` and `_` only, so a dot-tailed folder was renamed to
+        `minder-memory.bak` — and since the engine renaming its own slug is not
+        damage, the check reported the clone clean.
+        """
+        for token in ("~/minder-ztn.bak", "~/minder-ztn.2024"):
+            self.assertEqual(_spans(token), [token.lstrip("~/")], token)
+        self.assertEqual(ownership.former_spellings("minder-memory.bak"),
+                         ["minder-ztn.bak"])
+
+    def test_the_engines_own_dot_tails_still_move(self):
+        """It has three, from the same pre-rename grep as the other separators."""
+        for token in ("minder-ztn.md", "minder-ztn.git", "minder-ztn.template"):
+            self.assertEqual(_spans(token), [], token)
+
     def test_the_engines_own_identifiers_keep_their_shape(self):
         for engine in ("minder_ztn_session", "minder-ztn-platform", "MINDER_ZTN_BASE"):
             self.assertEqual(_spans(engine), [], engine)
