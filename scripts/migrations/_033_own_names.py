@@ -142,11 +142,18 @@ def run(repo_root: Path, *, dry_run: bool) -> dict:
         return result
 
     item = render_item(findings, today=date.today().isoformat())
-    if OPEN_ITEMS in text:
-        head, _, tail = text.partition(OPEN_ITEMS)
-        new_text = head + OPEN_ITEMS + item + tail
+    # Anchor on the HEADING LINE, never on the words. The shipped template
+    # explains the queue before it opens it — «Items in `## Open Items` are
+    # …» — so matching the text put the item inside that sentence, cut the
+    # explanation in half, and left the real section empty: an item raised and
+    # effectively hidden, which is worse than not raising it.
+    marker = "\n" + OPEN_ITEMS + "\n"
+    at = text.find(marker)
+    if at != -1:
+        cut = at + len(marker)
+        new_text = text[:cut] + item + text[cut:]
     else:
-        new_text = text.rstrip("\n") + "\n\n" + OPEN_ITEMS + item
+        new_text = text.rstrip("\n") + "\n\n" + OPEN_ITEMS + "\n" + item
     target.parent.mkdir(parents=True, exist_ok=True)
     write_text_utf8(target, new_text)
     return result
@@ -165,16 +172,22 @@ def main(argv: list[str] | None = None) -> int:
     result = run(repo_root, dry_run=args.dry_run)
     if args.json:
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
-        return 1 if result["action"] == "no-base" else 0
+        return 1 if result["action"] in ("no-base", "no-before-state") else 0
 
     if result["action"] == "no-base":
         print(f"033: {repo_root} holds no {BASE_MARKER} — this is not a base; will retry next update",
               file=sys.stderr)
         return 1
     if result["action"] == "no-before-state":
-        print("033: the migration ledger was never committed here, so there is no state from "
-              "before the rename to compare against — nothing raised.")
-        return 0
+        # NOT zero. The ledger line is written by the run that applies this
+        # migration and committed afterwards, so on a first update there is
+        # never a committed before-state — and a zero here records `applied`
+        # and retires the check on every clone before it ever looked. Non-zero
+        # records `partial`, which is what `heal` is for: the next update, with
+        # the commit behind it, looks for real.
+        print("033: no committed pre-rename state yet — this check runs again on your "
+              "next update.")
+        return 1
     if result["action"] == "nothing-to-raise":
         print("033: no name of yours was renamed into a path that does not exist.")
         return 0

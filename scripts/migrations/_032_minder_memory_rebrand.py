@@ -132,7 +132,14 @@ PROTECTED_PATTERNS: tuple[str, ...] = (
 # name starts a token (`~/repos/minder-ztn-ivanov`, `- minder-ztn-mcp`), while
 # `20260519-reflection-minder-ztn-origin-story` is a note's own slug with the
 # product named inside it, and that one moves with the product.
-OWN_NAME_PATTERN = r"(?i)(?<![\w-])minder-ztn-(?!platform\b)[A-Za-z0-9][A-Za-z0-9_-]*"
+#
+# The tail is UNICODE. An owner names their folders in the alphabet they think
+# in, and an ASCII-only tail left `minder-ztn-иванов` unprotected: the generic
+# `ztn-` rule fired inside it and produced `minder-minder-memory-иванов`, a
+# doubled product name in a path that had been theirs. `[^\W_]` is «a letter or
+# digit, any script» — the leading character may not be `_` or `-`, so the rule
+# still cannot start mid-token.
+OWN_NAME_PATTERN = r"(?i)(?<![\w-])minder-ztn-(?!platform\b)[^\W_][\w-]*"
 
 # The owner's own CREDENTIAL name — the same distinction, one axis over. Any
 # `ZTN_*` that is not one of the engine's own (ENGINE_ENV_NAMES) is what the

@@ -125,7 +125,10 @@ FILE_KEEP = "minder-memory-rebrand: keep-legacy-tokens"
 # The owner's own name — the skeleton name with their tail on it, which the
 # rename map leaves whole. Restated from the same home and for the same reason
 # as the two markers above; `test_check_update.py` pins it equal to the map's.
-OWN_NAME_PATTERN = r"(?i)(?<![\w-])minder-ztn-(?!platform\b)[A-Za-z0-9][A-Za-z0-9_-]*"
+# The tail is UNICODE — an owner names their folders in the alphabet they think
+# in, and an ASCII-only tail left `minder-ztn-иванов` both unprotected and
+# invisible to the detector below.
+OWN_NAME_PATTERN = r"(?i)(?<![\w-])minder-ztn-(?!platform\b)[^\W_][\w-]*"
 _OWN_NAME_RE = re.compile(OWN_NAME_PATTERN)
 
 # The same distinction one axis over: a `ZTN_*` that is not one of the engine's
@@ -145,7 +148,12 @@ _OWN_CREDENTIAL_RE = re.compile(OWN_CREDENTIAL_PATTERN)
 # repository or folder rewritten to a path that does not exist. Found by
 # reading what the SAME file said before the rename migration ran — nothing in
 # the tree afterwards betrays it, because the damaged line reads plausibly.
-_RENAMED_OWN_NAME_RE = re.compile(r"(?<![\w-])minder-memory-([A-Za-z0-9][A-Za-z0-9_-]*)")
+# `minder-minder-memory-<tail>` is the SAME damage in its 1.0.0-era shape: that
+# release's map doubled the product name inside an owner's path instead of
+# leaving it whole. Both spellings point at a directory that does not exist, and
+# both had `minder-ztn-<tail>` in the tree before the rename, so one pattern
+# finds them and one `was` reconstructs the original.
+_RENAMED_OWN_NAME_RE = re.compile(r"(?<![\w-])(?:minder-)?minder-memory-([^\W_][\w-]*)")
 # Suffixes the ENGINE owns: `minder-memory-platform` is this base's retired
 # project identifier (the map renames it on purpose) and `minder-memory-mcp` is
 # an engine directory whose predecessor sits in the manifest's retired rows.
@@ -439,9 +447,17 @@ def find_own_name_damage(repo: Path, before: str) -> list[dict]:
                   ":!zettelkasten/_sources", *RESIDUE_EXCLUDE)
     if listed.returncode != 0:
         return []
+    # Two ways to find a file's predecessor, and they cover different cases, so
+    # both are consulted per file rather than one replacing the other.
+    #
+    # Inverting the map is exact — but only for a name the map MOVES. A note
+    # whose own file name is the owner's is left alone by today's map, so
+    # inverting it yields nothing, even though an earlier release did move it.
+    # That is precisely the file most likely to hold the damage, so similarity
+    # is not just a fallback for a retired map: it is what answers the case the
+    # exact method cannot see.
     renames, degraded = _renames_by_map(repo, before)
-    if degraded:
-        renames = _renames_since(repo, before)
+    similar = _renames_since(repo, before)
     findings: list[dict] = []
     for rel in [p for p in listed.stdout.split("\0") if p.strip()]:
         if not in_owner_space(rel):
@@ -457,8 +473,13 @@ def find_own_name_damage(repo: Path, before: str) -> list[dict]:
         # name carried the product, and where an owner's path is most likely to
         # have been written down.
         shown = _git(repo, "show", f"{before}:{rel}")
-        if shown.returncode != 0 and rel in renames:
-            shown = _git(repo, "show", f"{before}:{renames[rel]}")
+        if shown.returncode != 0:
+            for predecessor in (renames.get(rel), similar.get(rel)):
+                if not predecessor:
+                    continue
+                shown = _git(repo, "show", f"{before}:{predecessor}")
+                if shown.returncode == 0:
+                    break
         if shown.returncode != 0:
             continue  # the file did not exist before the migration — nothing to compare
         original = shown.stdout

@@ -63,6 +63,15 @@ class TokenMapTests(unittest.TestCase):
         # renaming it in their notes would point at a path that does not exist.
         "minder-ztn-somebody": "minder-ztn-somebody",
         "~/repos/minder-ztn-ivanov/notes": "~/repos/minder-ztn-ivanov/notes",
+        # A tail is whatever the owner writes, in whatever alphabet they think
+        # in. An ASCII-only tail left the Cyrillic one unprotected, and the
+        # generic `ztn-` rule then doubled the product name inside it.
+        "~/minder-ztn-\u0438\u0432\u0430\u043d\u043e\u0432/zettelkasten":
+            "~/minder-ztn-\u0438\u0432\u0430\u043d\u043e\u0432/zettelkasten",
+        "deploy@box:/srv/minder-ztn-\u0438\u0432\u0430\u043d\u043e\u0432":
+            "deploy@box:/srv/minder-ztn-\u0438\u0432\u0430\u043d\u043e\u0432",
+        "minder-ztn-\u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430.md":
+            "minder-ztn-\u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430.md",
         # ...except the engine's own retired project identifier, which is ours.
         "minder-ztn-platform": "minder-memory-platform",
         "/ztn:process": "/minder:mem:process", "ztn:role:add": "minder:mem:role:add",

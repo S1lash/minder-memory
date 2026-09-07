@@ -298,6 +298,12 @@ If the runner exits 0 but reported `partial` outcomes, surface each one in the
 not finish. The update itself succeeded; the owner should know what is still
 outstanding, and that it will be retried automatically.
 
+A `partial` is not always a fault to report loudly. A migration that reads a
+state the owner has not committed yet — the update's own commit is Step 8, after
+this — is `partial` by design on a first run, and its line says so («runs again
+on your next update»). Pass those on in the owner's words, without dressing them
+up as something that went wrong.
+
 ### Step 6.5 — Derived vault docs (already done by the sync script)
 
 `sync_engine.sh` refreshes `<vault>/5_meta/help/` right after the migration

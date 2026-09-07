@@ -18,7 +18,13 @@
 # as one clarification with both texts beside each other, for the owner.
 #
 # `heal`: a clone where this never ran is unwarned, not broken — and a notice
-# must never be able to block a future update.
+# must never be able to block a future update. The kind is load-bearing in the
+# other direction too. On a FIRST update there is no committed pre-rename state
+# to read: the ledger line is written by the run that applies this migration and
+# committed afterwards. Exiting 0 there would record `applied` and retire the
+# check on every clone before it ever looked, so it exits non-zero, the runner
+# records `partial`, and the next update — with the commit behind it — looks for
+# real. `partial` is not a failure here; it is the retry this migration needs.
 #
 # The work is in `_033_own_names.py`; detection is shared with the post-update
 # check (`scripts/check_update.py`), so the two can never disagree. Idempotent:

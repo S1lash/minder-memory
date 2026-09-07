@@ -71,7 +71,8 @@ class CheckUpdateTests(unittest.TestCase):
     OWN_NAME_LINE = "My base lives in ~/projects/minder-ztn-ivanov/zettelkasten.\n"
     SOUL_BEFORE = (OWN_NAME_LINE
                    + "\nSome prose in between.\n\n"
-                   + "Backups go to ~/backups/minder-ztn-ivanov/daily.\n")
+                   + "Backups go to ~/backups/minder-ztn-"
+                     "\u0438\u0432\u0430\u043d\u043e\u0432/daily.\n")
     NOTE_REL_BEFORE = "zettelkasten/1_projects/ztn-as-second-brain.md"
     NOTE_REL_AFTER = "zettelkasten/1_projects/minder-memory-as-second-brain.md"
     # An ORDINARY renamed note: a product rename rewrites the title, the slug in
@@ -117,7 +118,22 @@ class CheckUpdateTests(unittest.TestCase):
         _write(self.clone, "zettelkasten/_records/observations/note.md",
                "An ordinary note about Minder Memory.\n")
         _write(self.clone, "zettelkasten/_system/SOUL.md", self.SOUL_BEFORE)
+        _write(self.clone, "zettelkasten/_system/roles/digest/role.md",
+               "---\nid: digest\n---\n\n"
+               "Read from ~/projects/minder-ztn-"
+               "\u0438\u0432\u0430\u043d\u043e\u0432/inbox each morning.\n")
         _write(self.clone, self.NOTE_REL_BEFORE, self.NOTE_BODY)
+        # A note whose own file name is the OWNER's: today's map leaves it
+        # alone, so a predecessor cannot be found by inverting the map, and
+        # only similarity can pair the two sides.
+        _write(self.clone,
+               "zettelkasten/1_projects/minder-ztn-"
+               "\u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430.md",
+               "# Setup\n\n" + "A paragraph of ordinary prose.\n" * 20
+               + "Checked out at ~/projects/minder-ztn-"
+               "\u0438\u0432\u0430\u043d\u043e\u0432.\n"
+               + "Mirrored to deploy@box:/srv/minder-ztn-"
+               "\u0438\u0432\u0430\u043d\u043e\u0432.\n")
         # A key is the OWNER's name for a service. It carries the former token
         # on purpose and the store is never rewritten.
         _write(self.clone, self.SECRETS_REL,
@@ -131,6 +147,11 @@ class CheckUpdateTests(unittest.TestCase):
         # owner's did not, and one note's FILE NAME moved with the product.
         _write(self.clone, "integrations/claude-code/install.sh", self.INSTALLER_AFTER)
         _git(self.clone, "mv", self.NOTE_REL_BEFORE, self.NOTE_REL_AFTER)
+        _git(self.clone, "mv",
+             "zettelkasten/1_projects/minder-ztn-"
+             "\u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430.md",
+             "zettelkasten/1_projects/minder-memory-"
+             "\u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430.md")
         _write(self.clone, self.NOTE_REL_AFTER,
                self.NOTE_BODY_AFTER.replace("minder-memory-ivanov", "minder-ztn-ivanov"))
         ledger = "".join(
@@ -403,14 +424,17 @@ class CheckUpdateTests(unittest.TestCase):
     def test_the_before_text_is_the_line_that_matches_not_the_first_one(self):
         """Two lines carry the name; the evidence must quote the right one."""
         _write(self.clone, "zettelkasten/_system/SOUL.md",
-               self.SOUL_BEFORE.replace("~/backups/minder-ztn-ivanov",
-                                        "~/backups/minder-memory-ivanov"))
+               self.SOUL_BEFORE.replace(
+                   "~/backups/minder-ztn-\u0438\u0432\u0430\u043d\u043e\u0432",
+                   "~/backups/minder-memory-\u0438\u0432\u0430\u043d\u043e\u0432"))
         _git(self.clone, "commit", "-qam", "the fourth line damaged, the first intact")
         res = self._run("--json")
         damage = next(p for p in json.loads(res.stdout)["probes"]
                       if p["probe"] == "own-name-damage")
         self.assertEqual(damage["status"], "fail")
-        self.assertIn("Backups go to ~/backups/minder-ztn-ivanov/daily.", damage["evidence"])
+        self.assertIn("Backups go to ~/backups/minder-ztn-"
+                      "\u0438\u0432\u0430\u043d\u043e\u0432/daily.",
+                      damage["evidence"])
         self.assertNotIn("My base lives in", damage["evidence"],
                          "the first line carrying the token is not the one that moved")
 
@@ -519,6 +543,77 @@ class CheckUpdateTests(unittest.TestCase):
         self.assertIn("credential-store", self._failed(res))
         self.assertIn("telegram-digest", res.stdout)
         self.assertIn("ZTN_MISSING_TOKEN", res.stdout)
+
+    IV = "\u0438\u0432\u0430\u043d\u043e\u0432"
+    NA = "\u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430"
+
+    def _damage_everywhere(self) -> None:
+        """Six dead paths across four files, in every shape that occurs.
+
+        SOUL and a role are ordinary rewrites; the note whose file name the
+        CURRENT map moves is found by inverting that map; the note that only
+        1.0.0's map moved is not, and needs the similarity fallback. The tails
+        are Cyrillic throughout, because that is the base this was found on.
+        """
+        setting = f"minder-{self.NA}"
+        # 1 — SOUL, fourth line
+        _write(self.clone, "zettelkasten/_system/SOUL.md",
+               f"My base lives in ~/projects/minder-ztn-{self.IV}/zettelkasten.\n"
+               "\nSome prose in between.\n\n"
+               f"Backups go to ~/backups/minder-memory-{self.IV}/daily.\n")
+        # 2 — a role
+        _write(self.clone, "zettelkasten/_system/roles/digest/role.md",
+               "---\nid: digest\n---\n\n"
+               f"Read from ~/projects/minder-memory-{self.IV}/inbox each morning.\n")
+        # 3 + 4 — the note the CURRENT map renames
+        _write(self.clone, self.NOTE_REL_AFTER, self.NOTE_BODY_AFTER)
+        # 5 + 6 — the note only 1.0.0's map renamed: its own name is the
+        # owner's, so today's map leaves it alone and cannot invert it.
+        _write(self.clone, f"zettelkasten/1_projects/minder-memory-{self.NA}.md",
+               "# Setup\n\n" + "A paragraph of ordinary prose.\n" * 20
+               + f"Checked out at ~/projects/minder-memory-{self.IV}.\n"
+               + f"Mirrored to deploy@box:/srv/minder-memory-{self.IV}.\n")
+        del setting
+        _git(self.clone, "add", "-A")
+        _git(self.clone, "commit", "-qm", "what 1.0.0 did across the whole base")
+
+    def test_every_dead_path_is_reported_whatever_shape_it_arrived_in(self):
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 0, "the fixture must start clean")
+        self._damage_everywhere()
+
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        damage = next(p for p in json.loads(res.stdout)["probes"]
+                      if p["probe"] == "own-name-damage")
+        self.assertEqual(damage["status"], "fail")
+        self.assertTrue(damage["evidence"].startswith("6 line(s)"),
+                        f"expected six findings: {damage['evidence']}")
+
+    def test_the_doubled_1_0_0_spelling_is_the_same_damage(self):
+        """1.0.0 produced `minder-minder-memory-<tail>` as well as the single form."""
+        _write(self.clone, "zettelkasten/_system/SOUL.md",
+               f"My base lives in ~/projects/minder-minder-memory-{self.IV}/zettelkasten.\n")
+        _git(self.clone, "commit", "-qam", "the doubled spelling")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        damage = next(p for p in json.loads(res.stdout)["probes"]
+                      if p["probe"] == "own-name-damage")
+        self.assertEqual(damage["status"], "fail")
+        self.assertIn(f"minder-ztn-{self.IV}", damage["evidence"])
+
+    def test_a_cyrillic_own_name_is_kept_and_counted(self):
+        _write(self.clone, "zettelkasten/_records/observations/cyr.md",
+               f"Base: ~/minder-ztn-{self.IV}/zettelkasten\n"
+               f"Mirror: deploy@box:/srv/minder-ztn-{self.IV}\n")
+        _git(self.clone, "add", "-A")
+        _git(self.clone, "commit", "-qm", "an owner writing in their own alphabet")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        residue = next(p for p in json.loads(res.stdout)["probes"]
+                       if p["probe"] == "clone-residue")
+        self.assertEqual(residue["status"], "ok", residue["evidence"])
+        self.assertIn("name your own repository, folder or credential", residue["evidence"])
 
     # -- cannot run at all -------------------------------------------------- #
 

@@ -2,6 +2,14 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.0.6 — Names in your own alphabet
+
+A folder of yours called `minder-ztn-иванов` is kept whole and read correctly,
+in every alphabet — before this it was doubled into a path that did not exist,
+and the check could not see it. The repair item now lands in the queue itself
+rather than inside the paragraph that explains the queue, and it looks again on
+your next update instead of being spent on the first.
+
 ## 1.0.5 — Small edges, filed down
 
 The update now tells you it can check itself, and says where a file moved to

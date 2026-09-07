@@ -59,6 +59,10 @@ class Migration033Tests(unittest.TestCase):
     NAME = "033-own-names-after-the-rename.sh"
 
     OWN = "My base lives in ~/projects/minder-ztn-ivanov/zettelkasten.\n"
+    PROSE_LINE = "Items in `## Open Items` are questions raised by skills.\n"
+    QUEUE_BEFORE = ("# Clarifications Needed\n\n## How to use\n\n"
+                    + PROSE_LINE
+                    + "\n---\n\n## Open Items\n\n## an earlier item\n")
     DAMAGED = "My base lives in ~/projects/minder-memory-ivanov/zettelkasten.\n"
 
     def setUp(self):
@@ -82,8 +86,10 @@ class Migration033Tests(unittest.TestCase):
     def _base(self, *, damaged: bool) -> None:
         """A clone with a before-state and an after-state, as an update leaves it."""
         _write(self.root, SOUL, self.OWN)
-        _write(self.root, CLARIFICATIONS,
-               "# Clarifications Needed\n\n---\n\n## Open Items\n\n## an earlier item\n")
+        # The shipped template MENTIONS the heading in prose long before the
+        # real one — anchoring on the first occurrence buries the item inside
+        # the explanation and leaves the queue itself empty.
+        _write(self.root, CLARIFICATIONS, self.QUEUE_BEFORE)
         _git(self.root, "init", "-q", "-b", "main")
         _git(self.root, "add", "-A")
         _git(self.root, "commit", "-qm", "before the rename migration ran")
@@ -120,12 +126,22 @@ class Migration033Tests(unittest.TestCase):
         self.assertEqual(_md5(self.root / SOUL), before,
                          "the migration must never rewrite the damaged file")
 
-    def test_the_item_lands_under_open_items_and_keeps_what_was_there(self):
+    def test_the_item_lands_under_the_real_heading_not_the_prose_that_names_it(self):
+        """The template explains the queue before it opens it.
+
+        Anchoring on the first occurrence of the heading text cut a sentence of
+        the explanation in half, put the item where nobody reads, and left the
+        real section empty — an item raised and effectively hidden, which is
+        worse than not raising it.
+        """
         self._base(damaged=True)
         self._run()
         queue = self._queue()
-        self.assertIn("## Open Items", queue)
-        self.assertLess(queue.index("## Open Items"), queue.index("033 "))
+        self.assertIn(self.PROSE_LINE, queue, "the prose that names the heading is intact")
+        heading = queue.index("\n## Open Items\n")
+        self.assertLess(heading, queue.index("033 "), "the item goes under the real heading")
+        self.assertLess(queue.index(self.PROSE_LINE), heading,
+                        "the explanation still comes first")
         self.assertIn("## an earlier item", queue, "an existing item must survive")
 
     def test_a_second_run_appends_nothing(self):
@@ -146,15 +162,24 @@ class Migration033Tests(unittest.TestCase):
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual(self._queue(), first)
 
-    def test_no_before_state_says_so_rather_than_reporting_all_clear(self):
+    def test_no_before_state_is_retried_rather_than_spent(self):
+        """On the FIRST update there is never a committed before-state.
+
+        The ledger line is written by the run itself and committed afterwards,
+        so a migration that exits 0 here is recorded `applied` and never looks
+        again — spent before it could do its job, on every clone. Exiting
+        non-zero records `partial`, which is exactly what `heal` is for: the
+        next update, after the commit, it looks for real.
+        """
         _write(self.root, SOUL, self.DAMAGED)
         _write(self.root, CLARIFICATIONS, "# Clarifications Needed\n\n## Open Items\n")
         _git(self.root, "init", "-q", "-b", "main")
         _git(self.root, "add", "-A")
         _git(self.root, "commit", "-qm", "a clone whose ledger was never committed")
         res = self._run()
-        self.assertEqual(res.returncode, 0, res.stderr)
-        self.assertIn("no state from", res.stdout)
+        self.assertNotEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("no committed pre-rename state yet", res.stdout + res.stderr)
+        self.assertIn("next update", res.stdout + res.stderr)
 
     # -- contract ----------------------------------------------------------- #
 
