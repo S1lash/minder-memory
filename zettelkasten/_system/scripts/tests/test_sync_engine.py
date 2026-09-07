@@ -150,11 +150,25 @@ class SyncEngineTests(unittest.TestCase):
         _git(self.up, "branch", "release/0.69.0")
         clone = _clone(self.tmp, self.up, version="0.60.0")
         _git(clone, "rm", "-q", "scripts/lib/version_floor.py")
+        # ...and an older copy of something the restore will overwrite, so the
+        # refusal has MODIFIED files to put back and not only added ones.
+        (clone / "scripts" / "manifest_paths.py").write_text(
+            "# the older release's copy\n", encoding="utf-8")
+        _git(clone, "add", "-A")
         _git(clone, "commit", "-q", "-m", "an engine that predates the floor")
         result = _run(clone, "--self-heal")
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertEqual(_git(clone, "status", "--porcelain", "--", "scripts/lib/version_floor.py").stdout, "")
         self.assertFalse((clone / "scripts" / "lib" / "version_floor.py").exists())
+        # «Leave the tree as it was found» has to mean the MODIFIED files too.
+        # Removing only what the self-heal added leaves the rest of `scripts/`
+        # carrying the newer release, so the floor release's own sync refuses
+        # the tree as dirty — and the two-step path never gets past step one.
+        left = [line for line in
+                _git(clone, "status", "--porcelain", "--", "scripts/").stdout.splitlines()
+                if line.strip() and "__pycache__" not in line
+                and "scripts/sync_engine.sh" not in line]
+        self.assertEqual(left, [], "a refused update must leave scripts/ as it found it")
         step_one = _run(clone, "--self-heal", "--branch", "release/0.69.0")
         self.assertEqual(step_one.returncode, 0, step_one.stdout + step_one.stderr)
 
@@ -339,6 +353,23 @@ class SyncEngineTests(unittest.TestCase):
         self.assertFalse((clone / "scripts" / "migrations" / "002-retired-upstream.sh").exists())
         self.assertEqual((clone / "integrations" / "VERSION").read_text(encoding="utf-8").strip(),
                          "1.0.2")
+
+    def test_the_closing_block_names_the_self_check_before_the_commit(self):
+        """A friend on the CLI is never told the self-check exists.
+
+        The skill runs it for them; the script's own closing block was the only
+        place a script user would learn of it, and it said nothing. Order
+        matters: check first, then commit — a commit made before the check is a
+        commit of whatever the update got wrong.
+        """
+        clone = _clone(self.tmp, self.up, version="0.69.0")
+        result = _run(clone)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("python3 scripts/check_update.py", result.stdout)
+        self.assertIn("git add -A && git commit", result.stdout)
+        self.assertLess(result.stdout.index("check_update.py"),
+                        result.stdout.index("git add -A"),
+                        "the check belongs above the commit, not after it")
 
     def test_the_dirty_guard_says_to_commit_scripts_alone(self):
         """A friend told only «commit or stash» commits their notes with it."""

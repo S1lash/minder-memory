@@ -554,7 +554,11 @@ def _git_unsaved(root: Path) -> tuple[set[str], set[str]]:
     promise a recovery that does not exist for half of them.
     """
     try:
-        out = subprocess.run(["git", "-C", str(root), "status", "--porcelain", "-z"],
+        # `-uall`: without it git collapses a wholly untracked directory to
+        # `dir/` and never names the files inside it — so a brand-new folder of
+        # drafts, which is precisely the owner's most unsaved work, would be
+        # rewritten and reported as nothing at all.
+        out = subprocess.run(["git", "-C", str(root), "status", "--porcelain", "-uall", "-z"],
                              capture_output=True, check=True).stdout
     except (OSError, subprocess.CalledProcessError):
         return set(), set()
@@ -656,8 +660,17 @@ def run(root: Path, *, dry_run: bool,
     # unsaved notes open deserves to be told which ones moved under them.
     changed = {c.path for c in report.changes
                if not c.path.startswith(_ENGINE_SEEDED) and c.path not in _ENGINE_SEEDED}
-    report.rewritten_dirty = sorted(p for p in changed & unsaved if p not in untracked)
-    report.rewritten_unsaved = sorted(changed & untracked)
+    # A file that also MOVED is reported `old → new`. Naming only where it used
+    # to be sends the owner looking at a path that no longer exists, which is
+    # the one thing this warning exists to prevent.
+    moved = {c.path: c.new_path for c in report.changes if c.new_path}
+
+    def _display(rel: str) -> str:
+        return f"{rel} → {moved[rel]}" if rel in moved else rel
+
+    report.rewritten_dirty = sorted(_display(p) for p in changed & unsaved
+                                    if p not in untracked)
+    report.rewritten_unsaved = sorted(_display(p) for p in changed & untracked)
     # Residue: what still matches after the run (or would, in a dry run).
     for rel in _candidates(root):
         if any(rel == e.rstrip("/") or rel.startswith(e.rstrip("/") + "/") for e in exclude) or rel in dirty:

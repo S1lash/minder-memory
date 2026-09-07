@@ -427,6 +427,12 @@ failed, 1 when something did, 2 when the check could not run at all.
 **Two things the script cannot reach**, because they are read through the
 scheduler tool rather than the filesystem — do them yourself, here:
 
+- The script's credential probe runs the roles preflight for you. If you run
+  `roles_run.py validate` yourself in an ordinary shell it will also report that
+  `MINDER_MEMORY_ROLES_KEY` is not set — that is about the shell you are
+  standing in, not about the clone: the key lives in the scheduler's
+  environment. Only findings that name a **secret** are the update's business,
+  and the probe already filters to those.
 - Read each cloud routine back. The prompt body must name no command under the
   former product namespace, and no environment KEY may still carry the former
   product name or its `_ROLES_KEY` spelling. Never read, print or quote a

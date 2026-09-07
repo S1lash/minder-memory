@@ -134,6 +134,29 @@ if [ "$BRANCH" != "$FLOOR_BRANCH" ] && ! python3 "$SCRIPT_DIR/lib/version_floor.
   git diff --cached --name-only --diff-filter=A -z -- scripts/ | while IFS= read -r -d '' added; do
     git rm -q --cached -- "$added" && rm -f -- "$added"
   done
+  # Removing what the self-heal ADDED is only half of «as it was found»: every
+  # file it overwrote still carries the newer release, so `scripts/` is dirty
+  # and the floor release's own sync refuses the tree — the same dead end, one
+  # step further along. Restoring from HEAD puts the clone back where it stood.
+  #
+  # This file is one of the files being restored. Bash has already read the
+  # script it is running, so replacing it mid-run is harmless on POSIX; on Git
+  # Bash a write to an open file can fail, and that failure must not turn a
+  # refusal into a crash. So a failure here is reported and stepped over: the
+  # only file at risk is this one, and the friend is about to run the floor
+  # release's copy anyway.
+  if ! git checkout HEAD -- scripts/ 2>/dev/null; then
+    # One path at a time, through a read loop — never `$( )` word-splitting,
+    # which would break on the first path carrying a space.
+    git -c core.quotepath=false diff --name-only HEAD -- scripts/ |
+      while IFS= read -r _path; do
+        [ -n "$_path" ] || continue
+        [ "$_path" = "scripts/sync_engine.sh" ] && continue
+        git checkout HEAD -- "$_path" 2>/dev/null || true
+      done
+    echo "note: scripts/sync_engine.sh could not be restored while it is running." >&2
+    echo "      Run:  git checkout HEAD -- scripts/sync_engine.sh" >&2
+  fi
   exit 2
 fi
 
@@ -389,6 +412,9 @@ cat <<EOF
 
 Review the diff:    git status
 Run tests:          (your test suite — engine ships pytest under zettelkasten/_system/scripts/tests/)
+Check it:           python3 scripts/check_update.py
+                    Proves from your filesystem that the update landed — before you
+                    commit it, not after.
 Commit it:          git add -A && git commit -m "engine ${version_after:-updated}"
                     Careful: that stages everything, including notes you have open and
                     have not saved. Commit those separately first if you want them apart.

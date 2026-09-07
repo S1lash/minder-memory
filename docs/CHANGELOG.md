@@ -2,6 +2,12 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.0.5 — Small edges, filed down
+
+The update now tells you it can check itself, and says where a file moved to
+rather than only where it used to be. A refused update leaves your clone exactly
+as it found it.
+
 ## 1.0.4 — Your credentials are yours
 
 **The engine renames only the variables it owns.** A role names its credentials,

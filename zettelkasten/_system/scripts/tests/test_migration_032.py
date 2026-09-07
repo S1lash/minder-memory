@@ -183,6 +183,26 @@ class Migration032Tests(unittest.TestCase):
         self.assertNotIn("renamed in place", res.stdout)
         self.assertNotIn("git had never seen", res.stdout)
 
+    def test_an_unsaved_file_that_also_moved_is_reported_as_old_to_new(self):
+        """The owner has to be able to FIND it afterwards.
+
+        A draft whose file name carried the product is both rewritten and
+        renamed. Naming only where it used to be sends them looking at a path
+        that no longer exists — the one thing the warning exists to prevent.
+        """
+        self._clone()
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid"}
+        for args in (("init", "-q"), ("add", "-A"), ("commit", "-qm", "seed")):
+            subprocess.run(["git", "-C", str(self.root), *args], capture_output=True, env=env)
+        _write(self.root, "zettelkasten/1_projects/ztn-draft.md",
+               "# ZTN draft\n\nStill writing this.\n")
+
+        res = _run(self.mig, env=env, cwd=self.root)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertIn("zettelkasten/1_projects/ztn-draft.md → "
+                      "zettelkasten/1_projects/minder-memory-draft.md", res.stdout)
+
     def test_engine_seeded_files_are_excluded_from_both_counts(self):
         """The installer runs before this migration, in the same update.
 
