@@ -2,6 +2,23 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.0.11 — Refusals that actually refuse
+
+The update tells you apart from your manifest again. A refusal because your
+clone is too old says only that; a refusal because the engine's own manifest is
+wrong says that instead — and it says it at all, which for one release it did
+not. A clone with no version recorded is treated as old rather than waved
+through.
+
+And a folder of yours named in an ordinary sentence — «сделал копию в
+minder-ztn-иванов рядом» — is found when an earlier release renamed it. It used
+to be missed unless the name sat in a path or in quotes.
+
+The cross-skill orientation card is now called `CLAUDE_MINDER_MEMORY.md`. The
+update removes the old name from your clone and brings the new one in the same
+step, and every card that links to it points at the name that exists. A fresh
+clone also arrives with the log the lens writes to, which it did not before.
+
 ## 1.0.10 — The instructions match what happens
 
 When the update refuses because your clone is too old, it now says only that,

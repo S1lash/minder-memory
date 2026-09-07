@@ -16,7 +16,7 @@ Pointer card. The full pipeline lives in the installed skill, not here.
 ## Sources of truth
 
 - **Pipeline:** `~/.claude/skills/minder-mem-process/SKILL.md` (after `install.sh`).
-- **Full orientation card:** [[CLAUDE_ZETTELKASTEN]] — three layers, naming,
+- **Full orientation card:** [[CLAUDE_MINDER_MEMORY]] — three layers, naming,
   routing, all Minder Memory skills, conventions.
 - **Runtime config:** `_system/docs/SYSTEM_CONFIG.md`.
 - **Processing principles:** `5_meta/PROCESSING_PRINCIPLES.md`.

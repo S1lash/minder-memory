@@ -327,8 +327,14 @@ export ENGINE_SYNC_BRANCH="$BRANCH"
 # the reader. Their codes are defined there (EXIT_GUARD_REFUSED=2,
 # EXIT_FLOOR_REFUSED=3); printing one trailer for both told a friend whose
 # manifest was perfectly fine to go and fix it.
-python3 "$REPO_ROOT/scripts/retire_paths.py"
-RETIRE_RC=$?
+# `|| RETIRE_RC=$?` and not a bare call: `set -e` at the top of this script kills
+# the shell the instant a command exits non-zero, so a following `RETIRE_RC=$?`
+# line never runs. Written that way the whole dispatch below was dead code — the
+# guard refusal reached the caller with no trailer at all, and the floor refusal
+# left with 3 instead of the 2 this script means by «refused». A conditional is
+# the one form `set -e` exempts.
+RETIRE_RC=0
+python3 "$REPO_ROOT/scripts/retire_paths.py" || RETIRE_RC=$?
 if [ $RETIRE_RC -eq 3 ]; then
   # The floor. The refusal itself printed the two-step path; adding anything
   # about the manifest here would send them looking for a fault that is not

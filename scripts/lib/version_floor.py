@@ -89,13 +89,24 @@ def version_at_head(repo_root) -> str:
     """
     import subprocess  # noqa: PLC0415
     from pathlib import Path as _Path  # noqa: PLC0415
-    shown = subprocess.run(
-        ["git", "-C", str(repo_root), "show", "HEAD:integrations/VERSION"],
-        capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if shown.returncode != 0:
-        local = _Path(repo_root) / "integrations/VERSION"
-        return local.read_text(encoding="utf-8").strip() if local.is_file() else ""
-    return shown.stdout.strip()
+
+    def _git(*args):
+        return subprocess.run(["git", "-C", str(repo_root), *args],
+                              capture_output=True, text=True, encoding="utf-8",
+                              errors="replace")
+
+    # Whether there IS a HEAD and whether the file is IN it are two questions,
+    # and `git show` fails the same way for both. Reading the working copy when
+    # the file is merely absent from HEAD reads the version the sync has just
+    # written — the new one — so a clone with no VERSION at HEAD looked current
+    # and walked straight past the floor.
+    if _git("rev-parse", "--verify", "-q", "HEAD").returncode == 0:
+        shown = _git("show", "HEAD:integrations/VERSION")
+        return shown.stdout.strip() if shown.returncode == 0 else ""
+    # No HEAD at all — nothing has been committed here, so the working copy is
+    # the only account of what this clone is.
+    local = _Path(repo_root) / "integrations/VERSION"
+    return local.read_text(encoding="utf-8").strip() if local.is_file() else ""
 
 
 def refuse_if_below_floor(repo_root) -> str | None:
@@ -111,12 +122,21 @@ def refuse_if_below_floor(repo_root) -> str | None:
     """
     version = version_at_head(repo_root)
     if not version:
-        return None
+        # No version is BELOW the floor, not exempt from it — the same answer
+        # the CLI entry has always given (`main("")` exits 3, and this module's
+        # own usage line says «below the floor or no version»). Returning None
+        # here let a clone with no `integrations/VERSION` at HEAD walk straight
+        # past the floor and land the current engine, reporting success, and
+        # this python entry is precisely what an older script executes.
+        return two_step_message("")
     try:
         if not below_floor(version):
             return None
     except ValueError:
-        return None
+        # An unparseable version is not a licence to proceed either: the floor
+        # exists because the migration chain assumes a shape, and «I cannot
+        # tell» is not «the shape is there».
+        return two_step_message(version)
     return two_step_message(version)
 
 

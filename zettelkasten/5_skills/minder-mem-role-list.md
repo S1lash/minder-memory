@@ -19,7 +19,7 @@ Pointer card. The full flow lives in the installed skill, not here.
 - **Flow:** `~/.claude/skills/minder-mem-role-list/SKILL.md` (after `install.sh`).
 - **What it reads:** each `_system/roles/{id}/role.md` and the tail of its
   `log.jsonl`.
-- **Full orientation card:** [[CLAUDE_ZETTELKASTEN]].
+- **Full orientation card:** [[CLAUDE_MINDER_MEMORY]].
 
 ## What it does (one paragraph)
 

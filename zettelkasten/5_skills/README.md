@@ -26,7 +26,7 @@ with its SKILL is wrong by definition; trust the SKILL and fix the card.
 
 | Card | Skill |
 |---|---|
-| `CLAUDE_ZETTELKASTEN.md` | cross-skill quick reference (not one skill) |
+| `CLAUDE_MINDER_MEMORY.md` | cross-skill quick reference (not one skill) |
 | `minder-mem-process.md` | `/minder:mem:process` |
 | `minder-mem-agent-lens.md` | `/minder:mem:agent-lens` |
 | `minder-mem-agent-lens-add.md` | `/minder:mem:agent-lens-add` |

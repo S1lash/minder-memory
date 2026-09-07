@@ -231,6 +231,80 @@ class SyncEngineTests(unittest.TestCase):
         step_one = _run(clone, "--self-heal", "--branch", "release/0.69.0")
         self.assertEqual(step_one.returncode, 0, step_one.stdout + step_one.stderr)
 
+    # -- the two refusals, run rather than read ---------------------------- #
+
+    def _pre_floor_clone(self, version: str = "0.65.0"):
+        clone = _clone(self.tmp, self.up, version=version)
+        (clone / "scripts" / "sync_engine.sh").write_text(_PRE_FLOOR_SCRIPT, encoding="utf-8")
+        _git(clone, "commit", "-q", "-am", "the updater a pre-floor clone carries")
+        return clone
+
+    def test_a_floor_refusal_through_the_real_script_exits_two(self):
+        """The dispatch, executed — not read.
+
+        Reaching it needs a clone whose own floor check PASSES (so the shell
+        does not stop first) while `retire_paths.py` still refuses. Removing
+        `integrations/VERSION` from HEAD is exactly that shape: the script reads
+        the working copy and proceeds, the helper reads HEAD and finds no
+        version — which is below the floor, not exempt from it.
+
+        The previous test for this asserted the string `-eq 3` appeared in the
+        file. It did; it was also unreachable, because `set -e` killed the shell
+        on the non-zero exit before the assignment that captured it. A file can
+        contain a branch it never runs.
+        """
+        clone = _clone(self.tmp, self.up, version="0.69.0")
+        _git(clone, "rm", "-q", "integrations/VERSION")
+        _git(clone, "commit", "-q", "-m", "a clone with no VERSION at HEAD")
+        (clone / "integrations").mkdir(exist_ok=True)
+        (clone / "integrations" / "VERSION").write_text("0.69.0\n", encoding="utf-8")
+
+        result = _run(clone)
+        out = result.stdout + result.stderr
+        self.assertEqual(result.returncode, 2,
+                         f"the sync means 2 by «refused»; the helper's own 3 must not "
+                         f"leak through: {out[-400:]}")
+        self.assertIn("below 0.69.0", out)
+        self.assertNotIn("Fix the manifest", out,
+                         "a floor refusal must not send them to a manifest that is fine")
+
+    def test_a_guard_refusal_exits_two_and_still_names_the_manifest(self):
+        """The sibling. 1.0.9 printed this trailer; 1.0.10's dead dispatch lost it."""
+        # Upstream retires a path inside owner space — the guard's own case.
+        (self.up / ".engine-manifest.yml").write_text(
+            _MANIFEST.replace("exclude: []",
+                              "exclude:\n  - zettelkasten/_records/meetings/\n")
+            + "\nretired:\n  - zettelkasten/_records/meetings/x.md\n",
+            encoding="utf-8")
+        _git(self.up, "add", "-A")
+        _git(self.up, "commit", "-q", "-m", "a manifest that retires owner space")
+        clone = _clone(self.tmp, self.up, version="0.69.0")
+
+        result = _run(clone)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        out = result.stdout + result.stderr
+        self.assertIn("Fix the manifest", out,
+                      "a guard refusal is exactly when that trailer belongs")
+        self.assertNotIn("below 0.69.0", out)
+
+    def test_a_clone_with_no_version_at_head_is_below_the_floor(self):
+        """«No version» is below the floor, not exempt from it.
+
+        The CLI entry has always exited 3 for it and the module's usage line says
+        so, but the python entry an older script actually calls returned None —
+        so a clone with no `integrations/VERSION` at HEAD walked past the floor
+        and landed the current engine, reporting success.
+        """
+        clone = self._pre_floor_clone()
+        _git(clone, "rm", "-q", "integrations/VERSION")
+        _git(clone, "commit", "-q", "-m", "a clone with no VERSION at HEAD")
+
+        result = _run(clone)
+        self.assertNotEqual(result.returncode, 0,
+                            f"no version must not pass the floor: "
+                            f"{(result.stdout + result.stderr)[-400:]}")
+        self.assertIn("below 0.69.0", result.stdout + result.stderr)
+
     def test_a_pre_floor_clone_running_its_own_script_is_still_refused(self):
         """A refusal in the new shell script is never read by the clone it stops.
 

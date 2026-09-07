@@ -29,7 +29,7 @@ Pointer card. The full pipeline lives in the installed skill, not here.
   ~2 h later, so lens production stays isolated from resolve
   consumption — prevents confirmation bias on the lens's own
   Action Hints).
-- **Full orientation card:** [[CLAUDE_ZETTELKASTEN]] — three layers,
+- **Full orientation card:** [[CLAUDE_MINDER_MEMORY]] — three layers,
   routing, all Minder Memory skills, conventions.
 
 ## What it does (one paragraph)

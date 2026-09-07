@@ -68,3 +68,8 @@ zettelkasten/.obsidian/graph.json
 zettelkasten/.obsidian/plugins/*/main.js
 zettelkasten/.obsidian/plugins/*/manifest.json
 zettelkasten/.obsidian/plugins/*/styles.css
+
+# Repo-root `.obsidian/` — an Obsidian vault opened one level too high. The
+# vault is `zettelkasten/`; a config dir here belongs to nothing, and its
+# presence makes the repo root look like a second vault.
+/.obsidian/

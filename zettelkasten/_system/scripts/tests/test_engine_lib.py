@@ -365,10 +365,72 @@ class TwoStepPathTests(unittest.TestCase):
         self.assertIn(printed[0], version_floor.two_step_message("0.65.0"))
 
     def test_the_two_refusals_have_different_exit_codes(self):
-        """One code made the sync print «fix the manifest» at a blameless friend."""
+        """The codes themselves. What the SYNC does with them is executed in
+        `test_sync_engine.py` — asserting that a branch exists in the file text
+        is the «a step nothing detects» class, and it passed happily while the
+        branch was unreachable dead code."""
         self.assertNotEqual(rp.EXIT_GUARD_REFUSED, rp.EXIT_FLOOR_REFUSED)
         self.assertEqual(rp.EXIT_GUARD_REFUSED, 2)
         self.assertEqual(rp.EXIT_FLOOR_REFUSED, 3)
-        sync = (_REPO_ROOT / "scripts/sync_engine.sh").read_text(encoding="utf-8")
-        self.assertIn(f"-eq {rp.EXIT_FLOOR_REFUSED}", sync,
-                      "the sync must branch on the floor code, not on any non-zero")
+
+    def test_every_shipped_mention_of_the_floor_branch_is_the_real_one(self):
+        """A branch name hand-written in five places is five chances to be wrong.
+
+        Only the doc block was pinned; the skill, the migrations README and the
+        changelog each carried their own copy, and a friend following any of
+        them would `git fetch` a branch that does not exist.
+        """
+        import re as _re
+        import sys as _sys
+        _sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+        from lib.version_floor import FLOOR_BRANCH  # noqa: PLC0415
+        from lib.manifest import read_section_lite  # noqa: PLC0415
+
+        pattern = _re.compile(r"release/\d+\.\d+\.\d+")
+        seen = 0
+        for entry in read_section_lite(_REPO_ROOT / ".engine-manifest.yml", "engine"):
+            target = _REPO_ROOT / entry.rstrip("/")
+            files = ([f for f in target.rglob("*") if f.is_file()] if target.is_dir()
+                     else ([target] if target.is_file() else []))
+            for f in files:
+                if "__pycache__" in f.parts or f.suffix not in (".md", ".py", ".sh", ""):
+                    continue
+                try:
+                    text = f.read_bytes().decode("utf-8")
+                except (OSError, UnicodeDecodeError):
+                    continue
+                for hit in pattern.finditer(text):
+                    seen += 1
+                    self.assertEqual(hit.group(0), FLOOR_BRANCH,
+                                     f"{f.relative_to(_REPO_ROOT)} names a floor branch "
+                                     f"that is not {FLOOR_BRANCH}")
+        self.assertGreater(seen, 1, "the sweep found nothing — it has stopped working")
+
+
+class SeededLogTests(unittest.TestCase):
+    """Every append-only log the engine writes must exist on a fresh clone.
+
+    `/minder:mem:agent-lens` Step 6 appends to `log_agent_lens.md`, and nothing
+    seeded it: three of the four logs had a `template:` row and the fourth did
+    not. On a fresh clone the first lens run met a file that was not there.
+
+    The list is not restated here. `ENGINE_DOCTRINE.md §3.5` already enumerates
+    the logs and their writers — that is the table an author updates when they
+    add one — so this reads it and asks the manifest whether each is seeded.
+    The next missing template fails here, not on a friend's first run.
+    """
+
+    def test_every_log_the_doctrine_names_is_seeded(self):
+        import re as _re
+        doctrine = (_REPO_ROOT / "zettelkasten/_system/docs/ENGINE_DOCTRINE.md").read_text(
+            encoding="utf-8")
+        logs = sorted(set(_re.findall(r"`_system/(state/log_[a-z_]+\.md)`", doctrine)))
+        self.assertTrue(logs, "the doctrine's log table has moved — this detector is blind")
+
+        manifest = lm.load_manifest(_REPO_ROOT)
+        seeded = {str(entry) for entry in (manifest.get("template") or [])}
+        missing = [
+            log for log in logs
+            if f"zettelkasten/_system/{log}".replace(".md", ".template.md") not in seeded
+        ]
+        self.assertEqual(missing, [], "append-only logs with no template to seed them")

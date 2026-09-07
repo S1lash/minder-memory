@@ -22,7 +22,7 @@ Pointer card. The full flow lives in the installed skill, not here.
 - **How the role fills that state:** the closing section of its `role.md`
   — the one [[minder-mem-role-add]] writes as the role's «close», named in the
   owner's own words rather than by a fixed heading.
-- **Full orientation card:** [[CLAUDE_ZETTELKASTEN]].
+- **Full orientation card:** [[CLAUDE_MINDER_MEMORY]].
 
 ## What it does (one paragraph)
 

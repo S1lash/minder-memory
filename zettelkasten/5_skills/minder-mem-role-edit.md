@@ -23,7 +23,7 @@ Pointer card. The full flow lives in the installed skill, not here.
   rotation only — the encrypted value in `_system/state/secrets.enc.json`.
   Nothing else.
 - **What runs the result:** [[minder-mem-roles]].
-- **Full orientation card:** [[CLAUDE_ZETTELKASTEN]].
+- **Full orientation card:** [[CLAUDE_MINDER_MEMORY]].
 
 ## What it does (one paragraph)
 

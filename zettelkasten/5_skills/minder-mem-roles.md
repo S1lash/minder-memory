@@ -31,7 +31,7 @@ Pointer card. The full tick contract lives in the installed skill, not here.
   (daily tick at 07:00 — after lint, ahead of the morning process run, so
   an inbox note a role leaves is folded in the same morning).
 - **Lock matrix + CLARIFICATION types:** `_system/docs/SYSTEM_CONFIG.md`.
-- **Full orientation card:** [[CLAUDE_ZETTELKASTEN]].
+- **Full orientation card:** [[CLAUDE_MINDER_MEMORY]].
 
 ## What it does (one paragraph)
 

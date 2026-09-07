@@ -248,6 +248,13 @@ holds files the engine never shipped, so it was left in place with those files
 named. That is the guard working, and it is the only notice the owner gets that
 something of theirs is sitting in a directory the engine has abandoned.
 
+**No `kept` line means say nothing.** Not «nothing of yours was touched», not
+«your files are safe» — the guard only exists from 1.0.8, and a clone that
+passed through 1.0.0–1.0.7 may have had such a directory removed by a release
+that had no guard at all. The engine cannot see what is already gone, so a
+reassurance it cannot check is a claim it must not make. Report what the run
+did; do not characterise what earlier runs did.
+
 ### Step 6 — Apply migrations
 
 If `--no-migrations` — skip.
@@ -637,10 +644,18 @@ each one is a thing the owner would otherwise discover by something failing.
 7. **A loader-style routine prompt keeps working unchanged**, because the
    prompt FILE names did not change — only what is inside them.
 8. **If this update took two steps, say so.** A clone below the floor updates to
-   `0.69.0` first, and that leaves an `engine 0.69.0` commit sitting in their
-   history that they did not write and will not recognise later. Tell them it is
-   theirs, that it was the first half of this update, and that nothing further
-   is owed on it. Condition the beat on evidence, never on a guess: the ledger
+   the floor release first, and that leaves a commit in their history that they
+   did not write and will not recognise later. Tell them it is theirs, that it
+   was the first half of this update, and that nothing further is owed on it.
+
+   Name it by what it CONTAINS, never by a subject line: the two paths through
+   this write different ones — the skill's own Step 8 proposes
+   `engine: update 0.65.0 → 0.69.0`, while a friend following the printed
+   commands types `engine 0.69.0` — so a beat that quotes either subject is
+   wrong for half the friends who read it. Show the hash the evidence gate
+   found and describe it as «the commit that landed 0.69.0».
+
+   Condition the beat on that evidence, never on a guess: the ledger
    (`.engine-migrations.jsonl`) carries no entry from before the floor, so read
    `git log --oneline -- integrations/VERSION` and include this beat only when a
    commit landing `0.69.0` appears between `version_before` and now. No such

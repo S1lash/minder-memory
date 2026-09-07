@@ -69,6 +69,9 @@ class CheckUpdateTests(unittest.TestCase):
     # -- fixtures ---------------------------------------------------------- #
 
     OWN_NAME_LINE = "My base lives in ~/projects/minder-ztn-ivanov/zettelkasten.\n"
+    PROSE = ("\u0421\u0434\u0435\u043b\u0430\u043b \u043a\u043e\u043f\u0438\u044e "
+             "\u0432 {tail}\u0438\u0432\u0430\u043d\u043e\u0432 "
+             "\u0440\u044f\u0434\u043e\u043c \u0441 \u043f\u0440\u043e\u0435\u043a\u0442\u043e\u043c.\n")
     SOUL_BEFORE = (OWN_NAME_LINE
                    + "\nSome prose in between.\n\n"
                    + "Backups go to ~/backups/minder-ztn-"
@@ -122,6 +125,10 @@ class CheckUpdateTests(unittest.TestCase):
                "---\nid: digest\n---\n\n"
                "Read from ~/projects/minder-ztn-"
                "\u0438\u0432\u0430\u043d\u043e\u0432/inbox each morning.\n")
+        # A sentence with the name in bare prose — no path, no key, no quotes —
+        # which is how people actually write about a folder of theirs.
+        _write(self.clone, "zettelkasten/_records/observations/prose.md",
+               self.PROSE.format(tail="minder-ztn-"))
         # Every shape 1.0.0 could damage, in the state that precedes it.
         _write(self.clone, "zettelkasten/_records/observations/own-shapes.md",
                "---\nid: own-shapes\n---\n"
@@ -455,34 +462,47 @@ class CheckUpdateTests(unittest.TestCase):
         self.assertEqual(residue["status"], "ok", residue["evidence"])
         self.assertIn("name your own repository, folder or credential", residue["evidence"])
 
-    def test_an_own_name_is_admissible_in_every_shape_that_names_a_thing(self):
-        """A slash was the old test, and it was too narrow by half.
+    def test_damage_in_bare_prose_is_reported_because_the_old_text_proves_it(self):
+        """No introducer, no quotes, no slash — just a sentence.
 
-        The same dead name turns up in a JSON scalar, a YAML scalar, an `id:`
-        field and a wikilink — none of which contain a slash, and every one of
-        which names something that has to exist. What stays excluded is the
-        name in running prose, where it is just the product being discussed.
+        The finder required something to INTRODUCE a name — a path, a key, a
+        quote, a wikilink — so that the product merely being talked about was
+        not read as a thing that must exist. That is the right guard when
+        nothing else can settle it. Here something can: the line before the
+        rename carried a name `lib.ownership` claims for the owner, and the line
+        after carries its renamed form. People write «сделал копию в
+        minder-ztn-иванов рядом», and their clone was reported clean.
         """
-        import sys as _sys
-        _sys.path.insert(0, str(CHECK.parent))
-        import check_update  # noqa: E402
+        # The fixture wrote the sentence before the rename; this is what 1.0.0
+        # made of it.
+        _write(self.clone, "zettelkasten/_records/observations/prose.md",
+               self.PROSE.format(tail="minder-memory-"))
+        _git(self.clone, "commit", "-qam", "the rename reached the sentence")
 
-        for label, line in (
-            ("json scalar", '{"vaultName": "minder-memory-' + self.IV + '"}'),
-            ("yaml scalar", "vault: minder-memory-" + self.IV),
-            ("id field", "id: minder-memory-" + self.NA),
-            ("wikilink", "See [[minder-memory-" + self.NA + "]] for the setup."),
-            ("path", "Checked out at ~/projects/minder-memory-" + self.IV + "."),
-            # A backtick introduces a name as surely as a colon does, and an
-            # owner writing notes in Markdown reaches for it constantly.
-            ("backtick", "- \u043a\u043e\u043f\u0438\u044f: `minder-memory-ivanov`"),
-        ):
-            found = check_update._admissible_own_names(line + "\n")
-            self.assertTrue(found, f"{label} was not admitted: {line}")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        damage = next(p for p in json.loads(res.stdout)["probes"]
+                      if p["probe"] == "own-name-damage")
+        self.assertEqual(damage["status"], "fail", damage["evidence"])
+        self.assertIn("prose.md", damage["evidence"])
+        self.assertIn(f"minder-ztn-{self.IV}", damage["evidence"],
+                      "the pre-rename sentence is the evidence, and it is quoted")
 
-        prose = "We renamed the product and minder-memory-platform moved with it.\n"
-        self.assertEqual(check_update._admissible_own_names(prose), [],
-                         "the product named in prose is not a thing that must exist")
+    def test_the_product_named_in_prose_with_no_such_history_is_not_damage(self):
+        """The sibling that keeps the loosened rule honest.
+
+        Dropping the introducer only works because the pre-rename text decides.
+        A line that merely mentions the product, with nothing behind it in the
+        old tree, must still report nothing.
+        """
+        _write(self.clone, "zettelkasten/_records/observations/talk.md",
+               "We renamed the product and minder-memory-platform moved with it.\n")
+        _git(self.clone, "add", "-A")
+        _git(self.clone, "commit", "-qam", "talking about the product")
+        res = self._run("--json")
+        damage = next(p for p in json.loads(res.stdout)["probes"]
+                      if p["probe"] == "own-name-damage")
+        self.assertEqual(damage["status"], "ok", damage["evidence"])
 
     def test_a_file_whose_own_name_was_renamed_is_reported_once(self):
         """The note is readable; every link that named it is not.

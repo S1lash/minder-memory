@@ -248,6 +248,7 @@ template:
   - zettelkasten/_system/state/log_maintenance.template.md
   - zettelkasten/_system/state/log_process.template.md
   - zettelkasten/_system/state/log_lint.template.md
+  - zettelkasten/_system/state/log_agent_lens.template.md
   # insights-config seeds the smart-resolve engine driven by
   # /minder:mem:resolve-clarifications. Ships under .template; resolver copies
   # to live path on first run when missing. Owner-mutable thereafter.
@@ -634,3 +635,9 @@ retired:
   - scripts/migrations/028-decision-runs-format-version.sh
   - scripts/migrations/029-refresh-vault-help.sh
   - scripts/migrations/030-seed-orphan-baseline.sh
+
+  # 1.0.11 — the cross-skill orientation card, named for the method the product
+  # grew from rather than for the product. A clone that has it under `engine:`
+  # keeps the old file after a sync (a sync copies what upstream HAS), so the
+  # row is what removes it; the new name arrives by the same sync.
+  - zettelkasten/5_skills/CLAUDE_ZETTELKASTEN.md

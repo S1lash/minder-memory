@@ -22,7 +22,7 @@ Pointer card. The full concierge flow lives in the installed skill, not here.
   a credential, encrypted, in `_system/state/secrets.enc.json` when the role reaches
   outward.
 - **What runs the result:** [[minder-mem-roles]].
-- **Full orientation card:** [[CLAUDE_ZETTELKASTEN]].
+- **Full orientation card:** [[CLAUDE_MINDER_MEMORY]].
 
 ## What it does (one paragraph)
 

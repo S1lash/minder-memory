@@ -31,7 +31,6 @@ _MIGRATIONS = _REPO_ROOT / "scripts" / "migrations"
 sys.path.insert(0, str(_MIGRATIONS))
 sys.path.insert(0, str(_SCRIPTS_DIR))
 
-import _032_minder_memory_rebrand as rb  # noqa: E402
 
 _ENV = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
         "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid"}

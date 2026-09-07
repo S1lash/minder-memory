@@ -61,8 +61,8 @@ When you find these in conflict, the higher one wins. When a rule is absent ever
 | `zettelkasten/_system/{SOUL,POSTS,long-form-playbook,decision-advisory-playbook}.md` | owner-curated; engine reads, surfaces clarifications, never silently overwrites |
 | `zettelkasten/_system/{TASKS,CALENDAR}.md` | `/minder:mem:process` — derived aggregates over note `- [ ]` / `📅` items (owner owns only the TASKS `## Stale` section). Not hand-edited; completeness enforced by `reconcile_tasks.py` / `reconcile_calendar.py` |
 | `zettelkasten/_system/registries/{TAGS,SOURCES}.md` | `/minder:mem:maintain`, `/minder:mem:lint` |
-| `zettelkasten/3_resources/people/PEOPLE.md` | `/minder:mem:process` (rows + mentions), `/minder:mem:bootstrap`, `/minder:mem:lint` (dedup/audit); tier only via `/minder:mem:resolve-clarifications` |
-| `zettelkasten/1_projects/PROJECTS.md` | `/minder:mem:bootstrap` (candidates); owner |
+| `zettelkasten/3_resources/people/PEOPLE.md` | `/minder:mem:process` (rows + mentions), `/minder:mem:bootstrap`, `/minder:mem:lint` (dedup/audit); tier only via `/minder:mem:resolve-clarifications`, and the `## Removed` retirement section only via `/minder:mem:resolve-clarifications` + owner, per Identity Contract |
+| `zettelkasten/1_projects/PROJECTS.md` | `/minder:mem:bootstrap` (candidates); owner; retirement / reclassification rows via `/minder:mem:resolve-clarifications` (the declared obligee of the Identity Contract) |
 | `zettelkasten/_system/registries/AUDIENCES.md` (Extensions table only) | `/minder:mem:resolve-clarifications` (appends rows on owner approval); spec sections never edited by hand |
 | `zettelkasten/_system/roles/{role-id}/` (every instance dir; the `_`-prefixed engine files are not one) | `role.md` — `/minder:mem:role:add`, `/minder:mem:role:edit`; `state/` — the role itself inside a `/minder:mem:roles` tick; `log.jsonl` — `/minder:mem:roles` only |
 | `zettelkasten/_system/state/secrets.enc.json` | `/minder:mem:role:add` (capture, via `roles_secrets.store_secret`). **Committed, encrypted per value** — so a cloud scheduler's fresh clone has it. The key lives only in the scheduler's env (`MINDER_MEMORY_ROLES_KEY`), never in git. The tick decrypts to a file outside the repo and deletes it; never echo a value into a log or a commit |
@@ -112,7 +112,7 @@ integrations/claude-code/skills/
   minder-mem-role-edit/        minder-mem-role-list/       minder-mem-role-ask/
 ```
 
-The `minder-mem-role*` family shares one subagent definition at `.claude/agents/minder-mem-role.md` — the agent `/minder:mem:roles` spawns per due role. It is the only agent definition the engine ships.
+The `minder-mem-role*` family shares one subagent definition at `.claude/agents/minder-mem-role.md` — the agent `/minder:mem:roles` spawns per due role. It is the only agent definition the engine ships. The two engine files every role's prompt is assembled from live at `zettelkasten/_system/roles/{_run-frame.md,_minder.md}`; everything else under `_system/roles/` is owner data.
 
 Skills are discovered through two paths:
 
@@ -153,7 +153,7 @@ When engine behaviour changes, these are the docs that must move with it. Drift 
 | `zettelkasten/_system/registries/AGENT_LENSES.md` | Agent-lens registry + frame contract |
 | `zettelkasten/_system/roles/_run-frame.md` | The per-run mechanics handed to every role — allowed writes, credentials, the two-line return |
 | `zettelkasten/_system/roles/_minder.md` | How a role uses the base — layer shapes, registries, the inbox-note shape `/minder:mem:process` picks up |
-| `zettelkasten/5_skills/CLAUDE_ZETTELKASTEN.md`, `zettelkasten/5_skills/minder-mem-*.md` | Engine quick-reference cards |
+| `zettelkasten/5_skills/CLAUDE_MINDER_MEMORY.md`, `zettelkasten/5_skills/minder-mem-*.md` | Engine quick-reference cards |
 | `.engine-manifest.yml` | Engine boundary; what ships to skeleton. Header comment above `template:` is the **SoT for the seed contract** (strip-seed / skill-seed / layered) |
 | `scripts/lib/` | Shared engine primitives: `portable` (LF/UTF-8 stdout + file I/O), `manifest` (the single reader of `.engine-manifest.yml`), `migrations` (the ledger + declared kinds), `git.sh` (branch identity, quotepath-safe path listing, MSYS-safe ref access). A concern that lands here has more than one call site — that is the bar |
 | `scripts/scheduler/record_tick_telemetry.py` | The tick odometer: reads the run's own session transcript (plus every sub-agent's) and appends one line of token consumption to `_system/state/tick-telemetry.jsonl`. It exists because a model cannot see its own usage — the only figure in its context is a remaining-budget counter that ignores cache reads and sub-agents entirely, so any self-reported number would be invention. Always exits 0: instrumentation that can abort a tick is worse than no instrumentation, which is why `/minder:mem:lint` A.13 has to watch for it going quiet |
@@ -169,6 +169,44 @@ When engine behaviour changes, these are the docs that must move with it. Drift 
 | `docs/onboarding.md`, `docs/upstream-sync.md`, `docs/scheduling.md` | Friend-facing docs |
 
 When you change a SKILL.md, ask: *does this affect anything in the table above?* If yes, update both in the same change. **Two-stage doc edits create drift; one-stage edits prevent it.**
+
+## Release and sync — the gotchas that bite
+
+- **`template:` category strips the `.template` suffix at release.** A file whose
+  *name* is load-bearing (e.g. anything protected by the engine-wide
+  `*.template.md` processing exclusion) must ship under `engine:` instead —
+  engine paths copy verbatim. That is why
+  `zettelkasten/_sources/inbox/describe-me/PROFILE.template.md` is listed under
+  `engine:`.
+- **The update reads the LOCAL `.engine-manifest.yml` to decide what to check
+  out.** A path newly added to `engine:` therefore reaches friends one
+  `/minder:mem:update` cycle late: run N lands the new manifest, run N+1 checks
+  out the path it lists. `scripts/` is the exception — `/minder:mem:update`
+  Step 1.5 and `sync_engine.sh --self-heal` check it out FIRST, so the runner,
+  the shared libs and any newly-added migration are always current within the
+  same run. Design a migration to rely on `scripts/` and on itself being
+  current, but NOT on a newly-listed engine file outside `scripts/` being
+  present yet.
+- **`release_engine.py` requires an empty `--target` and never prunes.** Real
+  releases go: release to a fresh mktemp dir → `rsync -a` (no `--delete`) onto
+  the skeleton clone → manually `git rm` paths removed from the engine set →
+  commit. A stale skeleton file removed upstream does NOT propagate to friends
+  via sync (checkout never deletes) — that is what `retired:` +
+  `scripts/retire_paths.py` are for; declare the removal there.
+
+## Test runner — pytest, not `unittest discover`
+
+CI and local runs use `python -m pytest tests/` from
+`zettelkasten/_system/scripts/`. `unittest discover` silently skips
+pytest-style function tests (no `TestCase` class), so whole suites never
+execute anywhere while the run still reports green. New test files may be
+pytest-style; never reintroduce `unittest discover` as the runner.
+
+**Deps** (`zettelkasten/_system/scripts/requirements.txt`): PyYAML, jsonschema
+(a hard import-time dependency of `lint_manifest_schema.py` — it `sys.exit(2)`s
+on a missing module, which kills test discovery), pytest, and `cryptography`
+(imported lazily by the encrypted credential store, so a base with no
+credentials neither needs it nor breaks without it).
 
 ## Verification — run before finalising engine changes
 

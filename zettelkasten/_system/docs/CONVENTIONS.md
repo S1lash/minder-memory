@@ -18,7 +18,7 @@
 - `zettelkasten/_system/docs/SYSTEM_CONFIG.md`
 - `zettelkasten/_system/docs/batch-format.md`
 - Frontmatter (`description`, `owned_by`, `read_by` fields) of `_system/state/log_*.md`
-- `zettelkasten/5_skills/CLAUDE_ZETTELKASTEN.md`
+- `zettelkasten/5_skills/CLAUDE_MINDER_MEMORY.md`
 - `zettelkasten/_system/docs/ARCHITECTURE.md` — системный дизайн как построен
 - `zettelkasten/_system/docs/CONVENTIONS.md` (этот файл)
 - Note templates в `5_meta/templates/`

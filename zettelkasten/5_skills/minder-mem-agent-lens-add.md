@@ -20,7 +20,7 @@ Pointer card. The full wizard flow lives in the installed skill, not here.
   `install.sh`).
 - **What lenses are:** [[minder-mem-agent-lens]] + `_system/registries/AGENT_LENSES.md`.
 - **Two-stage frame contract:** `_system/registries/lenses/_frame.md`.
-- **Full orientation card:** [[CLAUDE_ZETTELKASTEN]].
+- **Full orientation card:** [[CLAUDE_MINDER_MEMORY]].
 
 ## What it does (one paragraph)
 

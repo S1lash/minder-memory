@@ -277,20 +277,26 @@ def pre_032_commit(repo: Path) -> str | None:
     return parent.stdout.strip()
 
 
-def _admissible_own_names(text: str, root: Path | None = None) -> list[tuple[int, str, str]]:
-    """(line number, matched token, whole line) for every renamed own name that names a THING.
+def _renamed_own_names(text: str, root: Path | None = None) -> list[tuple[int, str, str]]:
+    """(line number, matched token, whole line) for every renamed own name in `text`.
 
-    A path was the original test, and it was too narrow by half. The audit found
-    the same dead name in a JSON scalar (`"vaultName": "minder-memory-иванов"`),
-    a YAML scalar (`vault: minder-memory-иванов`), an `id:` field and a
-    `[[wikilink]]` — none of which contain a slash, and every one of which names
-    something that has to exist. What is excluded is the name appearing in
-    ordinary prose, where it is just the product being talked about.
+    No introducer test. There was one — a name counted only when a path, a key,
+    a quote or a wikilink introduced it, so that the product merely being TALKED
+    ABOUT in prose was not read as a thing that must exist. That guard is the
+    right one when nothing else can settle the question.
+
+    Here something else can. Every caller of this function is comparing against
+    the pre-rename text, and that text is the evidence: if the line before the
+    rename carried a name `lib.ownership` claims for the owner, and the line
+    after carries its renamed form, the name was theirs and the path is now
+    dead — whatever punctuation happens to sit in front of it. Requiring an
+    introducer as well threw away real damage written the way people actually
+    write, «сделал копию в minder-ztn-иванов рядом с проектом», and the owner
+    was told their clone was clean.
     """
     out: list[tuple[int, str, str]] = []
     for index, line in enumerate(text.splitlines(), start=1):
         for match in _RENAMED_OWN_NAME_RE.finditer(line):
-            matched = match.group(0)
             token = ""
             for candidate in _TOKEN_CHARS.finditer(line):
                 if candidate.start() <= match.start() < candidate.end():
@@ -298,20 +304,8 @@ def _admissible_own_names(text: str, root: Path | None = None) -> list[tuple[int
                     break
             if ownership.is_engine_owned_name(token, root):
                 continue
-            before = line[:match.start()].rstrip()
-            # A path is admissible by its slash. Everything else is admissible
-            # by what introduces it: a key, an assignment, a quote, a list
-            # bullet, a wikilink. What is NOT admissible is the name in running
-            # prose, where the product is being talked about rather than
-            # something being named — and prose is what a preceding WORD marks.
-            if "/" in token or not before or before[-1] in ":=\"'`[|(,-":
-                out.append((index, matched, line.rstrip()))
+            out.append((index, match.group(0), line.rstrip()))
     return out
-
-
-def _path_like_own_names(text: str) -> list[tuple[int, str, str]]:
-    """Kept as the narrow shape, for callers that only want paths."""
-    return [row for row in _admissible_own_names(text) if "/" in row[2]]
 
 
 def _renames_by_map(repo: Path, ref: str) -> tuple[dict[str, str], str]:
@@ -473,7 +467,7 @@ def find_own_name_damage(repo: Path, before: str) -> list[dict]:
         current = _read(repo / rel)
         if not current:
             continue
-        candidates = _admissible_own_names(current, repo)
+        candidates = _renamed_own_names(current, repo)
         if not candidates:
             continue
         # The pre-rename text lives under the file's OLD path when the rename
