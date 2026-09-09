@@ -35,7 +35,7 @@ All four skills emit into one shape distinguished by the top-level
 ## Schema location and version evolution
 
 - **Active schema:** `v2.json` in this directory. `$id` =
-  `urn:minder-memory:manifest-schema:v2.3` (URN — no URL resolution, no domain
+  `urn:minder-memory:manifest-schema:v2.4` (URN — no URL resolution, no domain
   commitment, consumer-agnostic). Draft 2020-12.
 - **Past schemas** stay in this directory unchanged
   (`v2.json` → `v2.1.json` → `v3.json` …). Old batches keep
@@ -73,6 +73,7 @@ whether to update.
 | 2.2 | Add `technical` to `concepts.upserts[].type` enum (additive). | Producer-emitted category observed in real batches (e.g. `20260514-103200-process`); owner-approved trade-off 2a in resolve-clarifications session 2026-05-18. |
 | 2.3 | `processor` and `captured_by` name the product's namespace `minder:mem:<pipeline>`; the schema `$id` moves to `urn:minder-memory:…`. The former spelling is rejected; batches written before engine 1.0.0 validate after migration 032 has rewritten them. | Product rename (ADR-029). Not additive by the letter of the rules, shipped as MINOR because no consumer of the former spelling exists and the on-disk batches are rewritten in the same update. |
 
+| 2.4 | Add optional `constitution.alignment` — `candidates_considered` per eligibility path plus `checked` (additive). | A step that checks nothing because it found nothing and one that checks nothing because its selector cannot match its layer are indistinguishable in every other artefact a run emits; the second held undetected for months. The counts are the only signal that separates them, and `/minder:mem:lint` A.14 reads them. |
 ---
 
 ## Producer-side conformance — valid by construction

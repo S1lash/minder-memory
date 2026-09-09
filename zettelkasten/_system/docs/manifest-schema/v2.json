@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:minder-memory:manifest-schema:v2.3",
+  "$id": "urn:minder-memory:manifest-schema:v2.4",
   "title": "Minder Memory engine batch manifest — v2.x",
   "description": "Universal output contract emitted by every Minder Memory engine skill that produces persistent state changes (/minder:mem:process, /minder:mem:maintain, /minder:mem:lint, /minder:mem:agent-lens). Single shape, distinguished by the top-level `processor` field. SemVer: MAJOR breaks consumers, MINOR additive (new optional fields, sections, entity types). Forward-compat slot `section_extras: jsonb` lives both top-level and per-section. Audience-tag whitelist enforcement happens at the Minder Memory registry layer (lint scan A.7 against AUDIENCES.md, owner-extensible per tenant) — this schema enforces type only. Concept-name format conformance is producer-side guarantee (Minder Memory normalisers in `_system/scripts/_common.py`); this schema does not re-validate the regex. Privacy trio (`origin`, `audience_tags`, `is_sensitive`) is required-slot on every Tier 0/1/2 entity emission with conservative-safe defaults applied at emission time.",
 
@@ -348,6 +348,21 @@
             "archived":       { "type": "array", "items": { "$ref": "#/$defs/principle_archived_entry" } },
             "superseded":     { "type": "array", "items": { "$ref": "#/$defs/principle_superseded_entry" } },
             "section_extras": { "$ref": "#/$defs/section_extras" }
+          }
+        },
+        "alignment": {
+          "type": "object",
+          "description": "Constitution alignment check (/minder:mem:process 3.7.5). Reports what the step CONSIDERED, not only what it checked: a selector that can no longer match the layer it targets is otherwise indistinguishable from a run with genuinely nothing to check. Watched by /minder:mem:lint A.14.",
+          "properties": {
+            "candidates_considered": {
+              "type": "object",
+              "description": "Per eligibility path, artefacts the selector examined before eligibility narrowed them. Emitted even when zero — an absent count and a zero count mean different things.",
+              "properties": {
+                "typed_decision":       { "type": "integer", "minimum": 0 },
+                "tradeoff_observation": { "type": "integer", "minimum": 0 }
+              }
+            },
+            "checked": { "type": "integer", "minimum": 0, "description": "Artefacts that passed eligibility and were checked." }
           }
         },
         "constitution_core_view": {

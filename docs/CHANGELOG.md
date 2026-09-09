@@ -2,6 +2,38 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.1.0 — The scheduler stops needing you
+
+A scheduled tick could stop dead and wait for a click that was never coming.
+Processing sent its per-batch worker off to run in the background, and when the
+watcher failed to attach, the worker's result had no way home — so the run
+reached for the runtime's own scratch file to read it back. That file sits
+outside your notes, so reading it asks permission, and at four in the morning
+nobody answers. The tick then sat there until its time ran out, without even
+filing the failure note that would have told you. Batches now run in the
+foreground and hand their result straight back, and no tick reads the runtime's
+files under any circumstances.
+
+The constitution check had been quietly checking nothing. It looked for
+decisions by a frontmatter field that records stopped carrying months ago, so
+it matched nothing on every run while every note it should have examined still
+looked perfectly fine on disk. Each of its two paths now reads a field the
+thing it examines actually has: decisions come from your decision notes,
+trade-off observations from your observation records. And because a step that
+does nothing is invisible by nature, it now reports how many candidates it
+looked at, and the nightly lint raises a flag when that stays at zero while
+your notes keep arriving.
+
+Three smaller repairs of the same family. The delivery push runs exactly as
+written, with no flag added — one added `-u` had pointed your local branch at a
+sandbox branch that was then deleted, and everything downstream read the result
+as a divergence that was not there. Edits to the people registry address the
+row they mean instead of matching a heading name, which in a header full of
+prose had matched the wrong place and overwritten a section's counts. And where
+a recording ships both a transcript and its own summary, names are read from
+the transcript: a summary states the wrong name as confidently as the right
+one, and that error used to travel through a whole batch unchallenged.
+
 ## 1.0.12 — Two words, not one
 
 Three sentences the engine ships had the product's name welded to the next word

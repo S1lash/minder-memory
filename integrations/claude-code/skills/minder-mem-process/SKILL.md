@@ -131,7 +131,7 @@ mental model.
 | Step 4.6 Content Proportionality | Skipped (no creation ratio to evaluate). |
 | Step 4.7 Batch Data Accumulation | Runs. The accumulator's `records[]` and `knowledge_notes[]` lists are populated under the `updated[]` keys (not `created[]`). `concepts.upserts[]` IS populated — this is the load-bearing output of the mode. |
 | Step 5 Completion Gate | Runs unchanged. |
-| Step 5.5.1.5 Batch Manifest | **Branch (data-only):** identical schema; populates `records.updated[]`, `knowledge_notes.updated[]`, `concepts.upserts[]`. `created[]` arrays are emitted empty. `processor: "minder:mem:process"` unchanged; `format_version: "2.1"` unchanged. |
+| Step 5.5.1.5 Batch Manifest | **Branch (data-only):** identical schema; populates `records.updated[]`, `knowledge_notes.updated[]`, `concepts.upserts[]`. `created[]` arrays are emitted empty. `processor: "minder:mem:process"` unchanged; `format_version: "2.4"` unchanged. |
 | Step 6 Report | Renders «Reprocessed: N» instead of «Created: N». |
 
 **Idempotency.** Re-running `--reprocess-corpus` on a clean post-reprocess
@@ -365,6 +365,17 @@ Extract (quick, no deep analysis):
 Collect ALL person names/diminutives across ALL new transcripts.
 Load `3_resources/people/PEOPLE.md`.
 Resolve each name against the registry.
+
+**The raw transcript outranks any summary of it.** Where a source ships both
+— a recorder's own LLM summary alongside the verbatim text — resolve names
+against the verbatim text, and treat a name that appears only in the summary
+as unattested. A summariser states the wrong name with exactly the fluency it
+states the right one, so the error arrives carrying no doubt with it and
+propagates into `people:` frontmatter, backlinks and mention counts across the
+whole batch before anything contradicts it. When summary and transcript
+disagree on who someone is, the transcript wins and the disagreement itself
+goes to CLARIFICATIONS with both readings quoted — the mismatch is evidence
+about the source, and the next batch from that source deserves it.
 
 Three tiers:
 
@@ -768,7 +779,34 @@ subagent context, not summaries).
 ### 3.0.3 Subagent Invocation Contract
 
 - Tool: `Task`, `subagent_type: general-purpose` (inherits Opus from
-  orchestrator).
+  orchestrator), **always `run_in_background: false`**. Never background a
+  batch, and never poll for one.
+
+  **This does not make batches sequential.** A wave still goes out as §3.0.2
+  specifies — up to three `Task` blocks in one tool-use message, running
+  concurrently — and the orchestrator waits for that wave and receives all of
+  its manifests inline. Foreground is about where the result arrives, not about
+  how many run at once; reading it as «one batch at a time» would triple a
+  tick's wall-clock and strand a large backlog against the sandbox's time
+  limit.
+
+  This is load-bearing rather than stylistic, and the failure it prevents is
+  not obvious. The manifest below is a **return value** — Step 3.4.5 and every
+  orchestrator-side step consume it directly. A backgrounded batch returns
+  through a notification instead, and when the watcher cannot attach the
+  orchestrator is left holding no manifest and no way to ask for one. What it
+  reaches for next is the runtime's own spilled tool-result file, and that read
+  is outside the working tree: in an interactive session it raises a permission
+  prompt, and in a scheduler tick there is nobody to answer it, so the tick
+  blocks until its wall-clock expires. It never reaches failure-handling,
+  because a blocked prompt is not an error — so the tick dies without shipping
+  the failure note that would have made the death visible.
+
+  **The runtime's own files are never an input.** Session transcripts,
+  `tool-results/` spill files and anything else under the runtime's home are
+  not part of this pipeline. A batch whose manifest did not arrive is a failed
+  batch — treat it as one; never reconstruct it by reading what the runtime
+  wrote about itself.
 - Per-batch input passed in the Task prompt:
   - **Briefing (verbatim):** pre-scan results from Step 0 — PEOPLE.md,
     PROJECTS.md, HUB_INDEX.md, OPEN_THREADS, principle-candidates buffer
@@ -2014,31 +2052,46 @@ Subagent attaches per-transcript to its return manifest:
   (created in §3.5) that meet the §3.7.5 trade-off-observation
   eligibility — explicit named alternatives + values-bearing reason +
   reasoning-as-foreground. Empty list `[]` is the typical case;
-  populate only when all three conditions hold. Records typed as
-  `decision` are NOT eligible for this list (their constitution check
-  fires through the typed-decision path; double-flagging is harmless
-  but wasteful).
+  populate only when all three conditions hold. A record whose trade-off
+  was already atomised into a `decision` knowledge note in this same run
+  is NOT eligible for this list — that note carries the check through the
+  typed-decision path, and listing the record too spends a second Opus
+  call on the same reasoning.
 
 ### 3.7.5 Constitution Alignment Check
 
 > **Reprocess-corpus mode:** skip. No new decisions are extracted; alignment was checked in the original run.
 
-For every record produced in this run that satisfies the eligibility
+For every artefact produced in this run that satisfies the eligibility
 criteria below, run an alignment check against the active constitution
-tree. Records carrying heavy `fixes_applied` from §3.7 self-review
+tree. Artefacts carrying heavy `fixes_applied` from §3.7 self-review
 (≥ 3 fixes, or any HALLUCINATED fix) are deferred — content reliability
 borderline, do not generate drift clarifications until reviewed.
 
 This step runs in the **orchestrator**, after all subagents complete and
 their manifests are aggregated.
 
+**Each path selects on a field the layer it targets actually carries.**
+That is a hard constraint on this step, not a description of it. The two
+paths draw from two different layers, and those layers have different
+frontmatter: knowledge notes carry `types:` (§record-vs-note schema —
+`layer: knowledge`), records carry `kind:` and never `types:`. A selector
+pointed at a field its own layer does not emit matches nothing, forever,
+while every artefact it should have caught still looks correct on disk —
+so the failure is invisible to every content scan and is caught only by
+the candidate count this step reports (below). Changing either layer's
+frontmatter means revisiting this block in the same edit.
+
 **Eligibility — two paths.**
 
-1. **Typed-decision path (load-bearing).** Record's `types:` array
-   contains `decision`. Always eligible.
+1. **Typed-decision path (load-bearing).** A knowledge note created in
+   this run whose `types:` array contains `decision`. Always eligible.
+   Decisions are a knowledge-layer artefact — a record is the raw capture
+   a decision was extracted *from*, and checking the raw capture would
+   sweep in every alternative that was discussed and discarded.
 
 2. **Trade-off-observation path (per Principle 6 «Action vs Knowledge —
-   Capture Both»).** Record's `types:` array contains `observation` AND
+   Capture Both»).** A record with `kind: observation` AND
    the record path appears in the subagent's
    `tradeoff_framing_records[]` list (§3.0.3 manifest schema). Trade-off
    framing is detected by the subagent during §3.5 / §3.7 with
@@ -2060,22 +2113,38 @@ their manifests are aggregated.
    with no further side effect. The asymmetric cost favours strict
    detection.
 
-   **Why not retag as `decision`.** The `types:` taxonomy is owner-
-   facing — `decision` semantically implies a chosen path the owner
-   can later reference («what did we decide about X?»). A trade-off
-   observation in a journal entry («I notice I keep choosing speed
-   over depth») is a values pattern, not a decision artifact. Retagging
-   would corrupt search and registry semantics. The eligibility
-   expansion lives in this step's logic, not in the type taxonomy.
+   **Why this path exists at all, rather than promoting the observation
+   into a decision note.** The `types:` taxonomy is owner-facing —
+   `decision` semantically implies a chosen path the owner can later
+   reference («what did we decide about X?»). A trade-off observation in
+   a journal entry («I notice I keep choosing speed over depth») is a
+   values pattern, not a decision artifact; minting a decision note for
+   it would corrupt search and registry semantics and put words in the
+   owner's mouth. So the values signal is read where it actually lives,
+   in the record, and the eligibility expansion stays in this step's
+   logic rather than in the type taxonomy.
 
-Records that match neither path are skipped — not every record touches
-the constitution.
+Artefacts that match neither path are skipped — not everything produced in
+a run touches the constitution.
 
-**How:** invoke `/minder:mem:check-decision` per decision record. Pass:
+**Report what was considered, not only what was checked.** The step emits
+`constitution_alignment.candidates_considered` into the batch manifest —
+the count of artefacts each path examined before eligibility, per path.
+A step that checks nothing because it *found* nothing and a step that
+checks nothing because its selector cannot match are indistinguishable in
+every other artefact this run produces, and the second condition held here
+undetected for months. The count is what separates them, and
+`/minder:mem:lint` A.14 watches it.
+
+**How:** invoke `/minder:mem:check-decision` per eligible artefact. Pass:
 
 - `situation` = one-sentence distillation of the decision (context + chosen
-  path + stated rationale from the record)
-- `record_ref` = wiki-link to the record (meeting or observation), e.g. `[[YYYYMMDD-meeting-...]]` or `[[YYYYMMDD-observation-...]]`
+  path + stated rationale from the artefact)
+- `record_ref` = wiki-link to the artefact the verdict is about — the
+  decision note on path 1 (`[[YYYYMMDD-decision-...]]`), the observation
+  record on path 2 (`[[YYYYMMDD-observation-...]]`). It is the citation the
+  Evidence Trail carries back, so it points at what was actually read, never
+  at the source the artefact was extracted from.
 - `dry_run: false` (Evidence Trail append on cited principles is desired)
 - `--from-pipeline /minder:mem:process` — marks the call as `caller_class:
   mechanical`. Skips per-decision auto-commit on the telemetry JSONL
@@ -2135,6 +2204,18 @@ simpler to audit in `log_process.md`.
 
 **This step APPLIES the canonical rules from `_system/docs/SYSTEM_CONFIG.md` → "Data & Processing Rules".
 Those rules are the single source of truth. If a rule changes, update SYSTEM_CONFIG, not this step.**
+
+**Edit PEOPLE.md by anchor, never by a heading string.** Its header holds a
+long prose `**Last Updated:**` paragraph that narrates the batch, and that
+prose routinely contains the very heading names the file also uses as
+structure — so a substitution keyed on a string like `## Stats` matches inside
+the narration first and overwrites content that merely *described* the
+section. Address the row or the table you mean, or read the file and rewrite
+the specific region; a pattern that could match twice in this file is a
+pattern that will. Nothing in this step authorises inventing a substitution
+the step does not name: an edit shape not written here does not exist, and a
+run that finds itself needing one has found a gap to surface, not a licence to
+improvise on the owner's registry.
 
 Applicable rules (all mandatory, no silent compromise):
 
@@ -2532,7 +2613,7 @@ Accumulate:
 - **`batch_id`** = UTC timestamp of run start, format `YYYYMMDD-HHmmss`. Fixed at the moment the concurrency lock was acquired and stable for the rest of the run. On collision (theoretical, due to concurrency lock this should not happen) — append suffix `-1`, `-2`.
 - **`timestamp`** = ISO 8601 UTC with trailing `Z` (run start).
 - **`processor`** = `minder:mem:process`.
-- **`format_version`** = `2.1`. The markdown report mirrors the JSON manifest's
+- **`format_version`** = `2.4`. The markdown report mirrors the JSON manifest's
   top-level `format_version`; the contract that owns the value is
   `_system/docs/manifest-schema/` (`v{MAJOR}.json` + its README's SemVer rules),
   NOT `batch-format.md`'s own `version:` frontmatter field, which versions that
@@ -2742,13 +2823,31 @@ a friend's clone has no such repo.)
 
 Assemble the JSON dict in memory from the in-memory accumulator
 (§4.7) — top-level keys per that schema (`batch_id`,
-`timestamp`, `format_version: "2.1"`, `processor: "minder:mem:process"`,
+`timestamp`, `format_version: "2.4"`, `processor: "minder:mem:process"`,
 `sources_processed[]`, `records.{created,updated}[]`,
 `knowledge_notes.{created,updated}[]`, `hubs.{created,updated}[]`,
 `constitution{}`, `tier1_objects{}`, `tier2_objects{}`,
 `concepts.upserts[]`, `stats{}`). Each per-entity entry carries
 `origin`, `audience_tags`, `is_sensitive` from frontmatter; concept
 fields per the same accumulator output.
+
+`constitution.alignment` carries §3.7.5's own accounting and is emitted on
+every run, including runs where nothing was eligible:
+
+```yaml
+constitution:
+  alignment:
+    candidates_considered:
+      typed_decision: 24        # knowledge notes this run, before eligibility
+      tradeoff_observation: 3   # observation records this run, before eligibility
+    checked: 9                  # passed eligibility and were checked
+```
+
+Emit the counts even when they are zero — a zero that is present says the
+selector ran and found nothing, and a zero that is absent says nothing at
+all. That distinction is the whole point of the field: it is what lets
+`/minder:mem:lint` A.14 tell a quiet fortnight apart from a selector that
+stopped being able to match its own layer.
 
 Then invoke the autonomous emitter:
 

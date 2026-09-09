@@ -47,6 +47,19 @@ contract violation.
   harmless — delivery (`finalize-tick.sh` / Step 5b) does not depend on
   commit-author identity. Never amend to "fix" it; that is a contract
   violation and strands the tick.
+- Do NOT read the runtime's own files. Session transcripts, `tool-results/`
+  spill files and anything else under the runtime's home directory are not an
+  input to any step here. They sit outside the working tree, so reading one
+  raises a permission prompt — and a scheduler tick has nobody to answer it, so
+  the tick blocks until its wall-clock expires without ever reaching
+  failure-handling, because a blocked prompt is not an error. A result that did
+  not arrive by its normal return path is a failed step; handle it as one
+  instead of reconstructing it from what the runtime wrote about itself.
+  The single exception is `record_tick_telemetry.py` at Step 4.9: it reads
+  this run's own transcript because measuring the run is its whole purpose,
+  it is a declared step invoking a declared helper, and it degrades to
+  `status: unmeasured` rather than prompting. The prohibition is on YOU
+  opening those files to recover data some step should have returned.
 - Do NOT poll locks or state files between steps. Slash invocations are
   synchronous; their return IS completion.
 - Do NOT narrate or summarise between steps.
@@ -156,8 +169,12 @@ Then exit `partial` immediately.
 
    1. Read sandbox branch name from `.scheduler-state/start-branch`
       (call it `SANDBOX_BRANCH`).
-   2. `git push origin "HEAD:${SANDBOX_BRANCH}"` — push local commit to
-      sandbox branch. If this fails → run failure-handling.
+   2. `git push origin "HEAD:${SANDBOX_BRANCH}"` — push the local commit to
+      the sandbox branch. Run it **verbatim, with no flag added**. `-u` /
+      `--set-upstream` are forbidden in particular: they retarget the local
+      branch's upstream onto a sandbox branch that the squash-merge then
+      deletes, and every later tick and hook reads the resulting state as a
+      divergence that is not there. If this fails → run failure-handling.
    3. Call the `github` MCP `create_pull_request` tool with:
       - `base`: `main`
       - `head`: `<SANDBOX_BRANCH>`

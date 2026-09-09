@@ -29,7 +29,7 @@ version/phase/rename-history narratives.
 
 - Before acting on a non-trivial decision that touches identity, ethics,
   work philosophy, tech judgment, or life-domain trade-offs.
-- Inside `/minder:mem:process` Step 3.7.5 — for every eligible record in the
+- Inside `/minder:mem:process` Step 3.7.5 — for every eligible artefact in the
   current batch: `types: [decision]` (typed-decision path), or `types:
   [observation]` with the subagent's `tradeoff_framing` flag set
   (trade-off-observation path).
@@ -66,7 +66,7 @@ Do **not** invoke for:
 | `situation` | yes | 1–3 sentences describing the pending decision or observed behaviour |
 | `domains` | no | comma-separated subset of the enum (`ethics,identity,tech,…`); narrows the candidate pool |
 | `dry_run` | no | boolean; if true, skill only returns verdict, no Evidence Trail update |
-| `record_ref` | no | `[[YYYYMMDD-meeting-...]]` or `[[YYYYMMDD-observation-...]]` (any record-id) to cite as the decision source; defaults to the calling session |
+| `record_ref` | no | Wiki-link to the artefact being cited — a record (`[[YYYYMMDD-meeting-...]]`, `[[YYYYMMDD-observation-...]]`) or a knowledge note (`[[YYYYMMDD-decision-...]]`). Cite what was actually read: `/minder:mem:process` §3.7.5 checks decisions on the note that states them and trade-offs on the record that observed them. Defaults to the calling session |
 | `is_sensitive` | no | boolean; if true, telemetry emission omits situation text + rationale, keeps hash + verdict + citations only |
 
 ### Optional self-report (telemetry — best-effort, never blocks verdict)

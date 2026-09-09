@@ -1019,6 +1019,37 @@ the tick wrote down. So the tick judges and lint reads the judgement; a scan
 that tried to re-derive it would find no transcript and conclude, wrongly,
 that everything is fine.
 
+**A.14 Dead-selector backstop (constitution alignment):**
+
+The third check in the A.12 family, and the one that watches a step which
+runs, succeeds, and does nothing. `/minder:mem:process` §3.7.5 selects the
+artefacts to check against the constitution by frontmatter field. When a
+selector names a field the target layer does not carry, it matches nothing on
+every batch forever — and nothing else in the system can tell that apart from
+a run of batches that genuinely held no decisions. Every record and note it
+should have caught is still on disk and still correct; what is missing is a
+comparison that never happened.
+
+- **The signal.** Each batch manifest carries
+  `constitution_alignment.candidates_considered` — per path, how many
+  artefacts the selector examined *before* eligibility narrowed them. Take the
+  process manifests under `_system/state/batches/` from the last 14 days.
+- **The finding.** A path whose `candidates_considered` is `0` across **every**
+  manifest in that window, while the run produced artefacts of the layer that
+  path targets (knowledge notes for the typed-decision path, observation
+  records for the trade-off path), is a dead selector — raise a
+  `process-compatibility` CLARIFICATION naming the path, the field it selects
+  on, and the layer's actual frontmatter. Zero *eligible* artefacts is normal
+  and is not this finding; zero *considered* with the layer non-empty is not.
+- **Absent field, not zero.** A manifest that omits
+  `candidates_considered` entirely predates the field — skip it, the same way
+  A.13 skips ticks that ran before the recorder existed. Anchoring on the
+  field's own presence means no dated cut-off and nothing to remove later.
+- **Why 14 days rather than one run.** A single batch can legitimately produce
+  no notes of a given layer. Two weeks of process ticks cannot, on any base
+  that is being used at all — and on a base that is not, the window simply
+  never reports, which is the correct silence.
+
 ### Scan B — Thread Lifecycle
 
 **B.1 Stale thread detection per-status:**
@@ -1388,7 +1419,7 @@ fired F.2. Detection:
    principle body) and any path under `0_constitution/_archived/`.
 3. If the filtered set is empty → skip F.2 (no auto-trigger).
 4. Otherwise, derive `days = max(30, ceil((now - oldest_change_ts) / 86400))`
-   so the rescan window covers every decision record written under the
+   so the rescan window covers every eligible artefact written under the
    pre-edit tree, capped at a per-run ceiling of 90 days to bound cost.
    Owner can still run the manual path with a larger `--days` after.
 
@@ -1396,7 +1427,8 @@ The rescan window override **never shrinks** below the user-supplied
 `--days N` when both paths fire in the same invocation: `effective_days
 = max(N, derived_days)`.
 
-Per-record logic — same as `/minder:mem:process` Step 3.7.5 but emits
+Per-artefact logic — same as `/minder:mem:process` Step 3.7.5, including
+its two eligibility paths and the layer each one selects from, but emits
 CLARIFICATIONS of type `principle-drift-retro` (distinct from daily
 `principle-drift`) so the user can tell historical rescans apart from
 live checks. Pass `--from-pipeline /minder:mem:lint` to `/minder:mem:check-decision`
