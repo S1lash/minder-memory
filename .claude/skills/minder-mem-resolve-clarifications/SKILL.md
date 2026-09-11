@@ -152,6 +152,7 @@ for sane hypothesis forming, not a values-only concern.
 | `_system/SOUL.md` | Identity, focus, working style — drives hypothesis defaults AND reader alignment (how this owner takes in information) |
 | `3_resources/people/PEOPLE.md` | Mandatory for person-identity / people-bare-name resolution |
 | `1_projects/PROJECTS.md` | Mandatory for project-identity |
+| `_system/registries/FOLDERS.md` → `## Routing Rules` | The folder of every `knowledge-note` Step 6.5 creates |
 
 Conditional / on-demand (load only when round contains relevant Types):
 
@@ -1298,7 +1299,7 @@ ANY of:**
 
 | Class | What it captures | Target |
 |---|---|---|
-| `knowledge-note` | Architectural / organizational / decision / factual content that exceeds what fits in the Resolution text — explanations of how systems work, why a choice was made, status updates, niche-research conclusions | New file in `1_projects/` / `2_areas/{domain}/` / `3_resources/` per PARA routing; or append-section to existing note if anti-dedup found a match |
+| `knowledge-note` | Architectural / organizational / decision / factual content that exceeds what fits in the Resolution text — explanations of how systems work, why a choice was made, status updates, niche-research conclusions | New file in the folder the routing rules resolve for it (`_system/registries/FOLDERS.md → ## Routing Rules`); or append-section to existing note if anti-dedup found a match |
 | `soul-update` | Identity / Focus / Active Goals / Values shift the owner just declared («не делаю X», «теперь focus Y», «убираю Z как направление») | `_system/SOUL.md` targeted edit |
 | `people-update` | Factual update about an **existing** person — role change, org transition, relationship status change, biographical fact («Петя теперь в team B», «Маша вышла замуж»). NEW person mentions are NEVER handled by this class — they flow through the existing `people-bare-name` / `person-identity` CLARIFICATION path (raised by `/minder:mem:process` when transcripts surface unknown names) per doctrine §3.6 «no silent profile creation». | `3_resources/people/{id}.md` profile body edits and/or `PEOPLE.md` row updates (Org, Notes, Recent contexts columns). NEVER creates a new profile file. |
 
@@ -1651,10 +1652,9 @@ Direct writes by this skill (Steps 1–8):
   namespaced tags, wikilinks and nodes carrying a retired identifier
 
 Step 6.5 extraction writes (when owner approves a proposal at diff gate):
-- `1_projects/{slug}.md`, `2_areas/{domain}/{slug}.md`,
-  `3_resources/{kind}/{slug}.md` — new `knowledge-note` artefacts
-  created from extraction proposals. PARA routing follows the
-  artefact's domain and project / area / resource nature
+- New `knowledge-note` artefacts created from extraction proposals, each in
+  the folder the routing rules resolve for it
+  (`_system/registries/FOLDERS.md → ## Routing Rules`)
 - Existing knowledge notes — append-section when anti-dedup found a
   close match (`## Update {today}` block at end of body)
 - `_system/SOUL.md` — `soul-update` extraction edits (Identity, Focus,

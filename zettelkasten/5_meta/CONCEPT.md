@@ -996,17 +996,17 @@ tags:
       Инсайт: делегирование как акт доверия, не слабости
 
    b) 20260330-reflection-relationship-boundaries.md
-      → 2_areas/personal/relationships/
+      → 2_areas/personal/reflection/
       related_to: 20260330-reflection-delegation-trust
       Инсайт: границы в отношениях как форма заботы
 
    c) 20260330-reflection-energy-management.md
-      → 2_areas/personal/health/
+      → 2_areas/personal/reflection/
       related_to: 20260330-reflection-delegation-trust
       Инсайт: физическая нагрузка как регулятор когнитивной энергии
 
    d) 20260330-insight-burnout-prevention-routine.md
-      → 2_areas/personal/reflection/
+      → 2_areas/personal/
       related_to: 20260330-reflection-delegation-trust
       Инсайт: предотвращение выгорания через рутину, не через отдых
 

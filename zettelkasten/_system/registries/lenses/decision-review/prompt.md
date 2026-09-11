@@ -24,15 +24,8 @@ status: active
 **Где живут decision-ноты в этой базе:**
 
 - Frontmatter signal: `types: [..., decision, ...]` ИЛИ tag `type/decision`. Это primary source — ищи через grep frontmatter, не через filename pattern (хотя `*-decision-*.md` тоже частый pattern).
-- Локации варьируются по domain'у:
-  - `2_areas/work/technical/` — архитектурные / технические решения
-  - `2_areas/work/team/` — команда, компенсация, структура
-  - `2_areas/work/planning/` — рамки проекта, scope-cut, ресурсы
-  - `2_areas/work/company/` — org-level
-  - `2_areas/career/` — career-shape decisions (role naming, title structure)
-  - `2_areas/personal/reflection/` — life-decisions (если выделяются)
-  - `1_projects/{project}/` — project-shaped решения
-  - `0_constitution/` — values-level decisions, если такие появляются (axiom/principle/rule level)
+- Локация — по правилам маршрутизации (`_system/registries/FOLDERS.md → ## Routing Rules`), а более ранние ноты лежат там, куда их положили. Папка — не фильтр: собирай decision-ноты по frontmatter по всему PARA (`1_projects/` … `3_resources/`).
+- `0_constitution/` — values-level decisions, если такие появляются (axiom/principle/rule level).
 - Records после decision-даты — для проверки исхода: `_records/observations/`, `_records/meetings/`, последующие knowledge-notes / knowledge-updates по теме.
 - **Hubs по теме decision'а** в `5_meta/mocs/` — обязательно. Резолви через `domains:` или `projects:` фронтматтера decision-ноты (например `project: learning-goal` → `5_meta/mocs/hub-learning-goal.md`). Хабы читаются ДО формулировки observation (см. hub-awareness echo guard ниже).
 - Свои прошлые outputs в `_system/agent-lens/decision-review/{date}.md` — как age-trail для self-history (см. ниже), не как evidence.
@@ -279,8 +272,8 @@ appends an empty `## Update {today}` section to the decision note
 
 Favour `decision_update_section` when:
 
-- A decision note exists in the knowledge layer (`1_projects/`,
-  `2_areas/`) with explicit declared assumptions.
+- A decision note exists in the knowledge layer (`layer: knowledge`, any PARA
+  folder `1_projects/` … `3_resources/`) with explicit declared assumptions.
 - ≥2 records since the note's last `## Update` section either confirm
   an assumption with new force OR present concrete disconfirming
   evidence — enough that an experienced reader would say «time to

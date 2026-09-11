@@ -19,7 +19,7 @@ modified: '2026-08-15'
 
 ```
 0.  _system/docs/ENGINE_DOCTRINE.md        ← Загружается ПЕРВЫМ — обязывающая рамка для всех шагов
-1.  _system/docs/SYSTEM_CONFIG.md          ← Runtime config (форматы, routing, типы)
+1.  _system/docs/SYSTEM_CONFIG.md          ← Runtime config (форматы, типы)
 2.  5_meta/PROCESSING_PRINCIPLES.md        ← 8 принципов обработки + values profile
 3.  _system/SOUL.md                        ← Identity + Current Focus + Working Style
 4.  _system/views/CURRENT_CONTEXT.md       ← Live state — что актуально сейчас
@@ -34,6 +34,7 @@ modified: '2026-08-15'
 13. _system/views/HUB_INDEX.md             ← Индекс хабов
 14. _system/state/PROCESSED.md             ← Что обработано
 15. _system/state/CLARIFICATIONS.md        ← Pending clarifications
+16. _system/registries/FOLDERS.md          ← Правила маршрутизации (дословно в брифинг каждого пакета)
 ```
 
 ### Pipeline (Steps 0-6):

@@ -2,6 +2,32 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.1.1 — One kind of note, one folder
+
+Insights and decisions — the two kinds of note processing writes most — had no
+line in the folder rules, so each run placed them by eye, and notes of the same
+kind from the same week ended up in five or six folders. Every knowledge note
+now has one rule for where it goes, read off its own fields; the only judgment
+left is which of the three idea folders an idea belongs in — business, product,
+or neither. A note that belongs to a project goes to that project's folder,
+whatever its kind. Otherwise its kind decides, and insights and decisions
+follow their domain: work to `2_areas/work/`, career to `2_areas/career/`,
+working with AI to `3_resources/tech/ai-agents/`, other technical topics to
+`3_resources/tech/`, and everything personal — a domain you added yourself
+included — to `2_areas/personal/`. Topic sub-folders a note used to be matched
+into by keywords, such as `payments/` or `architecture/`, and the `team/` folder
+under work, no longer receive new notes; they keep the ones they have.
+
+The rules now reach the part of the pipeline that writes the notes: processing
+hands them over with every batch, and resolving clarifications loads them before
+filing what it extracts. The lenses that looked for reflections and decisions
+in fixed folders find them wherever the rules put them, and the search for an
+earlier version of an idea looks through every folder an idea can be filed in.
+
+Your existing notes stay where they are; only new ones follow the rule. One
+thing you will notice: a reflection that belongs to a project now goes to that
+project's folder rather than to your reflections folder.
+
 ## 1.1.0 — The scheduler stops needing you
 
 A scheduled tick could stop dead and wait for a click that was never coming.

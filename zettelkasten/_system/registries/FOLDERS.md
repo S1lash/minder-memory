@@ -5,7 +5,9 @@
 `_sources/` и `_system/` описаны точно — это одинаковый на каждой инсталляции
 каркас движка. Подпапки PARA-слоёв (`1_projects/` … `4_archive/`) —
 **иллюстрация**: их заводит владелец под свою жизнь по правилу «3+ заметки»
-внизу файла, и совпадать с примером они не обязаны.
+внизу файла, и совпадать с примером они не обязаны. Исключение — адреса,
+которые называют правила маршрутизации: туда заметка ложится, даже если папки
+ещё нет.
 
 ---
 
@@ -189,7 +191,13 @@ zettelkasten/
 сюда, не дублирует.
 
 Порядок разрешения — первый сработавший шаг выигрывает:
-`layer` (record / hub) → `types` по приоритету → `domain` → keywords контента.
+`layer` (record / hub) → проект (`projects:`) → `types` по приоритету → `domains`.
+
+Папка заметки знаний вычисляется из полей, которые у неё уже есть, — `projects:`,
+`types:`, `domains:` — и из строки реестра проектов. Сначала реши эти поля, затем
+прочитай папку по шагам ниже; заметку не кладут рядом с похожими по аналогии.
+Суждение нужно ровно в одном месте — какую из строк `idea` выбрать для идеи без
+проекта; всё остальное вычисляется.
 
 ### По layer
 
@@ -198,52 +206,64 @@ zettelkasten/
 | record | по `kind` — строки `record (kind: …)` в таблице ниже; `kind` отсутствует → `_records/meetings/` |
 | hub | 5_meta/mocs/ |
 
+### По проекту
+
+Только для заметки знаний (`layer: knowledge`). Перебирай `projects:` по порядку.
+Id без строки в `1_projects/PROJECTS.md` или со строкой, где колонка `Folder` —
+`-` или пусто, пропускается. Первый id, чья строка заполняет `Folder`,
+выигрывает, и заметка ложится в `1_projects/{id}/` — какого бы типа она ни была.
+Путь строится из id; ячейка отвечает только на вопрос, есть ли у проекта папка.
+Папки ещё нет на диске — её создают. Ни один id не подошёл — шаг не срабатывает.
+
 ### По типу (приоритет)
+
+Приоритет — порядок строк: из `types:` заметки срабатывает самая верхняя строка.
+Ни одна строка не подошла — шаг не срабатывает.
 
 | Type | Folder |
 |------|--------|
-| project | 1_projects/{project-id}/ |
-| meeting | 2_areas/work/meetings/ **[DEPRECATED — новые встречи маршрутизируются как record]** |
 | planning | 2_areas/work/planning/ |
-| technical + work | 2_areas/work/technical/ |
-| technical + ideas | 3_resources/tech/ |
-| idea + business | 3_resources/ideas/business/ |
-| idea + product | 3_resources/ideas/products/ |
-| idea (general) | 3_resources/ideas/ |
+| technical, в `domains:` есть `work` | 2_areas/work/technical/ |
+| technical, в `domains:` нет `work` | 3_resources/tech/ |
+| idea — про бизнес: модель, монетизация, рынок | 3_resources/ideas/business/ |
+| idea — про продукт или фичу | 3_resources/ideas/products/ |
+| idea — ни бизнес, ни продукт | 3_resources/ideas/ |
 | reflection | 2_areas/personal/reflection/ |
 | person | 3_resources/people/ |
 | log | 2_areas/personal/ |
+| reference | 3_resources/ |
+| project | по домену (таблица ниже) — заметку проекта с папкой уже разместил шаг «По проекту» |
+| meeting | по домену (таблица ниже) — встречи создаются как record; строка ловит заметку знаний этого типа |
+| insight | по домену (таблица ниже) |
+| decision | по домену (таблица ниже) |
 | record (kind: meeting) | _records/meetings/ |
 | record (kind: observation) | _records/observations/ |
 | record (kind: biometric) | _records/biometric/{source}/ |
 | record (kind: activity) | _records/activity/{source}/ |
 | hub | 5_meta/mocs/ |
 
-### По домену (если тип неясен)
+### По домену
+
+Срабатывает, когда ни одна строка типа не подошла или строка отсылает сюда.
+Папка у заметки одна, а доменов в `domains:` может быть несколько, и они равны
+(`DOMAINS.md`: неявного главного нет). Поэтому строки проверяются сверху вниз, и
+выигрывает первая, чей домен есть в заметке. Это правило выбора места, а не
+утверждение о главном домене: домены заметки остаются равными.
 
 | Domain | Folder |
 |--------|--------|
 | work | 2_areas/work/ |
 | career | 2_areas/career/ |
-| personal | 2_areas/personal/ |
-
-### По контенту (keywords)
-
-| Keywords | Folder |
-|----------|--------|
-| проекты, команда, релиз | 2_areas/work/ |
-| повышение, зарплата, должность | 2_areas/career/ |
-| AI, LLM, агенты, модели | 3_resources/tech/ai-agents/ |
-| архитектура, система, дизайн | 3_resources/tech/architecture/ |
-| платежи, эквайринг, карты | 3_resources/tech/payments/ |
-| стартап, бизнес, монетизация | 3_resources/ideas/business/ |
-| продукт, MVP, фича | 3_resources/ideas/products/ |
+| ai-interaction | 3_resources/tech/ai-agents/ |
+| tech | 3_resources/tech/ |
+| personal, identity, ethics, health, relationships, money, time, learning, meta | 2_areas/personal/ |
+| любой другой случай — пустой `domains:` или только домены, которых нет в строках выше | 2_areas/personal/ |
 
 ---
 
 ## Creating New Folders
 
-1. Только если есть 3+ заметок для категории
+1. Папка сверх адресов из правил маршрутизации — только если есть 3+ заметок для категории
 2. Добавить в эту структуру
 3. Использовать lowercase-with-dashes
 4. Обновить routing rules

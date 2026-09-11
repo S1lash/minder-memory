@@ -21,7 +21,8 @@
 ### Document Ownership
 
 This file is the **runtime configuration** loaded by `/minder:mem:process` at Step 1.
-It defines note formats, routing rules, entity types, naming conventions.
+It defines note formats, entity types, naming conventions. Folder routing lives
+in `_system/registries/FOLDERS.md → ## Routing Rules`.
 
 For philosophy and architecture: see `5_meta/CONCEPT.md`.
 For processing principles: see `5_meta/PROCESSING_PRINCIPLES.md`.
@@ -824,21 +825,25 @@ Full-text search по raw content: `grep -r "keyword" zettelkasten/_sources/`
 
 ## Types (type:)
 
-| Type | Description | Папка по умолчанию |
-|------|-------------|-------------------|
-| meeting | Встреча, совещание | **DEPRECATED** — новые встречи → `_records/meetings/` как records. Legacy notes в `2_areas/work/meetings/` сохраняются |
-| reflection | Рефлексия, размышления | 2_areas/personal/reflection/ |
-| task | Задача (редко отдельно) | по контексту |
-| idea | Идея | 3_resources/ideas/ |
-| decision | Решение | по контексту |
-| log | Дневник, отчёт | 2_areas/personal/ |
-| planning | Планирование | 2_areas/work/planning/ |
-| technical | Техническое | 2_areas/work/technical/ или 3_resources/tech/ |
-| reference | Справка | 3_resources/ |
-| person | Профиль человека | 3_resources/people/ |
-| project | Описание проекта | 1_projects/ |
-| record | Операционный лог transcript-grounded события (kind: meeting или observation) | `_records/meetings/` (встречи) или `_records/observations/` (соло Plaud) |
-| hub | Hub — синтез и эволюция по теме | 5_meta/mocs/ |
+Словарь описывает сами типы. Папку заметки определяют правила маршрутизации —
+`_system/registries/FOLDERS.md → ## Routing Rules`.
+
+| Type | Description |
+|------|-------------|
+| meeting | Встреча, совещание — **DEPRECATED**: новые встречи создаются как records (`kind: meeting`) |
+| reflection | Рефлексия, размышления |
+| insight | Неочевидная связь, вывод, распознанный паттерн |
+| task | Задача (редко отдельно) |
+| idea | Идея |
+| decision | Решение |
+| log | Дневник, отчёт |
+| planning | Планирование |
+| technical | Техническое |
+| reference | Справка |
+| person | Профиль человека |
+| project | Описание проекта |
+| record | Операционный лог transcript-grounded события (kind: meeting или observation) |
+| hub | Hub — синтез и эволюция по теме |
 
 ---
 
@@ -1147,7 +1152,7 @@ rows surface as CLARIFICATIONs). See `/minder:mem:lint` SKILL Scan A.11 for the 
 
 Правила маршрутизации заметки в папку живут в реестре папок —
 `_system/registries/FOLDERS.md → ## Routing Rules`. Он владеет порядком
-разрешения (layer → types → domain → keywords) и всеми таблицами. Читай их
+разрешения (layer → project → types → domains) и всеми таблицами. Читай их
 там; если файл недоступен — не угадывай папку, подними CLARIFICATION.
 
 ---
@@ -1376,7 +1381,7 @@ Before saving each note:
 
 | File | Purpose | Updated |
 |------|---------|---------|
-| _system/docs/SYSTEM_CONFIG.md | This file — runtime config (formats, routing, types) | Manual |
+| _system/docs/SYSTEM_CONFIG.md | This file — runtime config (formats, types) | Manual |
 | _system/SOUL.md | Identity + Focus + Working Style | Manual + /minder:mem:bootstrap (once) |
 | _system/state/OPEN_THREADS.md | Active open threads + resolved history | /minder:mem:bootstrap, /minder:mem:maintain, /minder:mem:resolve-clarifications (writers per Skill Write Territory) |
 | _system/views/CURRENT_CONTEXT.md | Live state snapshot for thin orientation | /minder:mem:bootstrap, /minder:mem:maintain |

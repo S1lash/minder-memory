@@ -184,7 +184,8 @@ hand it to `stated-vs-lived`; do not re-file it here as a «sharpening».
 - `_records/observations/` — solo reflections, voice-note debriefs, thinking
   out loud. Richest seam: the owner reasoning with themselves.
 - `_records/meetings/` — how they argue, push back, frame, what they cut.
-- `2_areas/`, `3_resources/` reflection notes — distilled thinking, sometimes
+- Reflection notes — knowledge notes with `reflection` in `types:`, in any PARA
+  folder (`1_projects/` … `3_resources/`) — distilled thinking, sometimes
   half-named.
 
 **What already exists (dedup AND build-on — read before proposing):**

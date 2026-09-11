@@ -119,7 +119,7 @@ mental model.
 | Step 3.4 LLM Classification | **Unchanged.** All 16 questions still run; Q15 (concepts) and Q16 (privacy) carry the load. Q1-Q14 outputs are accepted but not consumed by Step 3.5 in this mode (they remain available to the manifest for completeness). |
 | Step 3.4.5 Concept Matcher Subagent | **Unchanged.** Sees the populated CONCEPTS.md, prefers existing canonical names verbatim, coins new ones with type assignment. Idempotent on a clean state. |
 | Step 3.5 Create Outputs | **Branch:** UPDATE existing files. For each note, replace the `concepts:` array verbatim with the matcher output (post-`normalize_concept_name`). Apply `domain_resolutions[]` (`drop` / `remap` per the same contract). Preserve every other frontmatter field verbatim; never touch the body. NO new records, NO new knowledge notes, NO hub creation, NO `Evidence Trail` mutation. |
-| Step 3.6 Structural Verification | Runs the same checks against the updated frontmatter. |
+| Step 3.6 Structural Verification | Runs the same checks against the updated frontmatter, except folder placement: this mode never moves a file. |
 | Step 3.7 Self-Review | Skipped. Self-review's coverage manifest assumes new extraction; reprocess re-uses prior atomization decisions. |
 | Step 3.7.5 Constitution Alignment | Skipped (extraction-time concern). |
 | Step 3.8 People Profiles | Skipped (no new mentions are introduced). |
@@ -420,7 +420,7 @@ This guides context loading in Step 3.3 — load only relevant hubs, not all of 
 Read these system files (in parallel where possible):
 
 0. `_system/docs/ENGINE_DOCTRINE.md` — operating philosophy (load FIRST; binding frame for every step). Cross-skill rules from §3 govern: surface-don't-decide, inclusion-bias-on-capture / curation-on-promotion, idempotency, the owner-LLM contract.
-1. `_system/docs/SYSTEM_CONFIG.md` — note formats, routing rules, naming
+1. `_system/docs/SYSTEM_CONFIG.md` — note formats, naming
 2. `5_meta/PROCESSING_PRINCIPLES.md` — 8 principles + values profile
 3. `_system/SOUL.md` — identity + current focus + working style (context only)
 4. `_system/views/CURRENT_CONTEXT.md` — live state snapshot (context only)
@@ -438,6 +438,7 @@ Read these system files (in parallel where possible):
     Also scan **Resolved Archive** table: previously resolved name variants (e.g.,
     «Нуара» = Лара Громова, «Трафт» = Петров). Use these to auto-resolve
     transcription artifacts in new transcripts without re-creating ambiguities.
+16. `_system/registries/FOLDERS.md` → `## Routing Rules` — the folder of every knowledge note; passed verbatim into every batch briefing (§3.0.3)
 
 **CLARIFICATIONS HARD RULE.** При `confidence < threshold` — не принимать решение
 молча. Записать вопрос в `_system/state/CLARIFICATIONS.md` под `## Open Items`, использовать
@@ -820,6 +821,9 @@ subagent context, not summaries).
     tags: [trajectory/{id}]`. Nothing to emit when both sections are empty.
     Whole-identifier match only: a longer id that contains a retired one is
     a different identity, left alone.
+  - **Routing rules (verbatim):** the `## Routing Rules` section of
+    `_system/registries/FOLDERS.md`; the subagent files every knowledge note
+    it creates by them.
   - **Batch transcripts:** ordered list of absolute paths to source files
     in `_sources/processed/...`, in chronological order.
   - **Pipeline spec:** instruction to execute Steps 3.1–3.7 for every
@@ -1677,7 +1681,8 @@ Filename mapping by primary type:
 - idea → `YYYYMMDD-idea-{topic}.md`
 - technical → `YYYYMMDD-technical-{topic}.md`
 
-Folder: use routing logic from SYSTEM_CONFIG.md (Folder Routing Logic section).
+Folder: resolve by the routing rules in the briefing
+(`_system/registries/FOLDERS.md → ## Routing Rules`).
 Template: `5_meta/templates/note-template.md`
 
 Frontmatter MUST include `layer: knowledge`.
@@ -1736,12 +1741,18 @@ Decision notes:
 When a knowledge stream's primary type is `idea`:
 
 1. **SEARCH** existing ideas before creating a new file:
-   - Grep `3_resources/ideas/business/` and `3_resources/ideas/products/` frontmatter
+   - Grep the frontmatter of knowledge notes whose `types:` contains `idea`, across
+     `1_projects/`, `2_areas/` and `3_resources/` — the routing rules file an idea
+     by its project or by its nature, so an earlier version can sit in any of them
    - Match signals (all contribute to confidence):
      a) Tag overlap: compare `topic/*` and `project/*` tags (weight: 40%)
      b) Title/keyword overlap: extract 2-4 key words from new idea title,
         compare against existing titles and aliases (weight: 35%)
-     c) Subfolder match: same subfolder (business/ or products/) adds base score (weight: 25%)
+     c) Folder match: the candidate's routed folder equals the new idea's (weight: 25%).
+        A candidate's routed folder is its project's folder when its own
+        `projects:` resolves to one under the routing rules, otherwise the folder
+        it sits in — existing notes are never moved, so where a file sits is not
+        where the rules would file it today
 
 2. **Decision thresholds:**
    - **≥ 80% confidence — MATCH:** Update the existing idea note:
@@ -1759,7 +1770,7 @@ When a knowledge stream's primary type is `idea`:
 
 3. **Edge cases:**
    - Multiple matches ≥ 80%: pick highest confidence, log runner-ups to CLARIFICATIONS
-   - Cross-subfolder match (business↔products): treat as AMBIGUOUS regardless of score
+   - Match whose routed folders differ (e.g. business↔products, a project folder↔`3_resources/ideas/`): treat as AMBIGUOUS regardless of score
 
 Body structure for knowledge notes — the frontmatter fence (`---`) closes FIRST,
 then the body headings follow. Skeleton:
@@ -1965,7 +1976,7 @@ After creating EACH file with frontmatter + body that the subagent writes (recor
 - [ ] People IDs in `people:` exist in PEOPLE.md OR will be created in Step 3.8
 - [ ] Every id in `projects:` is eligible for the axis per the Identity Contract in `_system/docs/SYSTEM_CONFIG.md` — looked up in `1_projects/PROJECTS.md`, not recalled; a retired or reclassified id is a fail, not a warning. Cardinality per `5_meta/PROCESSING_PRINCIPLES.md` → «Project Tagging — Primary-Topic Only».
 - [ ] Tags follow conventions from TAGS.md (format: `type/xxx`, `domain/xxx`, etc.)
-- [ ] File placed in correct PARA folder per SYSTEM_CONFIG.md routing rules
+- [ ] A note this run created sits in the folder the routing rules (`_system/registries/FOLDERS.md → ## Routing Rules`) resolve for it; a note updated in place stays where it is
 - [ ] `source:` points to a real file path in `_sources/processed/`
 - [ ] `extracted_from:` (if present) references an existing or just-created record ID
 - [ ] `supersedes:` (if present) references an existing note ID

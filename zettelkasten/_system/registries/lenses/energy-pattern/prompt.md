@@ -29,7 +29,7 @@ Scope разделён на **evidence-scope** (откуда берутся verb
 **Evidence-scope — ТОЛЬКО records (verbatim affect-markers):**
 - `_records/observations/` — solo voice-notes, journal-shape.
 - `_records/meetings/` — own-affect parts only. Attribution: верь quote-блокам с явным `<owner>:` / `«…»` приписанным speaker'у (где `<owner>` — имя владельца базы из `_system/SOUL.md` Identity) + `speaker:` frontmatter. Если attribution фразы неоднозначна — skip и зафиксируй в Reasons как «ambiguous attribution, not counted».
-- `2_areas/personal/reflection/` — recent reflection notes, если есть verbatim affect-фразы.
+- Reflection-ноты — knowledge-ноты с `reflection` в `types:`, в любой папке PARA: recent, если есть verbatim affect-фразы.
 
 **Context-scope — automatic read для baseline и uniqueness-guard (НЕ evidence для hits):**
 - `_system/SOUL.md` → Working Style → «Заряжает / Истощает / Выводит из себя» — explicit declared baseline.
@@ -127,7 +127,7 @@ Owner уже self-aware — affect-категории explicit'но declared в 
 
 Перед тем как surface'ить hit, проверь:
 1. **Уже ли это в SOUL Working Style baseline?** Если категория и её полярность совпадают с declared — это НЕ shift. Surface как «no shift, baseline confirms» если это самый сильный сигнал недели.
-2. **Уже ли это явно зафиксировано в недавних reflection-нотах** (последние 30 дней `2_areas/personal/reflection/` и hub'ах)? Если уже отрефлексировано owner'ом — surface как «recurring known pattern» с пометкой на reflection-source, не как новое observation.
+2. **Уже ли это явно зафиксировано в недавних reflection-нотах** (reflection-ноты последних 30 дней — по `types:`, в любой папке PARA — и hub'ы)? Если уже отрефлексировано owner'ом — surface как «recurring known pattern» с пометкой на reflection-source, не как новое observation.
 
 **Hit valid когда:**
 - Категория появилась/выросла относительно baseline (новая, или sustained но не declared).
