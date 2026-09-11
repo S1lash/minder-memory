@@ -152,7 +152,6 @@ for sane hypothesis forming, not a values-only concern.
 | `_system/SOUL.md` | Identity, focus, working style — drives hypothesis defaults AND reader alignment (how this owner takes in information) |
 | `3_resources/people/PEOPLE.md` | Mandatory for person-identity / people-bare-name resolution |
 | `1_projects/PROJECTS.md` | Mandatory for project-identity |
-| `_system/registries/FOLDERS.md` → `## Routing Rules` | The folder of every `knowledge-note` Step 6.5 creates |
 
 Conditional / on-demand (load only when round contains relevant Types):
 
@@ -1299,7 +1298,7 @@ ANY of:**
 
 | Class | What it captures | Target |
 |---|---|---|
-| `knowledge-note` | Architectural / organizational / decision / factual content that exceeds what fits in the Resolution text — explanations of how systems work, why a choice was made, status updates, niche-research conclusions | New file in the folder the routing rules resolve for it (`_system/registries/FOLDERS.md → ## Routing Rules`); or append-section to existing note if anti-dedup found a match |
+| `knowledge-note` | Architectural / organizational / decision / factual content that exceeds what fits in the Resolution text — explanations of how systems work, why a choice was made, status updates, niche-research conclusions | A flat file in `_sources/inbox/resolve-clarifications/` carrying the owner-approved text; `/minder:mem:process` files it like any source (see «Filing a `knowledge-note` extraction» in Step 6.5) |
 | `soul-update` | Identity / Focus / Active Goals / Values shift the owner just declared («не делаю X», «теперь focus Y», «убираю Z как направление») | `_system/SOUL.md` targeted edit |
 | `people-update` | Factual update about an **existing** person — role change, org transition, relationship status change, biographical fact («Петя теперь в team B», «Маша вышла замуж»). NEW person mentions are NEVER handled by this class — they flow through the existing `people-bare-name` / `person-identity` CLARIFICATION path (raised by `/minder:mem:process` when transcripts surface unknown names) per doctrine §3.6 «no silent profile creation». | `3_resources/people/{id}.md` profile body edits and/or `PEOPLE.md` row updates (Org, Notes, Recent contexts columns). NEVER creates a new profile file. |
 
@@ -1316,11 +1315,14 @@ ANY of:**
 - If the same information was just written by Step 6 (Resolution text
   in CLARIFICATIONS_ARCHIVE, thread `Resolution:` field, Class B file
   edit) → drop, no proposal.
-- For `knowledge-note`: quick check against `_system/views/INDEX.md`
-  for existing notes on the same topic (grep on topic keywords from
-  draft filename). If a close match exists → reframe proposal as
-  «append-section to existing note» with the existing note's path,
-  not a new file.
+- For `knowledge-note`: a file in `_sources/inbox/resolve-clarifications/`
+  or `_sources/processed/resolve-clarifications/` whose body already carries
+  the same approved text → drop, no proposal; a resumed session files nothing
+  twice. Clarification titles repeat across the queue, so the title is
+  context only, never the match. Then check
+  `_system/views/INDEX.md` for an existing note on the same topic (grep on
+  topic keywords): a close match is named in the extraction as
+  `Related: [[{note-id}]]`, a hint for processing's connection pass.
 
 **Confidence floor: 0.6.** If extraction confidence is below 0.6, drop.
 Owner declines via `n` on diff are cheap; missing a capture is
@@ -1420,7 +1422,7 @@ attention.
 **Atomicity ordering per approved item.**
 1. Class B diff render.
 2. Owner confirms `[y/N]`.
-3. Write file to disk (knowledge note / SOUL edit / people update).
+3. Write file to disk (inbox extraction / SOUL edit / people update).
 4. Append entry to `extracted_artefacts[]` accumulator.
 5. Proceed to next item.
 
@@ -1429,13 +1431,32 @@ entry — recoverable (file is the truth; log is the audit). A crash
 between (1) and (3) leaves nothing on disk. The ordering guarantees
 no «log says written but file missing» state.
 
+**Filing a `knowledge-note` extraction.** It becomes a source, not a note —
+`/minder:mem:process` is the one writer of knowledge notes
+(`_system/docs/SYSTEM_CONFIG.md` → Skill Write Territory). The engine ships
+the `resolve-clarifications` source; this step only writes into it.
+- No `resolve-clarifications` row under Active or Reserved Sources in
+  `_system/registries/SOURCES.md` → write no file. Append an
+  `extraction-source-missing` CLARIFICATION carrying the approved text
+  verbatim, so nothing is lost, and go on with the session.
+- One flat file in `_sources/inbox/resolve-clarifications/`, named
+  `YYYY-MM-DD-{slug}.md` and portable per `_system/registries/SOURCES.md` →
+  «Portable names (Windows compatibility)». The name must be free in both that
+  folder and `_sources/processed/resolve-clarifications/` — processing moves the
+  file there, and a taken name would overwrite a processed source — so the slug
+  gets `-2`, `-3` until it is.
+- Frontmatter is one line, `source: resolve-clarifications` — provenance only;
+  `/minder:mem:process` reads the whole file as content.
+- The body is the knowledge in the owner's own words and language, then a
+  context line quoting the clarification item's title verbatim, then
+  `Related: [[{note-id}]]` when the anti-dedup check named a note.
+
 **Counter tracking for Step 9 refresh.**
 
 Step 6.5 writes feed into Class C counters from Step 6:
-- `knowledge-note` create → `registry_writes++` (new file under PARA
-  → INDEX needs regen via `/minder:mem:maintain`)
-- `knowledge-note` append-section → `registry_writes++` (content
-  changed → concept registry needs rebuild)
+- `knowledge-note` → no counter: the file waits in the inbox, and the
+  views are refreshed by `/minder:mem:process` + `/minder:mem:maintain` when they
+  file it
 - `soul-update` → no counter (SOUL is read directly by other skills;
   not a derived view)
 - `people-update` → `registry_writes++` (PEOPLE.md changed → INDEX
@@ -1652,11 +1673,8 @@ Direct writes by this skill (Steps 1–8):
   namespaced tags, wikilinks and nodes carrying a retired identifier
 
 Step 6.5 extraction writes (when owner approves a proposal at diff gate):
-- New `knowledge-note` artefacts created from extraction proposals, each in
-  the folder the routing rules resolve for it
-  (`_system/registries/FOLDERS.md → ## Routing Rules`)
-- Existing knowledge notes — append-section when anti-dedup found a
-  close match (`## Update {today}` block at end of body)
+- `_sources/inbox/resolve-clarifications/{YYYY-MM-DD}-{slug}.md` — one flat
+  file per approved `knowledge-note` extraction; `/minder:mem:process` files it
 - `_system/SOUL.md` — `soul-update` extraction edits (Identity, Focus,
   Active Goals zones; never the Values auto-zone)
 - `3_resources/people/{id}.md` — `people-update` profile body edits

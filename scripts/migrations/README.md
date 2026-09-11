@@ -112,6 +112,11 @@ it as a migration of its own (`pending()` globs `*.sh`).
   `scripts/check_update.py`, which the post-update check uses too. The import
   runs migration → permanent script and never the other way, so retiring the
   migration cannot take the check down with it.
+- `_034_resolve_clarifications_source.py` — migration `034`'s check: is the
+  `resolve-clarifications` source registered? Missing → it prints, for the
+  agent running `/minder:mem:update`, the exact `/minder:mem:source-add` command, and
+  exits non-zero so the check returns on every update until the source exists.
+  It never writes the registry — registering a source is that skill's job.
 
 ## The floor
 

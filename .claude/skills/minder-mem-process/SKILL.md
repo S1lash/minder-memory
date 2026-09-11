@@ -35,7 +35,8 @@ PROCESSED.md note column, §3.9), never a path to open.
 > unexpected schema, inconsistent references между registries) — **не останавливаться
 > и не гадать**: зафиксировать вопрос в `_system/state/CLARIFICATIONS.md` под `## Open Items`
 > с type `process-compatibility`, применить conservative default, продолжить обработку.
-> User разбирает на ревью.
+> User разбирает на ревью. Исключение — нечитаемый `_system/registries/FOLDERS.md`:
+> без правил маршрутизации прогон завершается (Step 1, пункт 16).
 
 ## Arguments
 
@@ -438,7 +439,7 @@ Read these system files (in parallel where possible):
     Also scan **Resolved Archive** table: previously resolved name variants (e.g.,
     «Нуара» = Лара Громова, «Трафт» = Петров). Use these to auto-resolve
     transcription artifacts in new transcripts without re-creating ambiguities.
-16. `_system/registries/FOLDERS.md` → `## Routing Rules` — the folder of every knowledge note; passed verbatim into every batch briefing (§3.0.3)
+16. `_system/registries/FOLDERS.md` → `## Routing Rules` — the folder of every knowledge note; passed verbatim into every batch briefing (§3.0.3). A run that cannot read it writes no knowledge note: it ends as an error naming the file, before Step 2.4 moves any source out of the inbox
 
 **CLARIFICATIONS HARD RULE.** При `confidence < threshold` — не принимать решение
 молча. Записать вопрос в `_system/state/CLARIFICATIONS.md` под `## Open Items`, использовать
