@@ -122,7 +122,9 @@ In order:
    | {id} | `_sources/inbox/{id}/` | {family} | {layout} | {default-domain} | {skip-subdirs or "—"} | {description} | {status} |
    ```
 
-Both writes happen as separate filesystem operations — there is no transaction. If step 2 fails after step 1 already created folders, the next invocation must detect the orphan folders and continue from where it left off (idempotency, see Step 5).
+3. **Update `Last Updated`** field at the top of SOURCES.md to today's ISO date (`YYYY-MM-DD`).
+
+All three writes happen as separate filesystem operations — there is no transaction. If step 2 fails after step 1 already created folders, the next invocation must detect the orphan folders and continue from where it left off (idempotency, see Step 5).
 
 ## Step 5: Idempotency Contract
 

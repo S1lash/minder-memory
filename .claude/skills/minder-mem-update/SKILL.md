@@ -290,17 +290,16 @@ Step 8. `011`–`014` are exactly this kind: un-aggregated tasks (`011`) / event
 surfaced, the owner never runs the backfill and the recovered data stays hidden —
 so surfacing them is load-bearing, not optional.
 
-**A message addressed to YOU is an instruction, not a notice.** Some migrations
-can do only the mechanical half, because the rest is a skill run — a
-conversation, or a write that belongs to a skill's own territory. Their message
-addresses you, the agent running this update, and names the skill and its
-arguments. Surface it and **do the steps it names**, in this same session, after
-the update finishes, confirming with the owner as that skill does. An owner who
-is only shown the text will not act on it — which is the exact failure the
-migration exists to prevent. `018` hands over parked roles (read its hand-off,
-offer `/minder:mem:role:add` per role, run its self-check); `034` registers a source
-the engine ships (run the `/minder:mem:source-add` command it prints — it keeps
-asking on every update until the source exists).
+**`018` is the same kind and needs one thing more.** It carries roles built on
+the previous shape out of the live path and writes the owner a hand-off — the
+mechanical half is done when it exits. What it cannot do is re-create the roles,
+because that is a conversation: the assignment is written in the owner's words
+and `writes:` is a boundary decided with them, never inferred. Its message
+therefore addresses YOU directly and asks you to read the hand-off, offer
+`/minder:mem:role:add` per parked role, and run its self-check afterwards. Surface it
+and **do the steps it names**, in this same session, after the update finishes.
+An owner who is only shown the text will not know their roles are recoverable —
+which is the exact failure the migration exists to prevent.
 
 If the runner exits non-zero, a **structural** migration failed:
 - The chain is already stopped and nothing after it ran.

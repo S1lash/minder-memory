@@ -82,8 +82,6 @@ universal starter set of sources defined in
 - `crafted/` — hand-written long-form documents (also where
   `/minder:mem:recap --crafted` saves verbatim artifacts like toasts, letters,
   posts)
-- `resolve-clarifications/` — knowledge you state while answering
-  `/minder:mem:resolve-clarifications`; the skill files it here, you don't
 
 If your input does not match any of the starter sources, run
 `/minder:mem:source-add` after install — it registers a new source-type

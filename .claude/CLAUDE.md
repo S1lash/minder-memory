@@ -56,11 +56,11 @@ When you find these in conflict, the higher one wins. When a rule is absent ever
 | `zettelkasten/_sources/inbox/` | `/minder:mem:process` consumes; `/minder:mem:source-add` registers new types |
 | `zettelkasten/_sources/processed/` | `/minder:mem:process` (move-only); never delete |
 | `zettelkasten/0_constitution/{axiom,principle,rule}/` | `/minder:mem:capture-candidate` → `/minder:mem:lint` F.5 promotion → `/minder:mem:regen-constitution` |
-| `zettelkasten/{1_projects,2_areas,3_resources,4_archive}/` (excluding READMEs) | writers per `_system/docs/SYSTEM_CONFIG.md` → Skill Write Territory (`/minder:mem:process` creates notes; other skills hold narrower lanes) |
+| `zettelkasten/{1_projects,2_areas,3_resources,4_archive}/` (excluding READMEs) | `/minder:mem:process`, `/minder:mem:maintain` |
 | `zettelkasten/5_meta/mocs/`, `zettelkasten/6_posts/` | `/minder:mem:maintain` (incl. `hub-cognitive-model.md`: its `<!-- AUTO-GENERATED: cognitive-model-hub -->` zone is rendered by `render_cognitive_model_hub.py` Step 7.9 — never hand-edit the table; the prose «portrait» above the markers is owner-curated) |
 | `zettelkasten/_system/{SOUL,POSTS,long-form-playbook,decision-advisory-playbook}.md` | owner-curated; engine reads, surfaces clarifications, never silently overwrites |
 | `zettelkasten/_system/{TASKS,CALENDAR}.md` | `/minder:mem:process` — derived aggregates over note `- [ ]` / `📅` items (owner owns only the TASKS `## Stale` section). Not hand-edited; completeness enforced by `reconcile_tasks.py` / `reconcile_calendar.py` |
-| `zettelkasten/_system/registries/{TAGS,SOURCES}.md` | `/minder:mem:maintain`, `/minder:mem:lint`; `SOURCES.md` rows also `/minder:mem:source-add` |
+| `zettelkasten/_system/registries/{TAGS,SOURCES}.md` | `/minder:mem:maintain`, `/minder:mem:lint` |
 | `zettelkasten/3_resources/people/PEOPLE.md` | `/minder:mem:process` (rows + mentions), `/minder:mem:bootstrap`, `/minder:mem:lint` (dedup/audit); tier only via `/minder:mem:resolve-clarifications`, and the `## Removed` retirement section only via `/minder:mem:resolve-clarifications` + owner, per Identity Contract |
 | `zettelkasten/1_projects/PROJECTS.md` | `/minder:mem:bootstrap` (candidates); owner; retirement / reclassification rows via `/minder:mem:resolve-clarifications` (the declared obligee of the Identity Contract) |
 | `zettelkasten/_system/registries/AUDIENCES.md` (Extensions table only) | `/minder:mem:resolve-clarifications` (appends rows on owner approval); spec sections never edited by hand |

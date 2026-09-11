@@ -2,29 +2,6 @@
 
 User-readable release notes. For the engineering log, see git history.
 
-## 1.1.2 — What you say while resolving goes through the inbox
-
-When you resolve clarifications and an answer carries something worth
-keeping, the skill used to write a knowledge note itself — a shortcut past
-processing that skipped what every other note gets: concepts, privacy,
-where it came from, the batch record. It now drops the text you approved
-into a folder of its own, `_sources/inbox/resolve-clarifications/`, and the
-next processing run files it like anything else you add — so you can always
-tell which notes came out of your answers. The note appears after that run
-rather than on the spot, and processing may split or reword it the way it
-does any source.
-
-The update asks the agent running it to register the new folder with
-`/minder:mem:source-add` — the same way you register any source — and keeps asking
-on every update until it is there. A source you have retired is not brought
-back. If resolving ever finds the folder unregistered, it files the approved
-text into a new clarification instead, so nothing is lost.
-
-Processing now refuses to run when it cannot read the folder rules: it stops
-with an error before taking anything out of your inbox. A scheduled run
-reports that like any other failure, and `/minder:mem:update` restores the
-file.
-
 ## 1.1.1 — One kind of note, one folder
 
 Insights and decisions — the two kinds of note processing writes most — had no
