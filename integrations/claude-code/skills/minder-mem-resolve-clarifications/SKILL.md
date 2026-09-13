@@ -152,7 +152,6 @@ for sane hypothesis forming, not a values-only concern.
 | `_system/SOUL.md` | Identity, focus, working style — drives hypothesis defaults AND reader alignment (how this owner takes in information) |
 | `3_resources/people/PEOPLE.md` | Mandatory for person-identity / people-bare-name resolution |
 | `1_projects/PROJECTS.md` | Mandatory for project-identity |
-| `_system/registries/FOLDERS.md` → `## Routing Rules` | The folder of every `knowledge-note` Step 6.5 creates |
 
 Conditional / on-demand (load only when round contains relevant Types):
 
@@ -1022,8 +1021,6 @@ For each answered question, classify the action:
   the owner's pick + new Evidence-Trail line).
 - Hub edits (open questions, current understanding bullets)
 - OPEN_THREADS.md state changes (open → resolved)
-- Decision-note creation (typically already created by the producer
-  skill; here only when owner explicitly requests)
 - Constitution edits — **never auto**. Principle-candidate accepts
   always render the proposed `0_constitution/{type}/{domain}/{slug}.md`
   body and ask for explicit confirm before write.
@@ -1299,7 +1296,7 @@ ANY of:**
 
 | Class | What it captures | Target |
 |---|---|---|
-| `knowledge-note` | Architectural / organizational / decision / factual content that exceeds what fits in the Resolution text — explanations of how systems work, why a choice was made, status updates, niche-research conclusions | New file in the folder the routing rules resolve for it (`_system/registries/FOLDERS.md → ## Routing Rules`); or append-section to existing note if anti-dedup found a match |
+| `knowledge-note` | Architectural / organizational / decision / factual content that exceeds what fits in the Resolution text — explanations of how systems work, why a choice was made, status updates, niche-research conclusions | One file in `_sources/inbox/resolve-clarifications/` (Step 6.5); `/minder:mem:process` turns it into a record and knowledge notes |
 | `soul-update` | Identity / Focus / Active Goals / Values shift the owner just declared («не делаю X», «теперь focus Y», «убираю Z как направление») | `_system/SOUL.md` targeted edit |
 | `people-update` | Factual update about an **existing** person — role change, org transition, relationship status change, biographical fact («Петя теперь в team B», «Маша вышла замуж»). NEW person mentions are NEVER handled by this class — they flow through the existing `people-bare-name` / `person-identity` CLARIFICATION path (raised by `/minder:mem:process` when transcripts surface unknown names) per doctrine §3.6 «no silent profile creation». | `3_resources/people/{id}.md` profile body edits and/or `PEOPLE.md` row updates (Org, Notes, Recent contexts columns). NEVER creates a new profile file. |
 
@@ -1313,14 +1310,10 @@ ANY of:**
   territory keeps the linkage layer single-source.
 
 **Anti-dedup before proposing.** For each tentative proposal:
-- If the same information was just written by Step 6 (Resolution text
-  in CLARIFICATIONS_ARCHIVE, thread `Resolution:` field, Class B file
-  edit) → drop, no proposal.
-- For `knowledge-note`: quick check against `_system/views/INDEX.md`
-  for existing notes on the same topic (grep on topic keywords from
-  draft filename). If a close match exists → reframe proposal as
-  «append-section to existing note» with the existing note's path,
-  not a new file.
+- If the same information is already written (Resolution text in
+  CLARIFICATIONS_ARCHIVE, thread `Resolution:` field, Class B file
+  edit, a file in `_sources/inbox/resolve-clarifications/`) → drop, no
+  proposal.
 
 **Confidence floor: 0.6.** If extraction confidence is below 0.6, drop.
 Owner declines via `n` on diff are cheap; missing a capture is
@@ -1409,7 +1402,7 @@ action expected.
 |---|---|
 | `y` (whole batch) or `1,2,3` (numbers) | For each selected: enter Class B diff gate → owner confirms diff → write file → append entry to `extracted_artefacts[]` log with `decision: approved`. On diff-stage `N` → drop without retry, log `decision: declined_at_diff` |
 | `n` (whole batch) | Drop all proposals, log each as `decision: declined` |
-| `{n}m` (modify one item) | Owner provides 1-line edit instruction (e.g. «не decision, а insight; domain career не work»). Re-draft in place → re-show updated proposal in same batch (next iteration). Further `m` allowed once; second `n` drops |
+| `{n}m` (modify one item) | Owner provides 1-line edit instruction (e.g. «оставь только вывод, без хронологии»). Re-draft in place → re-show updated proposal in same batch (next iteration). Further `m` allowed once; second `n` drops |
 | Mixed (`1y 2n 3m`) | Process each per its letter |
 
 **No recursive sub-menus.** `m` is bounded — owner gives one-line
@@ -1417,10 +1410,20 @@ edit, skill re-drafts once, re-presents. If still wrong → `n` drop.
 Owner can always recreate artefact manually if a complex case needs
 attention.
 
+**`knowledge-note` is an inbox file.** One flat file
+`_sources/inbox/resolve-clarifications/YYYY-MM-DDTHH-MM-SSZ-{slug}.md`, named by
+the UTC moment it is written. Body: the clarification's question,
+then the approved knowledge in the owner's words. When
+`resolve-clarifications` has no row in `## Active Sources` or
+`## Reserved Sources` of `_system/registries/SOURCES.md`, write no file:
+append an `extraction-source-missing` item to `CLARIFICATIONS.md` →
+`## Open Items` carrying the approved text verbatim, and log
+`decision: source_missing`.
+
 **Atomicity ordering per approved item.**
 1. Class B diff render.
 2. Owner confirms `[y/N]`.
-3. Write file to disk (knowledge note / SOUL edit / people update).
+3. Write file to disk (inbox file / SOUL edit / people update).
 4. Append entry to `extracted_artefacts[]` accumulator.
 5. Proceed to next item.
 
@@ -1432,10 +1435,6 @@ no «log says written but file missing» state.
 **Counter tracking for Step 9 refresh.**
 
 Step 6.5 writes feed into Class C counters from Step 6:
-- `knowledge-note` create → `registry_writes++` (new file under PARA
-  → INDEX needs regen via `/minder:mem:maintain`)
-- `knowledge-note` append-section → `registry_writes++` (content
-  changed → concept registry needs rebuild)
 - `soul-update` → no counter (SOUL is read directly by other skills;
   not a derived view)
 - `people-update` → `registry_writes++` (PEOPLE.md changed → INDEX
@@ -1652,11 +1651,9 @@ Direct writes by this skill (Steps 1–8):
   namespaced tags, wikilinks and nodes carrying a retired identifier
 
 Step 6.5 extraction writes (when owner approves a proposal at diff gate):
-- New `knowledge-note` artefacts created from extraction proposals, each in
-  the folder the routing rules resolve for it
-  (`_system/registries/FOLDERS.md → ## Routing Rules`)
-- Existing knowledge notes — append-section when anti-dedup found a
-  close match (`## Update {today}` block at end of body)
+- `_sources/inbox/resolve-clarifications/YYYY-MM-DDTHH-MM-SSZ-{slug}.md` — one file
+  per approved `knowledge-note`; without the source row, an
+  `extraction-source-missing` item in `_system/state/CLARIFICATIONS.md`
 - `_system/SOUL.md` — `soul-update` extraction edits (Identity, Focus,
   Active Goals zones; never the Values auto-zone)
 - `3_resources/people/{id}.md` — `people-update` profile body edits

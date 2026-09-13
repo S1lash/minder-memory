@@ -100,6 +100,7 @@ def _frontmatter(state: SessionState, ended_at: str) -> str:
         "items_constitution_veto": len(state.constitution_vetoed),
         "items_extracted_approved": sum(1 for e in state.extracted_artefacts if e.get("decision") == "approved"),
         "items_extracted_declined": sum(1 for e in state.extracted_artefacts if e.get("decision") in {"declined", "declined_at_diff"}),
+        "items_extracted_source_missing": sum(1 for e in state.extracted_artefacts if e.get("decision") == "source_missing"),
     }
     lines = [
         "---",

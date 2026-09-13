@@ -60,7 +60,8 @@ When you find these in conflict, the higher one wins. When a rule is absent ever
 | `zettelkasten/5_meta/mocs/`, `zettelkasten/6_posts/` | `/minder:mem:maintain` (incl. `hub-cognitive-model.md`: its `<!-- AUTO-GENERATED: cognitive-model-hub -->` zone is rendered by `render_cognitive_model_hub.py` Step 7.9 — never hand-edit the table; the prose «portrait» above the markers is owner-curated) |
 | `zettelkasten/_system/{SOUL,POSTS,long-form-playbook,decision-advisory-playbook}.md` | owner-curated; engine reads, surfaces clarifications, never silently overwrites |
 | `zettelkasten/_system/{TASKS,CALENDAR}.md` | `/minder:mem:process` — derived aggregates over note `- [ ]` / `📅` items (owner owns only the TASKS `## Stale` section). Not hand-edited; completeness enforced by `reconcile_tasks.py` / `reconcile_calendar.py` |
-| `zettelkasten/_system/registries/{TAGS,SOURCES}.md` | `/minder:mem:maintain`, `/minder:mem:lint` |
+| `zettelkasten/_system/registries/TAGS.md` | `/minder:mem:maintain` (`render_tags.py`) |
+| `zettelkasten/_system/registries/SOURCES.md` | `/minder:mem:source-add` (rows); owner (`## Deprecated Sources`) |
 | `zettelkasten/3_resources/people/PEOPLE.md` | `/minder:mem:process` (rows + mentions), `/minder:mem:bootstrap`, `/minder:mem:lint` (dedup/audit); tier only via `/minder:mem:resolve-clarifications`, and the `## Removed` retirement section only via `/minder:mem:resolve-clarifications` + owner, per Identity Contract |
 | `zettelkasten/1_projects/PROJECTS.md` | `/minder:mem:bootstrap` (candidates); owner; retirement / reclassification rows via `/minder:mem:resolve-clarifications` (the declared obligee of the Identity Contract) |
 | `zettelkasten/_system/registries/AUDIENCES.md` (Extensions table only) | `/minder:mem:resolve-clarifications` (appends rows on owner approval); spec sections never edited by hand |

@@ -412,6 +412,11 @@ exclude:
 # the engine deleted; a former name there is the point, and the rename map must
 # not turn a retirement into a live path.
 retired:
+  # Migration 034 as published in the withdrawn 1.1.2. A clone that updated
+  # while it was live still carries both files beside the current 034.
+  - scripts/migrations/034-resolve-clarifications-source.sh
+  - scripts/migrations/_034_resolve_clarifications_source.py
+
   # Both recorders in this engine were once called simply "telemetry" — one
   # for a tick's token consumption, one for a check-decision run. A reader had
   # to be told which file meant which. Each now names its subject. These paths

@@ -66,6 +66,15 @@ class SessionLogTests(_BaseSetup):
         self.assertIn("**Owner action:** approve", text)
         self.assertIn("**Inferred pattern:**", text)
 
+    def test_extraction_counts_cover_every_logged_decision(self):
+        state = rs.new_session(mode="interactive", trigger="owner")
+        for decision in ("approved", "declined", "declined_at_diff", "source_missing"):
+            state.extracted_artefacts.append({"class": "knowledge-note", "decision": decision})
+        text = rs.write_session_log(state).read_text(encoding="utf-8")
+        self.assertIn("items_extracted_approved: 1", text)
+        self.assertIn("items_extracted_declined: 2", text)
+        self.assertIn("items_extracted_source_missing: 1", text)
+
     def test_constitution_veto_renders_when_present(self):
         state = rs.new_session(mode="auto", trigger="lint")
         state.constitution_vetoed.append({

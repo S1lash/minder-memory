@@ -56,10 +56,9 @@ family values are rejected.
 
 Read in parallel:
 
-1. `zettelkasten/_system/registries/SOURCES.md` — the live registry. Check for ID collisions and table structure.
-2. `zettelkasten/_system/registries/SOURCES.template.md` — the schema spec. Use it to validate Layout / Default Domain / Status values and to mirror the column order used in the live registry.
+Read `zettelkasten/_system/registries/SOURCES.md` — the live registry. Check for ID collisions and take the column order from its table header. Legal values are the ones in Arguments and Step 2.
 
-If either file is missing, abort with a clear error pointing the owner at `/minder:mem:bootstrap` (the registries are bootstrap-seeded).
+If the file is missing, abort with a clear error pointing the owner at `/minder:mem:bootstrap` (the registry is bootstrap-seeded).
 
 ## Step 2: Resolve Arguments
 
@@ -72,7 +71,7 @@ For each argument that was not passed via flag, prompt the owner with one focuse
   - matches a reserved system name: `inbox`, `processed` (dot-prefixed names — `.gitkeep`, the pipeline lock files — are already excluded by the pattern; `describe-me` is a registered row, caught by the duplicate check above)
 - **Family** — must be one of `transcript`, `metric-day`, `recap`. Default `transcript` if not provided. Reject any other value.
 - **Layout** — must be one of the three documented types. No free-form input.
-- **Default Domain** — accept owner-provided string; reject only if empty / contains pipe characters. The whitelist (`personal`, `work`, `mixed`, `auto`, `health`, …) lives on SOURCES.template.md and is informational, not enforced.
+- **Default Domain** — accept owner-provided string; reject only if empty / contains pipe characters. Common values (`personal`, `work`, `mixed`, `auto`, `health`, …) are informational, not enforced.
 - **Skip Subdirs** — each entry is kebab-case or simple filename; reject `..`, absolute paths, glob characters (`*`, `?`, `[`).
 - **Status** — must be `active` or `reserved`. `deprecated` is intentionally NOT a creation state — deprecating happens by hand on an existing row.
 - **Description** — non-empty, no pipe characters (table delimiter). If a pipe is needed, escape with HTML entity `&#124;` and warn.
@@ -116,7 +115,7 @@ In order:
    - `_sources/processed/{id}/` with a `.gitkeep` file.
    - If a folder already exists, leave its contents alone; only ensure `.gitkeep` is present.
 
-2. **Append SOURCES.md row.** Locate the target table heading (`## Active Sources` or `## Reserved Sources`). If the heading is missing — create it just above `## Notes` (or at end-of-file if `## Notes` absent). Append the new row to the table preserving column order from SOURCES.template.md:
+2. **Append SOURCES.md row.** Locate the target table heading (`## Active Sources` or `## Reserved Sources`). If the heading is missing — create it just above `## Notes` (or at end-of-file if `## Notes` absent). Append the new row to the table in the column order of the registry's table header:
 
    ```
    | {id} | `_sources/inbox/{id}/` | {family} | {layout} | {default-domain} | {skip-subdirs or "—"} | {description} | {status} |
@@ -153,7 +152,7 @@ Next: drop input files into _sources/inbox/{id}/ and run /minder:mem:process.
 - **Never edits CONCEPT.md / SYSTEM_CONFIG.md / FOLDERS.md** — those describe the layout in source-agnostic terms.
 - **Never moves or processes files** — input handling is `/minder:mem:process`'s job.
 - **Never deprecates or removes sources** — deprecation is manual to enforce a deliberate audit-trail entry.
-- **Never modifies the deny-by-default `.engine-manifest.yml`** — owner data layer (`_sources/inbox/`, `_sources/processed/`) stays in the manifest's `exclude:` list, and the skeleton's `.gitkeep` provisioning is handled by `release_engine.py` from SOURCES.template.md.
+- **Never modifies the deny-by-default `.engine-manifest.yml`** — owner data layer (`_sources/inbox/`, `_sources/processed/`) stays in the manifest's `exclude:` list.
 
 ## Cross-skill interactions
 

@@ -280,26 +280,15 @@ unrecorded, so every future update re-ran it and re-aborted at the same point.
 A friend's clone sat unable to update for weeks because of one such repair. A
 repair of old data must never be able to block a future engine update.
 
-**Detection-only migrations (soft-nag) — MUST be surfaced, never let scroll past.**
-A migration that exits 0 but prints recovery instructions (a `/minder:mem:...` command) is
-NOT a failure — it detected a pre-existing backlog it cannot fix itself because
-recovery needs the LLM pipeline (classification / repair), not a shell script.
-Collect its captured message verbatim into a **Post-update recovery** list for
-Step 8. `011`–`014` are exactly this kind: un-aggregated tasks (`011`) / events
-(`012`), hub-index drift (`013`), misplaced note fences (`014`). If these are not
-surfaced, the owner never runs the backfill and the recovered data stays hidden —
-so surfacing them is load-bearing, not optional.
-
-**`018` is the same kind and needs one thing more.** It carries roles built on
-the previous shape out of the live path and writes the owner a hand-off — the
-mechanical half is done when it exits. What it cannot do is re-create the roles,
-because that is a conversation: the assignment is written in the owner's words
-and `writes:` is a boundary decided with them, never inferred. Its message
-therefore addresses YOU directly and asks you to read the hand-off, offer
-`/minder:mem:role:add` per parked role, and run its self-check afterwards. Surface it
-and **do the steps it names**, in this same session, after the update finishes.
-An owner who is only shown the text will not know their roles are recoverable —
-which is the exact failure the migration exists to prevent.
+**A migration that asks you to run a step — do it, never let it scroll past.**
+Some work only a skill or a conversation with the owner can finish; a migration
+leaves it as a request addressed to you to run a `/minder:mem:...` command after
+the update. Collect every such request verbatim into the **Post-update recovery**
+list for Step 8, whatever the migration's exit code — a `heal` that keeps asking
+until the work is done exits non-zero on purpose, to be retried. After the Step 8
+commit, run the requested commands in this same session. What they write is owner
+data: it is saved with `/minder:mem:save`, never in the engine commit. A request
+that is only shown leaves the work undone.
 
 If the runner exits non-zero, a **structural** migration failed:
 - The chain is already stopped and nothing after it ran.
@@ -311,7 +300,8 @@ If the runner exits non-zero, a **structural** migration failed:
 If the runner exits 0 but reported `partial` outcomes, surface each one in the
 **Post-update recovery** list for Step 8, naming the migration and what it could
 not finish. The update itself succeeded; the owner should know what is still
-outstanding, and that it will be retried automatically.
+outstanding, and that it will be retried automatically. A `partial` whose
+message asks you to run a step follows the rule above.
 
 A `partial` is not always a fault to report loudly. A migration that reads a
 state the owner has not committed yet — the update's own commit is Step 8, after
@@ -518,13 +508,11 @@ Follow-ups:
   • run /minder:mem:regen-constitution
   • run pytest zettelkasten/_system/scripts/tests/
 
-⚠ Post-update recovery — a migration detected a pre-existing backlog. Run these
-  once to recover it (each command re-verifies itself when it finishes; if you
-  defer, the nightly /minder:mem:lint keeps surfacing the same gap as a CLARIFICATION,
-  so nothing is lost):
-  • <verbatim recovery line captured from each soft-nag migration in Step 6, e.g.
-    "011: 39 un-aggregated tasks → run /minder:mem:process --reconcile-tasks">
-  (Omit this block entirely when no migration emitted a recovery nudge.)
+⚠ Post-update recovery — work a migration left for a skill. I run these after
+  the commit; what they write is saved with /minder:mem:save:
+  • <verbatim request captured in Step 6 from each migration that asks you to
+    run a /minder:mem:... command>
+  (Omit this block entirely when no migration asked for one.)
 
 [y] commit now   [m] edit message   [s] stage only, I'll commit
 [n] unstage and abort
@@ -587,7 +575,7 @@ absent or its profile doesn't fit, ignore it and use the floor.
   owner-relevant meaning ("faster", "more reliable", "no longer loses
   X"); if there is none, fold the rest into a single terse "under the
   hood" line, or omit. Depends on the update.
-- **Recovery actions** (soft-nag migrations, Step 6) → frame as "do
+- **Recovery actions** (steps migrations asked for, Step 6) → frame as "do
   this once to reclaim X" — benefit-first but honest that it's a
   one-time chore.
 
@@ -704,7 +692,7 @@ Ask for more detail on any point?
 - **Rewrite the migration ledger.** If the owner needs to re-run a migration
   that already succeeded, they remove its line from
   `.engine-migrations.jsonl` themselves — guarded territory. A `heal` that
-  ended `partial` needs no intervention: it is retried on the next update by
+  ended `partial` needs no ledger edit: it is retried on the next update by
   design.
 
 ## Idempotency

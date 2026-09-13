@@ -2,6 +2,20 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.1.3 — What you approve goes through processing
+
+Knowledge you approve while resolving clarifications is no longer written as a
+note on the spot. It is dropped into a new inbox source, `resolve-clarifications`,
+and the next processing run files it like anything else you record — with its
+links, privacy marks and a trace of where it came from. On an existing base the
+update asks to register that source, and asks again on every update until it is
+there; if the source is ever missing, your text waits verbatim in the
+clarifications queue.
+
+Processing stops with an error naming `_system/registries/FOLDERS.md` when it
+cannot read the folder rules, rather than filing notes without them. And
+`/minder:mem:source-add` now registers a source on every base.
+
 ## 1.1.1 — One kind of note, one folder
 
 Insights and decisions — the two kinds of note processing writes most — had no

@@ -69,8 +69,8 @@ fetch + checkout. One file per breaking engine change.
   because of one. **A repair of old data must never be able to block a future
   engine update** — and neither may a notice.
 
-  A detection-only migration still exits 0 and prints its recovery command to
-  stderr, which `/minder:mem:update` surfaces in its Post-update recovery list. It must
+  A detection-only migration asks the agent running `/minder:mem:update` to run
+  the command that finishes its work; Step 6 runs it, whatever the exit code. It must
   NOT coerce a failed detector run into a false "all clear" — if the detector
   produces no valid output, say so and point to a manual check.
 

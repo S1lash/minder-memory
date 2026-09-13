@@ -657,7 +657,7 @@ buffers) take the writer named here.
 | `_system/TASKS.md`, `CALENDAR.md` | `/minder:mem:process` (derived aggregates; owner owns only the TASKS `## Stale` section) | Aggregated views over note `- [ ]` / `📅` items |
 | `_system/POSTS.md` | owner | Operational layer |
 | `_system/registries/TAGS.md` | `render_tags.py` only (via `/minder:mem:maintain` Step 7.10 and `regen_all.py`) | Census of the `tags:` axis — managed zone regenerated, never hand-written |
-| `_system/registries/SOURCES.md` | `/minder:mem:source-add` (rows), `/minder:mem:lint` (`## Deprecated Sources`) | Inbox source whitelist |
+| `_system/registries/SOURCES.md` | `/minder:mem:source-add` (rows), owner (`## Deprecated Sources`) | Inbox source whitelist |
 | `_system/state/OPEN_THREADS.md` | `/minder:mem:bootstrap`, `/minder:mem:maintain`, `/minder:mem:resolve-clarifications` | Strategic open threads (`## Active` opened by maintain / resolve; `/minder:mem:process` context-only) |
 | `_system/state/CLARIFICATIONS.md` | every skill | Owner-gated resolution queue |
 | `_system/state/principle-candidates.jsonl` | `/minder:mem:capture-candidate`, `/minder:mem:bootstrap`, `/minder:mem:lint` (F.5 archive) | Append-only principle buffer |
