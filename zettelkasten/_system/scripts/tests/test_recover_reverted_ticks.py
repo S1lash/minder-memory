@@ -441,3 +441,199 @@ def test_an_unreadable_history_refuses_instead_of_reporting_clean(
         f"an unreadable history must refuse, not print a clean bill:\n"
         f"rc={res.returncode} stdout={res.stdout!r} stderr={res.stderr[-400:]}")
     assert "[]" not in res.stdout
+
+
+# ---------------------------------------------------------------------------
+# Declared identity. A delivery that states the base its tree was built on is
+# judged by that base: a path put back to its base content while the parent holds
+# something newer is a revert of work the tick never read — an incident whoever
+# produced that work. A base equal to the parent means the tick saw everything it
+# undid. Without a declaration the older reasoning stands, unchanged.
+# ---------------------------------------------------------------------------
+
+def _identity(base: str, run: str = "run-test") -> str:
+    return f"Minder-Tick-Base: {base}\nMinder-Tick-Run: {run}"
+
+
+def _commit(repo: Path, subject: str, body: str | None = None) -> str:
+    _git(repo, "add", "-A")
+    args = ["commit", "-q", "-m", subject]
+    if body:
+        args += ["-m", body]
+    _git(repo, *args)
+    return _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def _same_tag_race(tmp_path: Path, declare: bool, files: int = 3,
+                   base_override: str | None = None) -> tuple[Path, str, str]:
+    """Two process ticks start on the same base; the slower one delivers a stale tree.
+
+    Returns `(repo, base, stale_sha)`. Exactly the shape the subject heuristic
+    cannot settle: the interval the stale tick reverted holds only work of its own
+    tag.
+    """
+    repo = tmp_path / "race"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    _write(repo, "zettelkasten/_system/state/log_process.md", "# log\n")
+    _write(repo, "zettelkasten/2_areas/work/keep.md", "keep\n")
+    base = _commit(repo, "base")
+
+    for i in range(files):
+        _write(repo, f"zettelkasten/2_areas/work/20260917-note-{i}.md", f"note {i}\n")
+    _write(repo, "zettelkasten/_system/state/log_process.md", "# log\n- fast tick\n")
+    _commit(repo, "scheduler/process: process batch: 1 record(s) [scheduled]",
+            _identity(base, "run-fast") if declare else None)
+
+    _git(repo, "read-tree", base), _git(repo, "checkout-index", "-a", "-f")
+    for i in range(files):
+        (repo / f"zettelkasten/2_areas/work/20260917-note-{i}.md").unlink()
+    _write(repo, "zettelkasten/_system/state/log_process.md", "# log\n- slow tick\n")
+    _write(repo, "zettelkasten/_records/meetings/20260917-slow-own.md", "own record\n")
+    stale = _commit(repo, "scheduler/process: process batch: 1 record(s) [scheduled]",
+                    _identity(base_override or base, "run-slow") if declare else None)
+    return repo, base, stale
+
+
+def _judged(repo: Path, sha: str) -> dict:
+    res = _tool(repo, "detect", "--json", "--commit", sha)
+    assert res.returncode == 0, res.stderr
+    rows = json.loads(res.stdout)
+    return rows[0] if rows else {"proven": False, "needs_review": False}
+
+
+def test_an_undeclared_same_tag_race_stays_for_review(tmp_path: Path) -> None:
+    """The baseline this work closes, pinned so the fallback keeps its meaning."""
+    repo, _, stale = _same_tag_race(tmp_path, declare=False)
+    verdict = _judged(repo, stale)
+    assert verdict["proven"] is False and verdict["needs_review"] is True, verdict
+
+
+def test_a_declared_same_tag_race_is_proven(tmp_path: Path) -> None:
+    repo, base, stale = _same_tag_race(tmp_path, declare=True)
+    verdict = _judged(repo, stale)
+    assert verdict["proven"] is True, verdict
+    assert verdict["needs_review"] is False
+    assert verdict["base"] == base[:10], "the declared base, not a searched-for ancestor"
+    assert verdict["reverted"] == 3, verdict
+
+
+def test_a_declared_same_tag_race_is_repaired(tmp_path: Path) -> None:
+    repo, _, _ = _same_tag_race(tmp_path, declare=True)
+    res = _tool(repo, "apply", "--json")
+    assert res.returncode in (0, 3), res.stderr
+    for i in range(3):
+        path = repo / f"zettelkasten/2_areas/work/20260917-note-{i}.md"
+        assert path.read_text(encoding="utf-8") == f"note {i}\n", f"note {i} was not restored"
+    assert (repo / "zettelkasten/_records/meetings/20260917-slow-own.md").exists(), (
+        "the stale tick's own work stays")
+
+
+def test_a_declared_rollback_of_what_the_tick_saw_is_never_an_incident(
+        tmp_path: Path) -> None:
+    """The deliberate rollback, declared: its base is its parent — it read the work it
+    undid. Not proven, and not for review either: there is nothing left to settle."""
+    repo = tmp_path / "declared-rollback"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    _write(repo, "zettelkasten/_system/state/log_process.md", "# log\n")
+    _write(repo, "zettelkasten/2_areas/work/keep.md", "one\n")
+    base = _commit(repo, "base")
+    for rel, body in (("zettelkasten/2_areas/work/a.md", "a\n"),
+                      ("zettelkasten/2_areas/work/b.md", "b\n"),
+                      ("zettelkasten/2_areas/work/keep.md", "one changed\n")):
+        _write(repo, rel, body)
+    batch = _commit(repo, "scheduler/process: batch [scheduled]", _identity(base, "run-1"))
+
+    _git(repo, "read-tree", base), _git(repo, "checkout-index", "-a", "-f")
+    for rel in ("zettelkasten/2_areas/work/a.md", "zettelkasten/2_areas/work/b.md"):
+        (repo / rel).unlink()
+    _write(repo, "zettelkasten/_system/state/log_process.md", "# log\n- rollback run\n")
+    rollback = _commit(repo, "scheduler/process: roll back the batch [scheduled]",
+                       _identity(batch, "run-2"))
+
+    verdict = _judged(repo, rollback)
+    assert verdict["proven"] is False and verdict["needs_review"] is False, verdict
+    res = _tool(repo, "apply", "--json")
+    assert json.loads(res.stdout)["applied"] == []
+    assert not (repo / "zettelkasten/2_areas/work/a.md").exists()
+
+
+def test_an_invalid_declaration_falls_back_and_says_why(tmp_path: Path) -> None:
+    """A declared base that is not an ancestor of the commit (a cherry-pick, a
+    rewritten origin, a forged line) is not trusted in either direction."""
+    repo, _, _ = _same_tag_race(tmp_path, declare=False)
+    # A commit object that exists in the repository but is on no ancestry path.
+    tree = _git(repo, "rev-parse", "HEAD^{tree}").stdout.strip()
+    dangling = _git(repo, "commit-tree", tree, "-m", "dangling").stdout.strip()
+
+    (tmp_path / "second").mkdir()
+    repo2, _, stale = _same_tag_race(tmp_path / "second", declare=True,
+                                     base_override="0" * 39 + "1")
+    verdict = _judged(repo2, stale)
+    assert verdict["proven"] is False and verdict["needs_review"] is True, verdict
+    assert "declared" in verdict.get("reason", "").lower(), verdict
+
+    _git(repo, "commit", "-q", "--amend", "-m",
+         "scheduler/process: process batch: 1 record(s) [scheduled]",
+         "-m", _identity(dangling))
+    verdict = _judged(repo, _git(repo, "rev-parse", "HEAD").stdout.strip())
+    assert verdict["proven"] is False and verdict["needs_review"] is True, verdict
+    assert "ancestor" in verdict.get("reason", "").lower(), verdict
+
+
+def test_a_declared_partial_revert_below_the_signature_floor_is_found(
+        tmp_path: Path) -> None:
+    """The signature floor exists because an undeclared commit needs a big restored
+    set to look like the defect at all. A declared commit does not: one reverted
+    path is provable, so it must not be filtered out before the proof runs."""
+    repo, _, stale = _same_tag_race(tmp_path, declare=True, files=1)
+    res = _tool(repo, "detect", "--json")
+    assert res.returncode == 0, res.stderr
+    found = json.loads(res.stdout)
+    assert [c["commit"] for c in found if c["proven"]] == [stale[:10]], found
+
+
+def test_identity_audit_names_a_scheduled_commit_that_declares_nothing(
+        tmp_path: Path) -> None:
+    """A route that silently stops declaring would return its commits to the guess
+    with nobody told. Before the first declaration anywhere in the history, a missing
+    one is normal and not reported."""
+    repo = tmp_path / "audit"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    _write(repo, "zettelkasten/_system/state/log_process.md", "0\n")
+    base = _commit(repo, "scheduler/process: before the cutover [scheduled]")
+    _write(repo, "zettelkasten/_system/state/log_process.md", "1\n")
+    _commit(repo, "scheduler/process: declared [scheduled]", _identity(base))
+    _write(repo, "zettelkasten/_system/state/log_process.md", "2\n")
+    silent = _commit(repo, "scheduler/lint: declares nothing [scheduled]")
+    _write(repo, "zettelkasten/_system/state/log_process.md", "3\n")
+    _commit(repo, "garmin: metric day")
+    _write(repo, "zettelkasten/_system/state/log_process.md", "4\n")
+    broken = _commit(repo, "scheduler/roles: broken [scheduled]",
+                     "Minder-Tick-Base: not-a-sha")
+
+    res = _tool(repo, "identity", "--json")
+    assert res.returncode == 0, res.stderr
+    rows = json.loads(res.stdout)
+    assert sorted(r["commit"] for r in rows) == sorted([silent[:10], broken[:10]]), rows
+    assert all(r.get("reason") for r in rows)
+
+
+def test_identity_audit_is_silent_before_any_declaration(tmp_path: Path) -> None:
+    repo, _, _ = _same_tag_race(tmp_path, declare=False)
+    res = _tool(repo, "identity", "--json")
+    assert res.returncode == 0, res.stderr
+    assert json.loads(res.stdout) == []
+
+
+def test_a_declaration_in_the_subject_paragraph_is_not_read(tmp_path: Path) -> None:
+    """Only lines after the subject paragraph are a declaration. A subject built from
+    free text that smuggles a base in is judged as undeclared."""
+    repo, base, _ = _same_tag_race(tmp_path, declare=False)
+    _git(repo, "commit", "-q", "--amend", "-m",
+         f"scheduler/process: batch [scheduled]\nMinder-Tick-Base: {base}")
+    verdict = _judged(repo, _git(repo, "rev-parse", "HEAD").stdout.strip())
+    assert verdict.get("declared") is not True, verdict
+    assert verdict["needs_review"] is True, verdict

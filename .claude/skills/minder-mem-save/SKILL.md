@@ -152,7 +152,8 @@ Heuristic, not LLM-generated unless category is mixed/unclear:
 
 If `--message` passed — use that verbatim. Otherwise show the proposal
 and let the owner edit (single-line input). Keep messages in lowercase
-imperative, no Claude attribution, no body unless owner asks.
+imperative, no Claude attribution, no body unless owner asks — the one exception
+is the base declaration a `[scheduled]` commit carries (below).
 
 In `--auto` mode: use the proposed message (or `--message`) without
 prompting. If `--tag <text>` is set, prepend `<text>: ` to that message
@@ -160,6 +161,13 @@ prompting. If `--tag <text>` is set, prepend `<text>: ` to that message
 `[scheduled]` suffix so the owner can grep
 `git log --grep '\[scheduled\]'` and audit autonomous commits. Final
 shape: `[<tag>: ]<auto-or-message-msg> [scheduled]`.
+
+A `[scheduled]` commit also declares the commit its tree was built on, in its
+body — the one body such a commit carries. Take it from
+`python3 scripts/lib/tick_identity.py trailers` immediately before committing and
+pass it as a second `-m`; if that command prints nothing, commit without it. The
+declaration is how `scripts/recover_reverted_ticks.py` proves or clears a stale
+delivery, and `/minder:mem:lint` A.15 names any `[scheduled]` commit that lacks it.
 
 ### Step 3 — Show summary
 

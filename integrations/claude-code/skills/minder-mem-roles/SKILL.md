@@ -784,7 +784,16 @@ git -C "$REPO" diff --cached --quiet || {
   # to catch.
   git -C "$REPO" -c core.quotepath=false diff --cached --name-only \
     >> "$REPO/.scheduler-state/staged-paths"
-  git -C "$REPO" commit -q -m "roles: {role-id} — {outcome}, {writes} write(s) [scheduled]"
+  # Every `[scheduled]` commit declares the commit its tree was built on
+  # (`scripts/lib/tick_identity.py`). In a tick this commit is folded away; in an
+  # interactive run a save delivers it as is, and the declaration is what lets a
+  # stale delivery be proven rather than guessed at. Declaring never blocks it.
+  IDENTITY="$(python3 "$REPO/scripts/lib/tick_identity.py" trailers --repo "$REPO" 2>/dev/null || true)"
+  if [ -n "$IDENTITY" ]; then
+    git -C "$REPO" commit -q -m "roles: {role-id} — {outcome}, {writes} write(s) [scheduled]" -m "$IDENTITY"
+  else
+    git -C "$REPO" commit -q -m "roles: {role-id} — {outcome}, {writes} write(s) [scheduled]"
+  fi
   git -C "$REPO" rev-parse HEAD >> "$REPO/.scheduler-state/authored-shas"
 }
 ```

@@ -77,7 +77,13 @@ if git diff --cached --quiet -- "$CLAR"; then
   exit 2
 fi
 
-if ! git commit -m "scheduler/failure-local: $TICK failed: $CAUSE [scheduled]" >/dev/null; then
+# A `[scheduled]` commit a later save delivers declares its base like any other
+# (`scripts/lib/tick_identity.py`); without one it is still committed.
+IDENTITY="$(python3 scripts/lib/tick_identity.py trailers 2>/dev/null || true)"
+SUBJECT="$(printf '%s' "scheduler/failure-local: $TICK failed: $CAUSE [scheduled]" | tr '\r\n' '  ')"
+set -- -m "$SUBJECT"
+[ -n "$IDENTITY" ] && set -- "$@" -m "$IDENTITY"
+if ! git commit "$@" >/dev/null; then
   echo "ship-failure-note: local commit failed; CLARIFICATIONS note remains in dirty working tree" >&2
   exit 2
 fi

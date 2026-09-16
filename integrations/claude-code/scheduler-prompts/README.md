@@ -40,7 +40,8 @@ Routines' git proxy refuses direct push to `main`. The script instead:
 
 1. `git push origin HEAD:<sandbox-branch>` (proxy-allowed)
 2. `gh pr create --base main --head <sandbox-branch>`
-3. `gh pr merge --squash --delete-branch` with an explicit commit body
+3. `gh pr merge --squash --delete-branch` with an explicit commit body —
+   `tick_identity.py squash-body`, which carries the tick's declared base
 
 End state: `main` updated with one squash commit on origin, sandbox
 branch deleted on origin.
@@ -52,7 +53,8 @@ scheduler prompts have an explicit Step 5b that:
 1. Pushes the local commit to the sandbox branch via plain `git push`.
 2. Calls the `github` MCP `create_pull_request` tool.
 3. Calls the `github` MCP `merge_pull_request` tool with squash method
-   and an explicit `commit_message`.
+   and `commit_message` set to the output of
+   `python3 scripts/lib/tick_identity.py squash-body`.
 4. Leaves branch cleanup to GitHub's «Automatically delete head branches»
    setting — the prompts issue no delete call.
 

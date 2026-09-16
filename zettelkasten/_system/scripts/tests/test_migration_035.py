@@ -25,6 +25,10 @@ _SCRIPTS = _REPO_ROOT / "scripts"
 MIGRATION = "035-recover-reverted-tick-content.sh"
 HELPER = "_035_recover_reverted_ticks.py"
 TOOL = "recover_reverted_ticks.py"
+# The `scripts/lib/` modules the tool imports. An update lands `scripts/` whole, so
+# a real clone always has them; this sandbox is assembled by hand, so the list is
+# kept in ONE place — two copies of it is how one of them misses a new import.
+LIB_MODULES = ("__init__.py", "portable.py", "tick_identity.py")
 
 
 def _git(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
@@ -59,7 +63,7 @@ class Migration035Tests(unittest.TestCase):
         shutil.copy(_SCRIPTS / "migrations" / HELPER,
                     self.root / "scripts" / "migrations" / HELPER)
         shutil.copy(_SCRIPTS / TOOL, self.root / "scripts" / TOOL)
-        for name in ("portable.py", "__init__.py"):
+        for name in LIB_MODULES:
             shutil.copy(_SCRIPTS / "lib" / name, self.root / "scripts" / "lib" / name)
         self.mig = self.root / "scripts" / "migrations" / MIGRATION
 
@@ -381,7 +385,7 @@ class Migration035Tests(unittest.TestCase):
         _git(Path(self._tmp.name), "clone", "-q", "--depth", "1",
              f"file://{self.root}", str(shallow))
         for rel in (f"scripts/migrations/{MIGRATION}", f"scripts/migrations/{HELPER}",
-                    f"scripts/{TOOL}", "scripts/lib/portable.py", "scripts/lib/__init__.py"):
+                    f"scripts/{TOOL}", *(f"scripts/lib/{name}" for name in LIB_MODULES)):
             (shallow / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(self.root / rel, shallow / rel)
         res = subprocess.run(["bash", str(shallow / "scripts" / "migrations" / MIGRATION)],

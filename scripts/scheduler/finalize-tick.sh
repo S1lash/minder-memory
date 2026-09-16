@@ -245,12 +245,33 @@ else
   BODY="$(heuristic_message)"
 fi
 
+# One line, always. The body is free text from the caller, and a newline in it
+# would split the subject into paragraphs a reader of the run identity could be
+# made to parse (`scripts/lib/tick_identity.py`).
+BODY="$(printf '%s' "$BODY" | tr '\r\n' '  ')"
+
 case "$BODY" in
   "$TAG:"*) MESSAGE="$BODY [scheduled]" ;;
   *) MESSAGE="$TAG: $BODY [scheduled]" ;;
 esac
 
-git commit -m "$MESSAGE" || exit 2
+# The identity this delivery declares: the base its tree was built on, and the run
+# (`scripts/lib/tick_identity.py` owns the keys and says why the base decides).
+# Computed here, before integration, where `HEAD` is still the commit the tick
+# worked from — never read from `.scheduler-state`, which outlives runs and would
+# hand back yesterday's base.
+# Writing it can never fail the delivery: a commit without an identity falls back
+# to the recovery tool's older reasoning, a tick that fails loses its work.
+IDENTITY=""
+if ! IDENTITY="$(python3 "$SCRIPT_DIR/../lib/tick_identity.py" trailers 2>/dev/null)"; then
+  IDENTITY=""
+fi
+if [ -n "$IDENTITY" ]; then
+  git commit -m "$MESSAGE" -m "$IDENTITY" || exit 2
+else
+  echo "finalize-tick: warning — no run identity could be declared; delivering without it" >&2
+  git commit -m "$MESSAGE" || exit 2
+fi
 
 # This commit is scheduler-authored too: record it, so a delivery failure
 # leaves it foldable by the next tick under the same identity rule.
@@ -350,8 +371,15 @@ set +e
 # GitHub compose the squash message itself, and that message carries a
 # `Co-authored-by` trailer for every commit author other than the merger — the
 # sandbox commit's author included, which puts an assistant-authorship mark on
-# `main`. The same text is passed by the prompts' MCP fallback (Step 5b).
-MERGE_BODY="Autonomous scheduler tick."
+# `main`. The squash also writes a NEW message on `main`, so the run identity
+# reaches it only by being handed over here. `tick_identity.py squash-body` owns
+# the text, and the prompts' MCP fallback (Step 5b) calls the same command. If it
+# cannot run, the subject stands in: never empty, only without the identity.
+if ! MERGE_BODY="$(python3 "$SCRIPT_DIR/../lib/tick_identity.py" squash-body 2>/dev/null)" \
+    || [ -z "$MERGE_BODY" ]; then
+  echo "finalize-tick: warning — squash body could not be derived; the identity stops at the sandbox branch" >&2
+  MERGE_BODY="$MESSAGE"
+fi
 MERGE_OUT="$(gh pr merge "$PR_NUMBER" --squash --delete-branch --subject "$MESSAGE" --body "$MERGE_BODY" 2>&1)"
 MERGE_RC=$?
 set -e

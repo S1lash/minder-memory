@@ -2,6 +2,28 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.3.0 — Every scheduled delivery says what it was built on
+
+A scheduled run now writes one more line into the commit it delivers: which
+version of your base it started from. Nothing about what it delivers changes, and
+the commit's title reads exactly as before.
+
+That line settles a question the repair from 1.2.0 could not always answer. When a
+run erases work that arrived while it was busy, the repair puts the work back — but
+it had to guess who had written the erased work from how commit titles are spelled.
+Two runs of the same kind racing each other looked identical to a run deliberately
+undoing its own earlier output, so such a commit was left for you to judge by hand.
+Now each run states where it started, and the question has a plain answer: anything
+that arrived after that point, the run never saw, so it cannot have removed it on
+purpose. From this release on, no scheduled commit is ever left for you to decide.
+
+Nightly lint also watches the line itself: if a scheduled commit stops carrying it,
+lint names that commit, so the protection cannot fade out unnoticed. The usual
+cause is a scheduled routine whose prompt you pasted in full rather than the
+one-line loader — replacing it with the loader fixes it.
+
+Nothing to do on your side otherwise: the next scheduled run starts writing it.
+
 ## 1.2.1 — Scheduled commits are yours alone
 
 A run in the cloud delivers through a pull request that is squash-merged, and

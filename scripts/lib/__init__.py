@@ -11,6 +11,8 @@ every call site:
 - `portable`  — LF/UTF-8 stdout and file I/O that behaves the same on Windows
 - `manifest`  — the single reader of `.engine-manifest.yml`
 - `migrations` — the migration ledger: what ran, with what outcome
+- `tick_identity` — what a scheduler delivery declares about itself: the base its
+  tree was built on, and its run id
 
 Deliberately NOT here: a python twin of `lib/git.sh`. The engine's python code
 reaches git in exactly two places (`roles_guard.py`, `record_decision_run.py`), both

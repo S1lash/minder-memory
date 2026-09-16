@@ -47,7 +47,8 @@ def _git(cwd: Path, *args: str, check: bool = True, env: dict | None = None) -> 
     )
 
 
-def _run_script(cwd: Path, script: str, *args: str) -> subprocess.CompletedProcess:
+def _run_script(cwd: Path, script: str, *args: str,
+                env: dict | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["bash", f"scripts/scheduler/{script}", *args],
         cwd=cwd,
@@ -59,6 +60,7 @@ def _run_script(cwd: Path, script: str, *args: str) -> subprocess.CompletedProce
             "GIT_AUTHOR_EMAIL": "test@example.com",
             "GIT_COMMITTER_NAME": "test",
             "GIT_COMMITTER_EMAIL": "test@example.com",
+            **(env or {}),
         },
     )
 
@@ -95,7 +97,8 @@ def _seed_repo(tmp_path: Path) -> tuple[Path, Path]:
     scheduler_dst.mkdir(parents=True)
     for name in _SCHEDULER_SCRIPTS:
         shutil.copy(SCHEDULER_DIR / name, scheduler_dst / name)
-    shutil.copytree(LIB_DIR, work / "scripts" / "lib")
+    shutil.copytree(LIB_DIR, work / "scripts" / "lib",
+                    ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copy(MANIFEST, work / ".engine-manifest.yml")
 
     (work / "zettelkasten" / "_records").mkdir(parents=True)
@@ -104,9 +107,14 @@ def _seed_repo(tmp_path: Path) -> tuple[Path, Path]:
     # Production ignores the scheduler's own state directory. Without it here,
     # `.scheduler-state/authored-shas` is staged as owner data and lands in the
     # delivery commit — which both misreports what a tick delivered and hides a
-    # path-set check behind noise the real repository never has.
+    # path-set check behind noise the real repository never has. The same goes for
+    # bytecode: every python helper the scripts call writes `__pycache__/` beside
+    # itself, which the real repository ignores. Unignored here it reads as engine
+    # drift, and stage.sh stages a CLARIFICATIONS note about it — so whether a test
+    # passed depended on whether a cache happened to exist when the sandbox was
+    # copied.
     with open(work / ".gitignore", "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(".scheduler-state/\n")
+        handle.write(".scheduler-state/\n__pycache__/\n")
 
     _git(work, "add", ".gitignore", ".engine-manifest.yml", "scripts/scheduler/", "scripts/lib/")
     _git(work, "commit", "-q", "-m", "initial")
@@ -907,3 +915,189 @@ def test_finalize_takes_local_mode_for_every_non_branch_value(
     assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
     assert "LOCAL mode" in result.stdout
     assert "ROUTINES mode" not in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# The identity a delivery declares: the base its tree was built on, and its run.
+# `recover_reverted_ticks.py` decides a stale delivery by the declared base, so a
+# delivery that declares the wrong one — or none, through a route that silently
+# drops the message body — turns a provable incident back into a guess.
+# ---------------------------------------------------------------------------
+
+import sys  # noqa: E402
+
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+from lib import tick_identity  # noqa: E402
+
+
+def _origin_message(origin: Path) -> str:
+    return subprocess.run(["git", "log", "-1", "--format=%B", "main"], cwd=origin,
+                          capture_output=True, text=True, encoding="utf-8",
+                          check=True).stdout
+
+
+def test_a_local_delivery_declares_the_base_it_was_built_on(tmp_path: Path) -> None:
+    """The tip moved while the tick ran: the declared base is where the tick started,
+    not the tip it was integrated onto — that difference is the whole signal."""
+    work, origin = _seed_repo(tmp_path)
+    started_on = _git(work, "rev-parse", "HEAD").stdout.strip()
+
+    _clone_and_push(tmp_path, origin, "zettelkasten/_records/concurrent.md", "keep\n",
+                    "scheduler/process: 1 record(s) updated [scheduled]")
+    moved_tip = subprocess.run(["git", "rev-parse", "main"], cwd=origin, capture_output=True,
+                               text=True, check=True).stdout.strip()
+    assert moved_tip != started_on
+
+    (work / "zettelkasten/_records/own.md").write_text("own\n", encoding="utf-8")
+    result = _run_script(work, "finalize-tick.sh", "scheduler/roles",
+                         env={"CLAUDE_CODE_SESSION_ID": "session-abc-123"})
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+
+    delivered = _origin_message(origin)
+    ident = tick_identity.parse(delivered)
+    assert ident.status == "valid", delivered
+    assert ident.base == started_on, "the base is what the tick read, not the tip it landed on"
+    assert ident.run == "session-abc-123", "the run id joins the commit to its session"
+    subject = delivered.splitlines()[0]
+    assert subject == "scheduler/roles: 1 record(s) updated [scheduled]", (
+        "the subject is what existing readers parse, and it does not change")
+
+
+def test_a_folded_delivery_declares_the_fork_point(tmp_path: Path) -> None:
+    """A commit left behind by a failed tick is folded into this one. The tree this
+    tick worked from is that commit on top of ITS base, so the base is the fork
+    point — and nothing is read from `.scheduler-state`, which outlives runs."""
+    work, origin = _seed_repo(tmp_path)
+    fork = _git(work, "rev-parse", "HEAD").stdout.strip()
+
+    (work / "zettelkasten/_system/state/log_lint.md").write_text("left behind\n",
+                                                                  encoding="utf-8")
+    _git(work, "add", "-A")
+    _git(work, "commit", "-q", "-m", "scheduler/lint: state: routine update (1 file(s)) [scheduled]")
+    state = work / ".scheduler-state"
+    state.mkdir(exist_ok=True)
+    (state / "authored-shas").write_text(_git(work, "rev-parse", "HEAD").stdout.strip() + "\n",
+                                         encoding="utf-8")
+    _clone_and_push(tmp_path, origin, "zettelkasten/_records/concurrent.md", "keep\n",
+                    "garmin: metric day")
+
+    (work / "zettelkasten/_records/own.md").write_text("own\n", encoding="utf-8")
+    result = _run_script(work, "finalize-tick.sh", "scheduler/lint")
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+
+    ident = tick_identity.parse(_origin_message(origin))
+    assert ident.status == "valid"
+    assert ident.base == fork
+    assert ident.run, "a run id is generated when the runtime gives none"
+
+
+def test_a_routines_delivery_hands_the_identity_to_the_squash(tmp_path: Path) -> None:
+    """A squash merge writes a NEW message on `main` from what it is handed. Handed
+    only the lead line, the identity would stop at the sandbox branch."""
+    work, origin = _seed_repo(tmp_path)
+    started_on = _git(work, "rev-parse", "HEAD").stdout.strip()
+    state_dir = work / ".scheduler-state"
+    state_dir.mkdir()
+    (state_dir / "start-branch").write_text("claude/test-sandbox-ID\n", encoding="utf-8")
+    _, gh_env = _install_fake_gh(tmp_path, origin)
+
+    (work / "zettelkasten/_records/r1.md").write_text("rec1\n", encoding="utf-8")
+    result = _run_script(work, "finalize-tick.sh", "scheduler/process",
+                         env={**gh_env, "CLAUDE_CODE_SESSION_ID": "sess-routines"})
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+
+    body = (tmp_path / "fake-gh-state" / "merge-body").read_text(encoding="utf-8")
+    assert body.splitlines()[0] == tick_identity.SQUASH_LEAD, (
+        "the lead line stays: an empty or identity-only body is still composed by GitHub")
+    ident = tick_identity.parse(body)
+    assert ident.status == "valid", body
+    assert (ident.base, ident.run) == (started_on, "sess-routines")
+
+
+def test_an_identity_failure_never_blocks_delivery(tmp_path: Path) -> None:
+    """Declaring the base is instrumentation. A tick whose identity cannot be written
+    still delivers its work — losing a day of records to protect a label would invert
+    the priorities the label exists to serve."""
+    work, origin = _seed_repo(tmp_path)
+    (work / "scripts/lib/tick_identity.py").write_text("raise SystemExit(7)\n", encoding="utf-8")
+    _git(work, "commit", "-q", "-am", "break the identity writer")
+    _git(work, "push", "-q", "origin", "main")
+
+    (work / "zettelkasten/_records/own.md").write_text("own\n", encoding="utf-8")
+    result = _run_script(work, "finalize-tick.sh", "scheduler/process")
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+    assert "identity" in result.stderr.lower(), "the missing identity is named, not silent"
+    assert tick_identity.parse(_origin_message(origin)).status == "absent"
+    shown = subprocess.run(["git", "show", "main:zettelkasten/_records/own.md"], cwd=origin,
+                           capture_output=True, text=True, encoding="utf-8")
+    assert shown.returncode == 0, "the work itself was delivered"
+
+
+def test_a_local_failure_note_declares_its_identity(repo: Path) -> None:
+    """`ship-failure-note.sh` commits `[scheduled]` work that a later save delivers,
+    so it declares its base like any other scheduled commit.
+
+    This fallback runs precisely when the owner's own commits sit ahead of
+    `origin/main`, so the tree the tick read already contains them. Declaring the
+    older `origin/main` would make the tick look blind to the owner's commit — and a
+    deliberate change the tick made on top of it would then prove as a stale revert.
+    The declared base is the commit the tree was built on.
+    """
+    (repo / "zettelkasten/_records/manual.md").write_text("owner work\n", encoding="utf-8")
+    _git(repo, "add", "zettelkasten/_records/manual.md")
+    _git(repo, "commit", "-q", "-m", "owner manual edit")
+    started_on = _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    result = _run_script(repo, "ship-failure-note.sh", "test cause", "process-scheduled")
+    assert result.returncode == 0, result.stderr
+    ident = tick_identity.parse(_git(repo, "log", "-1", "--format=%B").stdout)
+    assert ident.status == "valid"
+    assert ident.base == started_on
+
+
+def test_squash_body_of_a_commit_without_identity_is_the_lead_alone(tmp_path: Path) -> None:
+    work, _ = _seed_repo(tmp_path)
+    res = subprocess.run(["python3", "scripts/lib/tick_identity.py", "squash-body"], cwd=work,
+                         capture_output=True, text=True, encoding="utf-8")
+    assert res.returncode == 0, res.stderr
+    assert res.stdout.strip() == tick_identity.SQUASH_LEAD
+
+
+def test_text_passed_into_a_subject_cannot_forge_a_declaration(repo: Path) -> None:
+    """An override message or a failure cause is free text. A newline in it must not
+    become a declaration line of its own — an injected older base is exactly the
+    input that turns a deliberate change into a false incident."""
+    forged = "0" * 39 + "1"
+    (repo / "zettelkasten/_records/own.md").write_text("own\n", encoding="utf-8")
+    result = _run_script(repo, "finalize-tick.sh", "scheduler/process",
+                         f"batch\n\nMinder-Tick-Base: {forged}")
+    assert result.returncode == 0, result.stderr
+    message = _git(repo, "log", "-1", "--format=%B").stdout
+    assert message.splitlines()[0].startswith("scheduler/process: batch"), message
+    ident = tick_identity.parse(message)
+    assert ident.status == "valid", message
+    assert ident.base != forged
+
+
+def test_a_forged_line_is_ignored_even_when_the_writer_is_down() -> None:
+    """With no real declaration beside it, a forged line in the subject paragraph
+    is not read at all — only lines after the subject paragraph count."""
+    forged = "0" * 39 + "1"
+    assert tick_identity.parse(f"subject\nMinder-Tick-Base: {forged}").status == "absent"
+
+
+def test_a_routines_squash_body_is_never_empty_when_the_helper_fails(tmp_path: Path) -> None:
+    work, origin = _seed_repo(tmp_path)
+    (work / "scripts/lib/tick_identity.py").write_text("raise SystemExit(7)\n", encoding="utf-8")
+    _git(work, "commit", "-q", "-am", "break the identity writer")
+    _git(work, "push", "-q", "origin", "main")
+    state_dir = work / ".scheduler-state"
+    state_dir.mkdir()
+    (state_dir / "start-branch").write_text("claude/test-sandbox-EMPTY\n", encoding="utf-8")
+    _, gh_env = _install_fake_gh(tmp_path, origin)
+
+    (work / "zettelkasten/_records/r1.md").write_text("rec1\n", encoding="utf-8")
+    result = _run_script(work, "finalize-tick.sh", "scheduler/process", env=gh_env)
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+    body = (tmp_path / "fake-gh-state" / "merge-body").read_text(encoding="utf-8")
+    assert body.strip(), "an empty squash body lets GitHub credit the sandbox author"

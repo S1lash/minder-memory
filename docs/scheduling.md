@@ -134,7 +134,9 @@ instead:
 1. `git push origin HEAD:<sandbox-branch>` (proxy-allowed).
 2. `gh pr create --base main --head <sandbox-branch>`.
 3. `gh pr merge --squash --delete-branch` with an explicit commit body — left
-   empty, GitHub writes its own and credits the sandbox's commit author.
+   empty, GitHub writes its own and credits the sandbox's commit author. The body
+   is `tick_identity.py squash-body`, so the tick's declared base (below) reaches
+   `main`.
 
 End state: `main` has one squash commit, sandbox branch deleted.
 
@@ -143,7 +145,8 @@ When `finalize-tick.sh` exits 2 with `"gh CLI not found in PATH"`, the
 scheduler prompts have an explicit Step 5b that routes through the
 `github` MCP server: push HEAD to the sandbox branch via plain `git
 push`, call MCP `create_pull_request`, call MCP `merge_pull_request`
-with `merge_method: squash` and an explicit `commit_message`. Branch cleanup falls to the repo setting
+with `merge_method: squash` and `commit_message` set to the output of
+`python3 scripts/lib/tick_identity.py squash-body`. Branch cleanup falls to the repo setting
 described in the next section. Step 5b is the **only** authorized
 non-script git/MCP path in the prompts.
 
@@ -171,6 +174,38 @@ Two consequences worth stating, because both are easy to get backwards:
   unauthorised and the tick refuses to deliver — which is the safe direction for a
   guard protecting owner data, and the reason a skill that forgets to record finds
   its own work refused rather than quietly published.
+
+## The identity a delivery declares
+
+Every commit a tick delivers states, in its message body, the base its tree was
+built on and the run that made it:
+
+```
+Minder-Tick-Base: <the last origin/main commit the tick worked from>
+Minder-Tick-Run: <the session id, or a generated one>
+```
+
+`finalize-tick.sh` takes the base when it commits — `HEAD`, the commit the tree
+was built on, before integrating onto a tip that moved — and
+`ship-failure-note.sh` does the same for its local fallback commit, where `HEAD`
+may be the owner's own unpushed commit. Nothing is
+carried over from `.scheduler-state`, which outlives runs. A squash merge writes a
+new message on `main`, so both cloud delivery routes hand the declaration over
+explicitly (`tick_identity.py squash-body`); the subject line is unchanged.
+
+**What reads it.** `scripts/recover_reverted_ticks.py` judges a stale delivery by
+the declared base: a path the commit put back to its base content, while its
+parent held something newer, is work the tick never read — an incident, whoever
+produced it. A base equal to the parent means the tick saw everything it undid.
+So a declared commit is never left for the owner to settle by hand; only commits
+from before declarations existed are judged from history alone.
+
+**What watches it.** `/minder:mem:lint` A.15 names every `[scheduled]` commit,
+after the first declared one, that declares nothing usable — a routine still
+holding a pasted prompt body, or a delivery route that drops the message body.
+
+Writing the declaration never fails a delivery: if the base cannot be established,
+the tick delivers without it and says so on stderr.
 
 ## ⚠️ Required repo setting — auto-delete head branches
 

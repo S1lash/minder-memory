@@ -266,10 +266,13 @@ Then exit `partial` immediately.
       - `pullNumber`: from step 3
       - `merge_method`: `squash`
       - `commit_title`: same as PR title in step 3
-      - `commit_message`: `Autonomous scheduler tick.` — always
-        this exact non-empty text. Left out, GitHub composes the squash body
-        itself and appends a `Co-authored-by` trailer for the sandbox commit's
-        author, which puts an assistant-authorship mark on `main`.
+      - `commit_message`: the output of
+        `python3 scripts/lib/tick_identity.py squash-body`, run at this step —
+        every line, unchanged. It is never empty. Left out, GitHub composes
+        the squash body itself and appends a `Co-authored-by` trailer for the
+        sandbox commit's author, which puts an assistant-authorship mark on
+        `main`. Shortened, the base this tick declares stops at the sandbox
+        branch, and a stale delivery by this tick can no longer be proven.
    5. Branch cleanup is automatic. The repo has «Automatically delete
       head branches» enabled in GitHub Settings → General → Pull
       Requests; GitHub removes `<SANDBOX_BRANCH>` the moment the squash

@@ -28,6 +28,23 @@ automatic arm requires all three of:
 Anything matching the signature but failing the proof is reported, never
 written.
 
+**A declared base settles it outright.** A delivery made by `finalize-tick.sh`
+states in its message the base its tree was built on (`scripts/lib/tick_identity.py`
+owns the keys and why). A path the commit puts back to its base content, while its
+parent holds something newer, is a revert of work the tick never read — proven,
+whoever produced that work, a tick of the same tag included. A base equal to the
+parent means the tick saw everything it undid — never an incident. Neither needs a
+producer guessed from a subject, so for a declared commit there is no `needs_review`
+class, and the signature floor does not apply: one reverted path is provable. A
+declaration that does not hold up — malformed, naming a commit that does not exist,
+or not an ancestor of the commit — is ignored with the reason attached, and the
+commit is judged as though it had declared nothing. The history-only reasoning above
+stays as the reader of everything committed before declarations existed.
+
+**The declaration itself is watched.** `identity` names every `[scheduled]` commit
+after the first declaration in the history that declares nothing usable — the one
+way a delivery route could quietly return its commits to the guess.
+
 **What gets written, and what only gets reported.** The reconstruction tells us
 which paths the delivery reverted and what they held — it is not what gets
 written. It carries the whole state of the base as it stood before the incident,
@@ -43,6 +60,7 @@ position of a row is part of its meaning.
 
 Usage:
   python3 scripts/recover_reverted_ticks.py detect [--json] [--since <date>]
+  python3 scripts/recover_reverted_ticks.py identity [--json] [--since <date>]
   python3 scripts/recover_reverted_ticks.py plan  [--json] [--commit <sha>]
   python3 scripts/recover_reverted_ticks.py apply [--json] [--commit <sha>]
                                                   [--merge-diverged]
@@ -72,6 +90,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from lib import tick_identity  # noqa: E402
 from lib.portable import configure_std_streams  # noqa: E402
 
 ZERO = "0" * 40
@@ -225,13 +244,107 @@ def prove(repo: Path, sha: str) -> dict:
     written or dropped: a silent drop is what would let a real incident be
     reported as a clean base.
     """
-    unproven = {"proven": False, "needs_review": False}
     subject = git("log", "-1", "--format=%s", sha, cwd=repo).strip()
     if "[scheduled]" not in subject:
-        return unproven
-    parent = git("rev-parse", f"{sha}~1", cwd=repo).strip()
+        return {"proven": False, "needs_review": False}
+    parent = first_parent(repo, sha)
     if not parent:
-        return unproven
+        return {"proven": False, "needs_review": False}
+
+    ident = tick_identity.parse(git("log", "-1", "--format=%B", sha, cwd=repo))
+    rejected = declaration_problem(repo, ident, parent)
+    if ident.status == "valid" and not rejected:
+        return prove_by_declaration(repo, sha, parent, subject, ident.base)
+
+    verdict = prove_by_history(repo, sha, parent, subject)
+    if rejected:
+        # Named, never swallowed: a declaration that does not hold up is itself
+        # something the owner should see — it is how a broken delivery route shows.
+        note = f"declared identity ignored: {rejected}"
+        verdict = {**verdict, "identity": note,
+                   "reason": f"{verdict['reason']}; {note}" if verdict.get("reason") else note}
+    return verdict
+
+
+def first_parent(repo: Path, sha: str) -> str:
+    """The first parent, or empty for a root commit.
+
+    Read from the commit's own parent list rather than from a failing `sha~1`: a
+    root commit and a git that could not answer are opposite situations, and only
+    the first one may be passed over.
+    """
+    ids = git("rev-list", "--parents", "-n1", sha, cwd=repo).split()
+    return ids[1] if len(ids) > 1 else ""
+
+
+def declaration_problem(repo: Path, ident: "tick_identity.Identity", parent: str) -> str:
+    """Why a commit's declaration cannot be used, or empty when it can (or is absent).
+
+    A declared base is trusted only when it is a commit that precedes this one. A
+    cherry-pick carries a base from another line of history; a rewritten origin
+    leaves a base that no longer exists; and a base the commit does not descend
+    from would make the interval meaningless. Each is rejected in BOTH directions —
+    it neither proves an incident nor clears one.
+    """
+    if ident.status == "absent":
+        return ""
+    if ident.status == "invalid":
+        return ident.reason
+    if not git_ok("cat-file", "-e", f"{ident.base}^{{commit}}", cwd=repo):
+        return f"declared base {ident.base[:10]} does not exist in this repository"
+    if not git_ok("merge-base", "--is-ancestor", ident.base, parent, cwd=repo):
+        return f"declared base {ident.base[:10]} is not an ancestor of the commit's parent"
+    return ""
+
+
+def changes(repo: Path, a: str, b: str) -> dict[str, tuple[str, str]]:
+    """`path -> (blob at a, blob at b)` for every path that differs; ZERO when absent.
+
+    NUL-separated raw output, so no path is quoted, escaped or split, whatever its
+    characters.
+    """
+    out = git("diff", "--raw", "--no-renames", "--no-abbrev", "-z", a, b, cwd=repo)
+    fields = out.split("\0")
+    result: dict[str, tuple[str, str]] = {}
+    i = 0
+    while i + 1 < len(fields):
+        info, path = fields[i], fields[i + 1]
+        i += 2
+        parts = info.lstrip(":").split()
+        if len(parts) < 5:
+            raise GitFailed(f"unreadable raw diff entry {info!r} between {a[:10]} and {b[:10]}")
+        result[path] = (parts[2], parts[3])
+    return result
+
+
+def prove_by_declaration(repo: Path, sha: str, parent: str, subject: str, base: str) -> dict:
+    """Judge a commit by the base it declares. Always a verdict, never review.
+
+    Reverted = every path that changed between the base and the parent, and that
+    this commit puts back to exactly its base content. The tick never read those
+    changes, so it cannot have undone them on purpose — which is also why a base
+    equal to the parent can never produce one.
+    """
+    if base == parent:
+        return {"proven": False, "needs_review": False, "declared": True}
+    interval = changes(repo, base, parent)
+    if not interval:
+        return {"proven": False, "needs_review": False, "declared": True}
+    written = changes(repo, parent, sha)
+    reverted = sorted(p for p, (at_base, _) in interval.items()
+                      if p in written and written[p][1] == at_base)
+    if not reverted:
+        return {"proven": False, "needs_review": False, "declared": True}
+    reverted_set = set(reverted)
+    return {"proven": True, "needs_review": False, "declared": True,
+            "base": base, "parent": parent, "reverted": reverted,
+            "own_work": sorted(p for p in written if p not in reverted_set),
+            "subject": subject}
+
+
+def prove_by_history(repo: Path, sha: str, parent: str, subject: str) -> dict:
+    """The proof for a commit that declares nothing usable: read from history alone."""
+    unproven = {"proven": False, "needs_review": False}
     own = set(lines(git("diff", "--name-only", "--diff-filter=AM", parent, sha, cwd=repo)))
     for base in lines(git("rev-list", "--first-parent", f"-n{ANCESTOR_SEARCH}", parent,
                           cwd=repo))[1:]:
@@ -304,6 +417,82 @@ def foreign_producer_in(repo: Path, base: str, parent: str, subject: str) -> boo
         if other != mine:
             return True
     return False
+
+
+def scheduled_messages(repo: Path, rev: str, since: str | None, reverse: bool = False,
+                       first_parent: bool = False) -> list[tuple[str, str, str]]:
+    """`(sha, committer date, full message)` for every non-merge `[scheduled]` commit."""
+    args = ["log", "--no-merges", "--format=%x00%H%x01%cI%x01%B"]
+    if first_parent:
+        args.append("--first-parent")
+    if reverse:
+        args.append("--reverse")
+    if since:
+        args.append(f"--since={since}")
+    args.append(rev)
+    rows = []
+    for chunk in git(*args, cwd=repo).split("\x00")[1:]:
+        parts = chunk.split("\x01", 2)
+        if len(parts) != 3:
+            continue
+        sha, date, message = parts
+        if "[scheduled]" in (message.splitlines() or [""])[0]:
+            rows.append((sha, date, message))
+    return rows
+
+
+def declared_candidates(repo: Path, rev: str, since: str | None) -> list[dict]:
+    """Every declared `[scheduled]` commit — proved directly, below the signature floor."""
+    return [{"commit": sha[:10], "sha": sha, "date": date,
+             "subject": message.splitlines()[0]}
+            for sha, date, message in scheduled_messages(repo, rev, since, reverse=True)
+            if tick_identity.parse(message).status == "valid"]
+
+
+def undeclared(repo: Path, rev: str, since: str | None) -> list[dict]:
+    """`[scheduled]` commits after the first declaration that declare nothing usable.
+
+    The cutover is read from the history itself, so a clone that has never run a
+    declaring engine reports nothing, and every clone starts watching from the day
+    its own first declared delivery landed.
+    """
+    # First-parent: deliveries land on the main line, and a cutover picked from a
+    # side branch merged later would silently exempt every main-line commit before
+    # that merge.
+    cutover = ""
+    for sha, _date, message in scheduled_messages(repo, rev, None, reverse=True,
+                                                  first_parent=True):
+        if tick_identity.parse(message).status == "valid":
+            cutover = sha
+            break
+    if not cutover:
+        return []
+    found = []
+    for sha, date, message in scheduled_messages(repo, rev, since, first_parent=True):
+        if sha == cutover or not git_ok("merge-base", "--is-ancestor", cutover, sha, cwd=repo):
+            continue
+        parent = first_parent(repo, sha)
+        ident = tick_identity.parse(message)
+        problem = (declaration_problem(repo, ident, parent) if parent
+                   else "a root commit has no interval to declare")
+        if ident.status == "absent":
+            problem = "declares no base"
+        if problem:
+            found.append({"commit": sha[:10], "sha": sha, "date": date,
+                          "subject": message.splitlines()[0], "reason": problem})
+    return found
+
+
+def in_history_order(repo: Path, rev: str, rows: list[dict]) -> list[dict]:
+    """Oldest first by position in the history, the order `detect` itself yields.
+
+    Not by committer date: clocks on different machines and runners disagree, and
+    the order in which incidents are repaired must not depend on whose clock was
+    right.
+    """
+    position = {sha: i for i, sha in enumerate(lines(git("rev-list", "--reverse", rev,
+                                                         cwd=repo)))}
+    return sorted(rows, key=lambda c: position.get(c["sha"], len(position)))
 
 
 MISSING = ""          # the path genuinely does not exist at that revision
@@ -638,7 +827,7 @@ def main(argv: list[str] | None = None) -> int:
     configure_std_streams()
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("mode", choices=("detect", "plan", "apply"))
+    ap.add_argument("mode", choices=("detect", "identity", "plan", "apply"))
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--rev", default="HEAD")
     ap.add_argument("--since", default=None)
@@ -668,16 +857,41 @@ def main(argv: list[str] | None = None) -> int:
               "from a blind scan would be worse than refusing.", file=sys.stderr)
         return 2
 
-    candidates = ([{"sha": git("rev-parse", args.commit, cwd=repo).strip(),
-                    "commit": args.commit[:10],
-                    "subject": git("log", "-1", "--format=%s", args.commit, cwd=repo).strip()}]
-                  if args.commit else detect(repo, args.rev, args.since, args.threshold))
+    if args.mode == "identity":
+        rows = undeclared(repo, args.rev, args.since)
+        if args.json:
+            print(json.dumps(rows, ensure_ascii=False))
+        elif rows:
+            for c in rows:
+                print(f"{c['commit']}  {c['subject'][:60]}\n    {c['reason']}")
+        elif declared_candidates(repo, args.rev, None):
+            print("every scheduled commit since the first declaration declares its base")
+        else:
+            print("no scheduled commit declares its base yet — nothing to watch")
+        return 0
+
+    if args.commit:
+        candidates = [{"sha": git("rev-parse", args.commit, cwd=repo).strip(),
+                       "commit": args.commit[:10],
+                       "subject": git("log", "-1", "--format=%s", args.commit,
+                                      cwd=repo).strip()}]
+    else:
+        candidates = detect(repo, args.rev, args.since, args.threshold)
+        # A declared commit is proved directly, whatever its size: the signature floor
+        # exists for commits that have only their shape to go on.
+        seen = {c["sha"] for c in candidates}
+        extra = [dict(c, declared_only=True)
+                 for c in declared_candidates(repo, args.rev, args.since)
+                 if c["sha"] not in seen]
+        if extra:
+            candidates = in_history_order(repo, args.rev, candidates + extra)
 
     if args.mode == "detect":
         judged = []
         for c in candidates:
             p = prove(repo, c["sha"])
             judged.append({**c, "proven": p["proven"], "needs_review": p["needs_review"],
+                           **({"declared": True} if p.get("declared") else {}),
                            **({"base": p["base"][:10],
                                "reverted": len(p["reverted"]) if p["proven"] else p["reverted"]}
                               if p.get("base") else {}),
@@ -698,9 +912,12 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"(needs your review, nothing written) {c['commit']}  "
                       f"{c['subject'][:60]}\n    {c.get('reason', '')}", file=sys.stderr)
             for c in judged:
-                if not c["proven"] and not c["needs_review"]:
-                    print(f"(signature only, not written) {c['commit']}  {c['subject'][:60]}",
-                          file=sys.stderr)
+                if c["proven"] or c["needs_review"] or c.get("declared_only"):
+                    continue
+                label = ("declared base: it saw what it undid" if c.get("declared")
+                         else "signature only")
+                print(f"({label}, not written) {c['commit']}  {c['subject'][:60]}",
+                      file=sys.stderr)
             if not hits and not review:
                 print("no stale-tree delivery found")
         return 0

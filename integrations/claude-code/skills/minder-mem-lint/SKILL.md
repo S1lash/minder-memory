@@ -1067,7 +1067,8 @@ emptied inbox and correctly reports that there was nothing to process.
   implementation here would be the reason the two disagree later.
 
   ```
-  python3 scripts/recover_reverted_ticks.py detect --since "26 hours ago"
+  python3 scripts/recover_reverted_ticks.py detect --json --since "26 hours ago"
+  python3 scripts/recover_reverted_ticks.py identity --json --since "26 hours ago"
   ```
 
 - **The finding.** Each commit the tool reports as proven → one aggregate
@@ -1077,19 +1078,32 @@ emptied inbox and correctly reports that there was nothing to process.
 - **Three classes, and only one of them is a confirmed loss.** The tool judges each
   candidate rather than printing everything that matches a shape, and `--json`
   carries its verdict per commit:
-  - `proven` — scheduler provenance, the stale-tree shape, the tick's own work on
-    top, and somebody else's work in the interval it reverted. This is the class
-    above, and the only one raised as a loss.
-  - `needs_review` — everything but the last condition. A run rolling back its own
-    previous output and two ticks of the same tag racing each other are identical
-    in the history and opposite in meaning, so the commit goes into the SAME
-    aggregate item, explicitly as a commit needing the owner's verdict rather than
-    a confirmed loss. Do not drop it: silence here is how a real incident gets
-    reported as a clean base.
+  - `proven` — for a commit that declares the base its tree was built on
+    (`"declared": true`), a path it put back to that base's content while its
+    parent held something newer: work the tick never read. For an undeclared one,
+    scheduler provenance, the stale-tree shape, the tick's own work on top, and
+    somebody else's work in the interval it reverted. This is the class above, and
+    the only one raised as a loss.
+  - `needs_review` — undeclared commits only: everything but the last condition. A
+    run rolling back its own previous output and two ticks of the same tag racing
+    each other are identical in the history and opposite in meaning, so the commit
+    goes into the SAME aggregate item, explicitly as a commit needing the owner's
+    verdict rather than a confirmed loss. Do not drop it: silence here is how a
+    real incident gets reported as a clean base. When the row carries `identity`,
+    the commit declared something that did not hold up — quote that reason in the
+    item.
   - neither — an ordinary deliberate revert, which restores an ancestor's tree
     exactly with no own work on top. *Reported on stderr and never raised* — the
     corpus contains such commits, and a scan that raised them would teach the
     owner to ignore this one.
+- **The declaration is watched too.** Each row `identity --json` returns is a
+  `[scheduled]` commit, newer than the first declared one, that declares nothing
+  usable → one aggregate `scheduler-tick-identity-missing` CLARIFICATION naming the
+  commits and each row's `reason`. It is not a loss; it is the route by which the
+  `needs_review` class would quietly return — most often a routine still holding a
+  pasted prompt body, whose delivery drops the declaration. An empty list is the
+  ordinary answer, including on every clone that has never delivered a declared
+  commit.
 - **Never autofixed, and deliberately not by lint.** The repair is
   `scripts/recover_reverted_ticks.py apply`, which writes into the working tree
   for the owner to review. Restoring records and notes is outside lint's write
