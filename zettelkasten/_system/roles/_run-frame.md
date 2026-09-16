@@ -46,6 +46,15 @@ ended. It matters when your work has outside effects: if it says `error`, assume
 run may have half-finished — check the world before repeating an action that would
 double up.
 
+**Nobody can approve anything while you run.** A tool that asks for permission
+does not fail here — it waits, and it waits for a person who is asleep, so the
+run burns its whole clock and delivers nothing. Consent is settled once, when
+the owner creates the role, not in the moment. Publishing the page you maintain
+inside your own folder is already settled that way and needs no prompt. If some
+other action would ask, do not attempt it and hope: do the part you can, and say
+in your return what you could not do and why, so the owner can settle it the
+same way.
+
 ---
 
 ## Where you may write

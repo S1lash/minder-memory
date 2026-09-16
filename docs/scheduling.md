@@ -146,6 +146,31 @@ with `merge_method: squash`. Branch cleanup falls to the repo setting
 described in the next section. Step 5b is the **only** authorized
 non-script git/MCP path in the prompts.
 
+## The delivery surface — every step that commits records what it staged
+
+`finalize-tick.sh` refuses to push when a path differs from `origin/main` and no
+step of the tick recorded staging it. The record is `.scheduler-state/staged-paths`
+(gitignored, one repo-relative path per line, appended, cleared only on a
+successful delivery), and the rule behind it is general rather than one skill's
+habit:
+
+**A step that stages or commits inside a tick appends what it staged to that file,
+at the moment it stages it.** `stage.sh` does this for every tick. A skill that
+makes its own commit mid-tick does it too — `/minder:mem:roles` is the only one
+today, once per role — and it records the set *before* committing, because
+afterwards the index is clean and there is nothing left to read.
+
+Two consequences worth stating, because both are easy to get backwards:
+
+- **The record is never derived from the commits it polices.** After the fold
+  (`reset --soft`), a folded commit's changes are back in the index, so a surface
+  read from the index would authorise exactly the stale tree the check exists to
+  catch. It is written by the producing step, from what that step staged.
+- **A missing or empty record fails closed.** Then every differing path is
+  unauthorised and the tick refuses to deliver — which is the safe direction for a
+  guard protecting owner data, and the reason a skill that forgets to record finds
+  its own work refused rather than quietly published.
+
 ## ⚠️ Required repo setting — auto-delete head branches
 
 The Routines proxy blocks `git push origin --delete <branch>`, and the
@@ -166,6 +191,29 @@ explicitly. Verify it is on before relying on cloud scheduling.
 
 For LOCAL mode the setting is not required (no PR involved), but
 enabling it does no harm.
+
+## Set `TZ` on the roles routine, or your day turns over somewhere else
+
+A role's cadence is counted in days, and a day needs a timezone. The tick takes
+it from `TZ`, and falls back to whatever clock the machine has. A cloud run has
+no `TZ` and no idea where you live, so it counts in UTC — and a `daily` role's
+day then turns over at midnight UTC rather than at midnight where you are.
+
+Nothing breaks, and that is what makes it confusing: the scheduled tick still
+fires at the hour you picked and still runs. What surprises you is a run started
+by hand in the hours between your midnight and UTC's, which reports `already ran
+on this local date` and does nothing, correctly, while your calendar says it is
+a new day.
+
+**Set `TZ` to your IANA zone in the routine's environment config**, beside the
+cron line — `TZ=Europe/Berlin`, `TZ=America/New_York`, `TZ=Asia/Tokyo`. The
+further you live from UTC the more it matters: a few hours east of it the
+boundary lands in the small hours and you meet it once; in the Americas it lands
+in the afternoon and a day's work gets counted against the wrong day.
+
+On Windows, `zoneinfo` needs the `tzdata` package to resolve a zone name at all;
+without it the tick uses a fixed offset, which is right except across a
+daylight-saving change.
 
 ## Credentials for the roles tick — MINDER_MEMORY_ROLES_KEY
 
@@ -333,6 +381,23 @@ older of the two — a tick then runs last quarter's instructions against this
 quarter's engine, and nothing announces it. So the scheduler holds a pointer
 and the repository holds the contract. Paste each loader once; engine updates
 reach every tick on their own from then on.
+
+**Give each routine its own result branch — `claude/<routine-name>`.** It is the
+configuration field beside the cron line and the prompt (the platform calls it the
+outcome or result branch), and it decides how the tick delivers. With a branch,
+`finalize-tick.sh` takes the ROUTINES path below: push to that branch, open a pull
+request, squash-merge — the merge happens on the server, so a tick that ran for
+hours **cannot** overwrite what another tick delivered while it worked. Without
+one, the same tick pushes straight to `main`.
+
+Delivery is written to survive the direct-push case too — it folds onto the point
+it started from and replays its own patch onto the current tip — but the branch
+removes the class instead of handling it, and costs one field. One branch per
+routine, never shared: two routines pushing to the same branch race each other on
+it.
+
+A host crontab, launchd or a GitHub Action needs no branch — those have push
+rights to `main` by design, and LOCAL mode is the correct path for them.
 
 ```
 /schedule

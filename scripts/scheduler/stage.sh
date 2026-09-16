@@ -153,6 +153,24 @@ fi
 
 git add -- "${STAGEABLE[@]}" || exit 2
 
+# Record what this tick staged. finalize-tick.sh compares the delivered commit
+# against `origin/main` and refuses any path outside this surface — the rail that
+# notices a delivery touching content no step of the tick ever handled. Appended,
+# never truncated: a tick stages more than once, and the union across its own steps
+# is the whole surface, which is also what lets a retried tick prove its work after
+# the fold has collapsed it.
+#
+# Deliberately NOT filtered by "was it already in the index": after the fold a
+# tick's own committed work sits in the index exactly as a folded change does, so
+# excluding pre-staged paths refuses the tick its own delivery. Content is what
+# separates a stale tree from honest work, and the rebase in finalize-tick.sh is
+# what enforces that — this record answers the narrower question of which paths
+# the tick handled at all.
+mkdir -p .scheduler-state
+for path in "${STAGEABLE[@]}"; do
+  printf '%s\n' "$path" >> .scheduler-state/staged-paths
+done
+
 # Defence-in-depth: re-classify what actually landed in the index. The
 # manifest is authoritative; this catches index races where a stat-only
 # refresh might let an engine path slip through.

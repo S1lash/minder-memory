@@ -156,6 +156,13 @@ engine:
   - .claude/CLAUDE.md
   - .claude/settings.json
 
+  # The hook `.claude/settings.json` registers. It has to ship: a cloud run
+  # clones the repository fresh, so the workspace is never trusted and a
+  # project's `permissions.allow` is not applied there — while hooks from the
+  # repository are. It is the one mechanism that can settle a standing role's
+  # consent for every clone rather than on one machine.
+  - .claude/hooks/approve_role_artifact.py
+
   # Project-local skill discoverability for Claude Code Routines (cloud
   # cron). Routines clone the repo fresh and discover skills only at the
   # canonical `.claude/skills/<name>/SKILL.md` path. Each entry under here

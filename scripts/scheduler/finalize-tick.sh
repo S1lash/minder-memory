@@ -146,7 +146,23 @@ if [ "$AHEAD_COUNT" -gt 0 ]; then
   fi
 
   echo "finalize-tick: folding $AHEAD_COUNT previous unpushed [scheduled] commit(s) into this tick"
-  git reset --soft origin/main || exit 2
+  # The fold collapses THIS TICK's commits into one, so it resets to the point
+  # those commits branched from — never to `origin/main`. Resetting to a tip that
+  # moved while the tick ran keeps the stale index and commits it on top of
+  # everything that arrived, which reverts it: a fast-forward push that git has
+  # no reason to refuse. Six deliveries erased a day of records each that way.
+  FORK_POINT="$(git merge-base HEAD origin/main 2>/dev/null || true)"
+  if [ -z "$FORK_POINT" ]; then
+    echo "finalize-tick: cannot determine the fork point with origin/main; aborting" >&2
+    exit 2
+  fi
+  # The surface is NOT read from the folded commits. Adding their paths here
+  # launders the one case the check exists for: when the stale tree is inside the
+  # tick's own commit, "paths my commits contain" authorises exactly what should
+  # have been refused. Every step that commits records what it staged — stage.sh
+  # here, and the roles skill for its per-role commits — so the surface comes
+  # from the record, never from the artifact under suspicion.
+  git reset --soft "$FORK_POINT" || exit 2
 fi
 
 bash "$SCRIPT_DIR/stage.sh" || exit 2
@@ -245,6 +261,38 @@ fi
 LOCAL_SHA="$(git rev-parse --short HEAD)"
 echo "finalize-tick: committed $LOCAL_SHA — $MESSAGE"
 
+# Integration. The commit sits on the fork point, so it is behind a tip that
+# moved while the tick ran; replaying it forward is what makes the delivery a
+# fast-forward honestly instead of by overwriting. A rebase carries the tick's
+# own patch, so a concurrent change inside a file this tick also touched is kept
+# rather than reverted.
+if ! git merge-base --is-ancestor origin/main HEAD 2>/dev/null; then
+  echo "finalize-tick: integrating onto origin/main"
+  if ! git rebase origin/main >/dev/null 2>&1; then
+    git rebase --abort >/dev/null 2>&1 || git rebase --quit >/dev/null 2>&1 || true
+    echo "finalize-tick: integration conflicted; nothing pushed" >&2
+    echo "  The tick's commit $LOCAL_SHA stays local and unpushed. The next tick folds" >&2
+    echo "  and retries it. Conflicting paths need a look if this repeats:" >&2
+    git --no-pager diff --name-only "origin/main...HEAD" 2>/dev/null | sed 's/^/    /' >&2 || true
+    exit 2
+  fi
+  # A rebase rewrites the commit, and authorship is by exact SHA — recording the
+  # new one is what keeps a later tick from reading this tick's own work as
+  # foreign and refusing to fold it forever.
+  if [ -n "$AUTHORED" ]; then
+    git rev-parse HEAD >> "$AUTHORED_SHAS_FILE"
+  fi
+  LOCAL_SHA="$(git rev-parse --short HEAD)"
+  echo "finalize-tick: integrated as $LOCAL_SHA"
+fi
+
+# The rail: nothing may differ from origin/main except what this tick wrote.
+# This is the check that fails loudly if a stale tree ever reaches delivery by
+# some other route — the guarantee does not rest on the fold staying correct.
+if ! python3 "$SCRIPT_DIR/_delivery_check.py" origin/main ".scheduler-state/staged-paths"; then
+  exit 2
+fi
+
 START_BRANCH=""
 if [ -f .scheduler-state/start-branch ]; then
   START_BRANCH="$(cat .scheduler-state/start-branch 2>/dev/null || true)"
@@ -258,7 +306,7 @@ fi
 if ! git_is_branch_name "$START_BRANCH" || [ "$START_BRANCH" = "main" ]; then
   echo "finalize-tick: LOCAL mode (start branch '$START_BRANCH') — direct push to origin/main"
   git push origin main || exit 2
-  rm -f "$AUTHORED_SHAS_FILE"
+  rm -f "$AUTHORED_SHAS_FILE" ".scheduler-state/staged-paths"
   echo "finalize-tick: delivered to origin/main"
   exit 0
 fi
@@ -302,7 +350,7 @@ MERGE_OUT="$(gh pr merge "$PR_NUMBER" --squash --delete-branch --subject "$MESSA
 MERGE_RC=$?
 set -e
 if [ "$MERGE_RC" -eq 0 ]; then
-  rm -f "$AUTHORED_SHAS_FILE"
+  rm -f "$AUTHORED_SHAS_FILE" ".scheduler-state/staged-paths"
   echo "finalize-tick: PR #$PR_NUMBER squash-merged into main; sandbox branch deleted"
   exit 0
 fi
@@ -311,7 +359,7 @@ fi
 # Treat as soft success in that case.
 STATE="$(gh pr view "$PR_NUMBER" --json state --jq .state 2>/dev/null || echo UNKNOWN)"
 if [ "$STATE" = "MERGED" ]; then
-  rm -f "$AUTHORED_SHAS_FILE"
+  rm -f "$AUTHORED_SHAS_FILE" ".scheduler-state/staged-paths"
   echo "finalize-tick: PR #$PR_NUMBER merged but sandbox-branch delete failed; next-tick recovery will clean up"
   echo "$MERGE_OUT" >&2
   exit 0

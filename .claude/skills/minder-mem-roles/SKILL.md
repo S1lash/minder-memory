@@ -774,8 +774,17 @@ it:
 
 ```bash
 git -C "$REPO" diff --cached --quiet || {
-  git -C "$REPO" commit -q -m "roles: {role-id} — {outcome}, {writes} write(s) [scheduled]"
   mkdir -p "$REPO/.scheduler-state"
+  # Record the staged set BEFORE committing — afterwards the index is clean and
+  # there is nothing left to read. `finalize-tick.sh` refuses to push any path
+  # that differs from `origin/main` and appears in no step's record, so a commit
+  # made here without this line would have its own legitimate work refused. The
+  # record is deliberately not derived from the commit: a surface read back out
+  # of the commits it polices would authorise exactly the stale tree it exists
+  # to catch.
+  git -C "$REPO" -c core.quotepath=false diff --cached --name-only \
+    >> "$REPO/.scheduler-state/staged-paths"
+  git -C "$REPO" commit -q -m "roles: {role-id} — {outcome}, {writes} write(s) [scheduled]"
   git -C "$REPO" rev-parse HEAD >> "$REPO/.scheduler-state/authored-shas"
 }
 ```
@@ -975,6 +984,9 @@ second consecutive error reaches the owner's queue.
 - `.scheduler-state/hold-back` — append, only a `secret_leak` path left on
   disk; gitignored, consumed by `stage.sh`
 - `.scheduler-state/authored-shas` — append, one SHA per commit this tick
+- `.scheduler-state/staged-paths` — append, the paths of every per-role commit,
+  recorded before the commit; gitignored, read by `finalize-tick.sh` as the
+  surface this tick is allowed to deliver
   made, written the instant the commit succeeds; gitignored, consumed by
   `finalize-tick.sh` on successful delivery
 - `.scheduler-state/disowned-shas` — append, one SHA per commit found ahead of

@@ -219,7 +219,17 @@ You do not paste these bodies into your scheduler. Each routine gets a
 one-line **loader** instead — it points at the file above, so the tick reads
 its contract from the repository at run time and engine updates reach your
 schedules without you re-pasting anything. The loaders are in
-`docs/scheduling.md` → «Plug-in — Claude Code `/schedule`». Any runner that
+`docs/scheduling.md` → «Plug-in — Claude Code `/schedule`».
+
+**Give every cloud routine a result branch.** In Claude Code `/schedule` that is
+the routine's own branch (`claude/<something>`, one per routine) — the
+configuration field the platform calls the outcome or result branch. With it, a
+tick delivers by pushing to that branch and squash-merging a pull request, so the
+server does the merge: a tick that ran for hours cannot overwrite what arrived
+while it worked, whatever else goes wrong. Without it the tick pushes straight to
+`main`, and although delivery is written to survive that too, the branch removes
+the whole class rather than handling it. A host crontab or a GitHub Action pushes
+to `main` by design and needs no branch — this is about cloud routines. Any runner that
 can launch a Claude Code session with this repository as its working
 directory works: Claude Code `/schedule`, GitHub Actions cron, a host crontab
 calling `claude` headless.
@@ -273,6 +283,17 @@ and they accumulate.
 This is a one-time toggle per repository. Local cron / launchd setups
 do not strictly need it (LOCAL delivery mode pushes directly to `main`
 with no PR involved), but enabling it does no harm.
+
+### Your timezone, on the roles routine
+
+Set `TZ` to your IANA zone in the routine's environment config —
+`TZ=Europe/Berlin`, `TZ=America/New_York`. A role's cadence counts days,
+and a cloud run has no idea where you live, so without this it counts
+them in UTC and a `daily` role's day turns over at midnight UTC instead
+of yours. Set it when you create the routine: the symptom afterwards is
+a hand-started run that says `already ran on this local date` on what
+your calendar calls a new day. Details in
+[`scheduling.md`](scheduling.md).
 
 ### Push credentials
 

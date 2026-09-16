@@ -2,6 +2,67 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.2.0 — A scheduled run can no longer delete a day of your notes
+
+A nightly run that took a long time could erase everything that arrived while it
+worked. It happens like this: the run notes where your base stands, works for
+hours, and then delivers. If another run has delivered in the meantime, the slow
+one was putting back the picture it had taken at the start — records, notes and
+recordings you had not processed yet, gone in a single delivery that git had no
+reason to refuse. Nothing looked wrong afterwards, because the same delivery also
+rolled back the log entries that would have mentioned them, and the next run
+looked at the emptied inbox and correctly reported that there was nothing to do.
+
+Delivery is fixed at the root: a run now hands over only its own work, replayed on
+top of whatever arrived, so two runs that touch the same file keep both changes
+instead of one erasing the other. On top of that there is a check that refuses to
+deliver at all if anything outside the run's own work would move — the guarantee
+no longer rests on the fix alone staying correct.
+
+**Your base is repaired on this update, from your own history.** The update finds
+any such delivery in the whole history of your clone and puts the content back
+into your working tree, uncommitted, so `git diff` shows you exactly what
+returned; then it tells you to save it, and to run processing for any recording
+that was lost before it had been processed at all. A file that both sides changed
+in a way no rule settles is never guessed — it is handed to the assistant running
+your update to resolve on the spot, and only what even that cannot settle reaches
+your clarifications queue. If you would rather look first, set
+`MINDER_MEMORY_NO_AUTO_RECOVER=1` and the update only reports.
+
+An intentional revert of your own looks identical to this defect from the
+outside — a file going back to an older version — so nothing is written on
+resemblance. A repair needs proof: the commit has to come from a scheduled run,
+match an earlier snapshot everywhere it wrote nothing itself, carry its own work
+on top, which a revert never does, and have undone somebody else's work, which a
+run rolling back its own previous output has not.
+
+Some commits cannot be settled either way — two runs of the same kind racing
+each other look exactly like a run deliberately undoing itself, and the history
+holds nothing that separates them. Those are named to you, with the command that
+shows what a repair would write without writing it. They are neither repaired
+nor passed over quietly: the one outcome worse than either would be reporting a
+damaged base as clean.
+
+The nightly lint now watches for it too, so a delivery like this cannot go
+unnoticed again for days — including on a clone that has not taken this update
+yet.
+
+**Tell your roles routine where you live.** A role's cadence counts days, and a
+scheduled run in the cloud has no idea what your timezone is, so it counts them
+in UTC — a `daily` role's day turns over at midnight UTC rather than at yours.
+Set `TZ` to your zone in the routine's environment config. Your scheduled ticks
+were always fine; what this fixes is a run you start by hand finding that the
+day has not turned over yet.
+
+**A standing role no longer waits for you to approve its own page.** A role that
+publishes the page it maintains was asking permission on every scheduled run —
+and a scheduled run has nobody to answer, so it waited out its whole time and
+delivered nothing, quietly, for as long as that went unnoticed. Your consent for
+that belongs at the moment you create the role, not in the middle of a run at
+four in the morning, so the engine now settles it for you. The permission is
+narrow on purpose: it covers a page published from inside a role's own folder,
+and nothing else — anything a role tries to publish elsewhere still asks.
+
 ## 1.1.3 — What you approve goes through processing
 
 Knowledge you approve while resolving clarifications is no longer written as a

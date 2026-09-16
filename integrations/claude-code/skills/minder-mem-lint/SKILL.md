@@ -1050,6 +1050,57 @@ comparison that never happened.
   that is being used at all — and on a base that is not, the window simply
   never reports, which is the correct silence.
 
+**A.15 Reverted-delivery backstop:**
+
+The fourth check in the A.12 family, and the only one that watches for content
+that was **taken away**. A scheduler tick that ran long folds its commits onto an
+`origin/main` that moved while it worked; the fold reinstates the tick's own
+starting snapshot on top of everything that arrived, and the push is a
+fast-forward nothing refuses. Because the state files are rolled back in the same
+commit as the work they describe, every other scan is right about what it can
+read: `BATCH_LOG` reconciles, A.12 sees no un-integrated batch, the manifests that
+survive validate, and every remaining file is well-formed. What is missing is an
+event. Worse, the loss is self-concealing — the next process tick looks at the
+emptied inbox and correctly reports that there was nothing to process.
+
+- **The command.** Detection lives in one place and this scan calls it; a second
+  implementation here would be the reason the two disagree later.
+
+  ```
+  python3 scripts/recover_reverted_ticks.py detect --since "26 hours ago"
+  ```
+
+- **The finding.** Each commit the tool reports as proven → one aggregate
+  `scheduler-tick-reverted-content` CLARIFICATION naming the commits, their stale
+  base, and how many paths each reverted. Never one item per path: a single
+  delivery reverts scores of them.
+- **Three classes, and only one of them is a confirmed loss.** The tool judges each
+  candidate rather than printing everything that matches a shape, and `--json`
+  carries its verdict per commit:
+  - `proven` — scheduler provenance, the stale-tree shape, the tick's own work on
+    top, and somebody else's work in the interval it reverted. This is the class
+    above, and the only one raised as a loss.
+  - `needs_review` — everything but the last condition. A run rolling back its own
+    previous output and two ticks of the same tag racing each other are identical
+    in the history and opposite in meaning, so the commit goes into the SAME
+    aggregate item, explicitly as a commit needing the owner's verdict rather than
+    a confirmed loss. Do not drop it: silence here is how a real incident gets
+    reported as a clean base.
+  - neither — an ordinary deliberate revert, which restores an ancestor's tree
+    exactly with no own work on top. *Reported on stderr and never raised* — the
+    corpus contains such commits, and a scan that raised them would teach the
+    owner to ignore this one.
+- **Never autofixed, and deliberately not by lint.** The repair is
+  `scripts/recover_reverted_ticks.py apply`, which writes into the working tree
+  for the owner to review. Restoring records and notes is outside lint's write
+  territory, and the restoration plus the reconciliation of the state files that
+  describe it is one decision, not two — a pipeline that silently performed half
+  of it would hide the other half.
+- **The window, and who does the deep pass.** 26 h here, the same buffer A.12 and
+  Scan H use. The whole-history pass belongs to migration `035`, which runs once
+  per clone; this scan is the standing watch for everything after it, including a
+  clone still running a tick that has not taken the delivery fix.
+
 ### Scan B — Thread Lifecycle
 
 **B.1 Stale thread detection per-status:**

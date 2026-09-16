@@ -72,7 +72,9 @@ _SCHEDULER_SCRIPTS = (
     "stage.sh",
     "finalize-tick.sh",
     "ship-failure-note.sh",
+    "pin-main.sh",
     "_classify_paths.py",
+    "_delivery_check.py",
 )
 
 
@@ -99,7 +101,14 @@ def _seed_repo(tmp_path: Path) -> tuple[Path, Path]:
     (work / "zettelkasten" / "_records").mkdir(parents=True)
     (work / "zettelkasten" / "_system" / "state").mkdir(parents=True)
 
-    _git(work, "add", ".engine-manifest.yml", "scripts/scheduler/", "scripts/lib/")
+    # Production ignores the scheduler's own state directory. Without it here,
+    # `.scheduler-state/authored-shas` is staged as owner data and lands in the
+    # delivery commit — which both misreports what a tick delivered and hides a
+    # path-set check behind noise the real repository never has.
+    with open(work / ".gitignore", "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(".scheduler-state/\n")
+
+    _git(work, "add", ".gitignore", ".engine-manifest.yml", "scripts/scheduler/", "scripts/lib/")
     _git(work, "commit", "-q", "-m", "initial")
     _git(work, "push", "-q", "-u", "origin", "main")
     return work, origin
@@ -461,6 +470,276 @@ def test_routines_mode_push_to_sandbox_and_pr_merge(tmp_path: Path) -> None:
     )
     assert "scheduler/process:" in main_log.stdout
     assert "[scheduled]" in main_log.stdout
+
+
+def _second_clone(tmp_path: Path, origin: Path, name: str) -> Path:
+    """A clone of `origin` that is guaranteed to be on `main`.
+
+    `git clone` of a repository whose HEAD points at a branch the clone cannot
+    resolve leaves the checkout on no branch at all ("remote HEAD refers to
+    nonexistent ref"), and a later `git push origin main` then fails with nothing
+    to push. That passed locally on a git that guessed `main` anyway and failed in
+    CI — so the branch is asserted here rather than assumed.
+    """
+    other = tmp_path / name
+    subprocess.run(["git", "clone", "-q", str(origin), str(other)], check=True)
+    _git(other, "config", "user.email", "test@example.com")
+    _git(other, "config", "user.name", "test")
+    _git(other, "checkout", "-q", "-B", "main", "origin/main")
+    # `symbolic-ref --short -q`, never `rev-parse --abbrev-ref`: the latter prints
+    # the literal string `HEAD` on a detached checkout, so it would report success
+    # in precisely the state this assertion exists to catch. The engine's own
+    # portability gate names this rule — and caught this line when I wrote it the
+    # wrong way.
+    branch = _git(other, "symbolic-ref", "--short", "-q", "HEAD", check=False).stdout.strip()
+    assert branch == "main", f"second clone is on {branch or 'a detached HEAD'!r}, not main"
+    return other
+
+
+def _clone_and_push(tmp_path: Path, origin: Path, rel: str, body: str, subject: str) -> None:
+    """A second clone delivers while the tick under test is still running."""
+    other = _second_clone(tmp_path, origin, f"other-{abs(hash(rel)) % 10000}")
+    target = other / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body, encoding="utf-8")
+    _git(other, "add", "-A")
+    _git(other, "commit", "-q", "-m", subject)
+    _git(other, "push", "-q", "origin", "main")
+
+
+def test_delivery_never_reverts_a_push_that_landed_mid_tick(tmp_path: Path) -> None:
+    """The defect, pinned: the fold must not reinstate the tick's starting tree.
+
+    A tick pins `origin/main`, commits its own work, and only then a concurrent
+    tick delivers. Folding onto the fetched tip commits the stale index over it,
+    which is how six real deliveries erased a day of records each.
+    """
+    work, origin = _seed_repo(tmp_path)
+
+    (work / "zettelkasten/_system/state/log_lint.md").write_text("tick work\n", encoding="utf-8")
+    _git(work, "add", "-A")
+    _git(work, "commit", "-q", "-m", "roles: one — ok, 1 write(s) [scheduled]")
+    state = work / ".scheduler-state"
+    state.mkdir(exist_ok=True)
+    (state / "authored-shas").write_text(
+        _git(work, "rev-parse", "HEAD").stdout.strip() + "\n", encoding="utf-8")
+
+    _clone_and_push(tmp_path, origin, "zettelkasten/_records/concurrent.md", "keep me\n",
+                    "scheduler/process: 1 record(s) updated [scheduled]")
+
+    result = _run_script(work, "finalize-tick.sh", "scheduler/roles")
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+
+    survived = subprocess.run(
+        ["git", "show", "main:zettelkasten/_records/concurrent.md"],
+        cwd=origin, capture_output=True, text=True, encoding="utf-8")
+    assert survived.returncode == 0, "the concurrent record was deleted from origin/main"
+    assert "keep me" in survived.stdout
+
+    delivered = subprocess.run(
+        ["git", "show", "main:zettelkasten/_system/state/log_lint.md"],
+        cwd=origin, capture_output=True, text=True, encoding="utf-8")
+    assert delivered.returncode == 0 and "tick work" in delivered.stdout, (
+        "the tick's own work must still be delivered")
+
+
+def test_a_stale_version_of_a_staged_file_cannot_reach_origin(tmp_path: Path) -> None:
+    """The hard case: the victim file IS in the tick's own surface.
+
+    A path allowlist cannot help here — the tick legitimately handled that file, so
+    membership proves nothing about the content. What protects the concurrent change
+    is the integration step: the tick's patch is replayed onto the moved tip, and a
+    tick carrying a pre-concurrent version of the same lines conflicts instead of
+    overwriting. This test exists because the earlier one kept the victim OUT of the
+    surface and therefore only exercised path membership.
+    """
+    work, origin = _seed_repo(tmp_path)
+    (work / "zettelkasten/_records/shared.md").write_text("line one\n", encoding="utf-8")
+    _git(work, "add", "-A")
+    _git(work, "commit", "-q", "-m", "seed shared file")
+    _git(work, "push", "-q", "origin", "main")
+
+    (work / "zettelkasten/_records/shared.md").write_text(
+        "line one\ntick line\n", encoding="utf-8")
+    _git(work, "add", "zettelkasten/_records/shared.md")
+    state = work / ".scheduler-state"
+    state.mkdir(exist_ok=True)
+    (state / "staged-paths").write_text(
+        "zettelkasten/_records/shared.md\n", encoding="utf-8")
+    _git(work, "commit", "-q", "-m", "roles: one — ok [scheduled]")
+    (state / "authored-shas").write_text(
+        _git(work, "rev-parse", "HEAD").stdout.strip() + "\n", encoding="utf-8")
+
+    _clone_and_push(tmp_path, origin, "zettelkasten/_records/shared.md",
+                    "line one\nCONCURRENT LINE\n",
+                    "scheduler/process: 1 record(s) updated [scheduled]")
+
+    result = _run_script(work, "finalize-tick.sh", "scheduler/roles")
+    assert result.returncode != 0, (
+        "a tick whose tree predates the concurrent change must not deliver:\n"
+        f"stdout={result.stdout}\nstderr={result.stderr}")
+
+    delivered = subprocess.run(
+        ["git", "show", "main:zettelkasten/_records/shared.md"],
+        cwd=origin, capture_output=True, text=True, encoding="utf-8")
+    assert "CONCURRENT LINE" in delivered.stdout, (
+        "the concurrent content must still be what origin/main holds")
+
+
+def test_delivery_refuses_a_change_the_tick_never_staged(tmp_path: Path) -> None:
+    """The invariant is on content: a path the tick never wrote may not move.
+
+    Path membership is not the check — this plants a deletion inside the tick's
+    own commit, which a path-level subset test would wave through as soon as the
+    file appears in the staged set.
+    """
+    work, origin = _seed_repo(tmp_path)
+    (work / "zettelkasten/_records/owner-note.md").write_text("owner\n", encoding="utf-8")
+    _git(work, "add", "-A")
+    _git(work, "commit", "-q", "-m", "seed owner note")
+    _git(work, "push", "-q", "origin", "main")
+
+    (work / "zettelkasten/_records/owner-note.md").unlink()
+    (work / "zettelkasten/_system/state/log_lint.md").write_text("tick\n", encoding="utf-8")
+    _git(work, "add", "-A")
+    _git(work, "commit", "-q", "-m", "roles: one — ok [scheduled]")
+    state = work / ".scheduler-state"
+    state.mkdir(exist_ok=True)
+    (state / "authored-shas").write_text(
+        _git(work, "rev-parse", "HEAD").stdout.strip() + "\n", encoding="utf-8")
+    (state / "staged-paths").write_text(
+        "zettelkasten/_system/state/log_lint.md\n", encoding="utf-8")
+
+    result = _run_script(work, "finalize-tick.sh", "scheduler/roles")
+    assert result.returncode == 2, f"stdout={result.stdout}\nstderr={result.stderr}"
+    assert "owner-note" in result.stderr
+
+    still_there = subprocess.run(
+        ["git", "show", "main:zettelkasten/_records/owner-note.md"],
+        cwd=origin, capture_output=True, text=True, encoding="utf-8")
+    assert still_there.returncode == 0, "nothing may be pushed when the invariant trips"
+
+
+def test_pinning_moves_a_clean_main_forward_and_leaves_local_commits_alone(
+        tmp_path: Path) -> None:
+    """Both halves of pinning, because fixing one of them broke the other.
+
+    Removing the rebase stopped the SHA-identity wedge and also stopped the tree
+    from advancing at all — so a tick with nothing of its own read yesterday's
+    inbox, state and registries, and no careful delivery afterwards can undo a
+    decision taken on stale input. A clean main fast-forwards; a main carrying the
+    tick's own commits is left exactly as it is.
+    """
+    work, origin = _seed_repo(tmp_path)
+    _clone_and_push(tmp_path, origin, "zettelkasten/_records/arrived.md", "new\n",
+                    "scheduler/process: 1 record(s) updated [scheduled]")
+
+    result = _run_script(work, "pin-main.sh")
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+    assert "fast-forwarded" in result.stdout
+    assert (work / "zettelkasten/_records/arrived.md").exists(), (
+        "the tick must see what arrived before it starts working")
+
+    # Now the tick has work of its own, and a further push lands upstream.
+    (work / "zettelkasten/_system/state/log_lint.md").write_text("mine\n", encoding="utf-8")
+    _git(work, "add", "-A")
+    _git(work, "commit", "-q", "-m", "roles: one — ok [scheduled]")
+    mine = _git(work, "rev-parse", "HEAD").stdout.strip()
+    _clone_and_push(tmp_path, origin, "zettelkasten/_records/later.md", "later\n",
+                    "scheduler/process: 1 record(s) updated [scheduled]")
+
+    second = _run_script(work, "pin-main.sh")
+    assert second.returncode == 0, f"stdout={second.stdout}\nstderr={second.stderr}"
+    assert _git(work, "rev-parse", "HEAD").stdout.strip() == mine, (
+        "the tick's own commit must not be rewritten or dropped by pinning")
+
+
+def test_a_stale_tick_cannot_overwrite_what_arrived_while_it_ran(tmp_path: Path) -> None:
+    """The defect where it actually lives: the tick's tree is older than the tip.
+
+    Not "a tick wrote something wrong" — no rail can tell that from legitimate
+    work, because the tick staged the content itself and only the owner knows what
+    was meant. The defect is narrower and mechanical: the tick's commit carries a
+    version of a file from BEFORE a concurrent change that has since been
+    delivered. Replaying the tick's own patch onto the moved tip is what keeps the
+    concurrent content, and this test is what proves it does.
+    """
+    work, origin = _seed_repo(tmp_path)
+    (work / "zettelkasten/_records/shared.md").write_text("line one\n", encoding="utf-8")
+    _git(work, "add", "-A")
+    _git(work, "commit", "-q", "-m", "seed shared file")
+    _git(work, "push", "-q", "origin", "main")
+
+    # The tick pins here and appends its own line, knowing nothing of what follows.
+    (work / "zettelkasten/_records/shared.md").write_text(
+        "line one\ntick line\n", encoding="utf-8")
+    _git(work, "add", "-A")
+    _git(work, "commit", "-q", "-m", "roles: one — ok [scheduled]")
+    state = work / ".scheduler-state"
+    state.mkdir(exist_ok=True)
+    (state / "authored-shas").write_text(
+        _git(work, "rev-parse", "HEAD").stdout.strip() + "\n", encoding="utf-8")
+    (state / "staged-paths").write_text(
+        "zettelkasten/_records/shared.md\n", encoding="utf-8")
+
+    # Meanwhile another clone prepends its own line to the same file and delivers.
+    other = _second_clone(tmp_path, origin, "other-shared")
+    (other / "zettelkasten/_records/shared.md").write_text(
+        "concurrent line\nline one\n", encoding="utf-8")
+    _git(other, "add", "-A")
+    _git(other, "commit", "-q", "-m", "scheduler/process: 1 record(s) updated [scheduled]")
+    _git(other, "push", "-q", "origin", "main")
+
+    result = _run_script(work, "finalize-tick.sh", "scheduler/roles")
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+
+    delivered = subprocess.run(
+        ["git", "show", "main:zettelkasten/_records/shared.md"],
+        cwd=origin, capture_output=True, text=True, encoding="utf-8")
+    assert delivered.returncode == 0, delivered.stderr
+    assert "concurrent line" in delivered.stdout, "the concurrent change was overwritten"
+    assert "tick line" in delivered.stdout, "the tick's own work was lost"
+
+
+def test_a_failed_tick_survives_the_next_pinning(tmp_path: Path) -> None:
+    """Authorship must outlive pinning, or a stuck tick stays stuck forever.
+
+    `pin-main.sh` used to replay local commits, which rewrote their SHAs — and
+    finalize authorises by exact SHA, so the rewritten commit read as unauthored
+    and every later tick refused to touch it.
+    """
+    work, origin = _seed_repo(tmp_path)
+
+    (work / "zettelkasten/_system/state/log_lint.md").write_text("first try\n", encoding="utf-8")
+    _git(work, "add", "-A")
+    _git(work, "commit", "-q", "-m", "roles: one — ok [scheduled]")
+    state = work / ".scheduler-state"
+    state.mkdir(exist_ok=True)
+    (state / "authored-shas").write_text(
+        _git(work, "rev-parse", "HEAD").stdout.strip() + "\n", encoding="utf-8")
+    # The real flow records a path when the step stages it, and the record survives
+    # until a delivery succeeds — which is what lets a retried tick still prove its
+    # own work. Writing it here is what makes this fixture the failed-tick case
+    # rather than a tick whose record was lost.
+    (state / "staged-paths").write_text(
+        "zettelkasten/_system/state/log_lint.md\n", encoding="utf-8")
+
+    _clone_and_push(tmp_path, origin, "zettelkasten/_records/later.md", "later\n",
+                    "scheduler/process: 1 record(s) updated [scheduled]")
+
+    pinned = _run_script(work, "pin-main.sh")
+    assert pinned.returncode == 0, f"stdout={pinned.stdout}\nstderr={pinned.stderr}"
+
+    result = _run_script(work, "finalize-tick.sh", "scheduler/roles")
+    assert result.returncode == 0, (
+        "the tick's own commit must still be recognised after pinning:\n"
+        f"stdout={result.stdout}\nstderr={result.stderr}")
+
+    for rel, needle in (("zettelkasten/_records/later.md", "later"),
+                        ("zettelkasten/_system/state/log_lint.md", "first try")):
+        got = subprocess.run(["git", "show", f"main:{rel}"], cwd=origin,
+                             capture_output=True, text=True, encoding="utf-8")
+        assert got.returncode == 0 and needle in got.stdout, rel
 
 
 def test_routines_mode_gh_missing_fails_gracefully(tmp_path: Path) -> None:

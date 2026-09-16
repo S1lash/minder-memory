@@ -10,8 +10,29 @@ fetch + checkout. One file per breaking engine change.
 - Each script is idempotent. The runner records every attempt in the ledger at
   repo root and never re-runs a migration that succeeded.
 - Scripts run from the repo root. They may rewrite files, move paths,
-  or print upgrade instructions for the user. They MUST NOT touch
-  user-data paths (records, knowledge, registries, SOUL, constitution).
+  or print upgrade instructions for the user. **Owner data — records, knowledge,
+  registries, SOUL, constitution — is off limits, with one narrow exception, and
+  the exception is a decision rather than a judgment call in the moment
+  (ADR-029, ADR-030).** A migration may write owner data only when all of these
+  hold:
+
+  1. **The engine's own defect caused the state it repairs.** Not a shape the
+     engine would prefer, not a convention that changed — damage this code did.
+  2. **The repair is computed from the clone itself, and invents nothing.** The
+     content comes from that clone's own history or from a deterministic
+     transformation of what is already there.
+  3. **It is deterministic and idempotent**, so a second run is a no-op and two
+     clones with the same history get the same result.
+  4. **It refuses rather than guesses.** Anything a rule does not settle is left
+     alone and handed to the agent running the update, or to the owner.
+  5. **`git` undoes it in one step**, which means it never writes into a file
+     carrying the owner's uncommitted work — there the two could not be
+     separated afterwards.
+
+  The two that qualify today are `032` (the product rename: one token map over
+  the clone) and `035` (returning content a stale scheduler delivery deleted).
+  Anything that does not meet all five reports and asks; that is the default, and
+  the exception is deliberately hard to reach.
 - Keep migrations small and reversible.
 - **Declared kind — `structural` vs `heal`.** Every migration states, in a
   header comment on the second line, what its failure means:
