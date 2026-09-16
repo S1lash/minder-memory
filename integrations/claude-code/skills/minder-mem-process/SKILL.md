@@ -1552,7 +1552,8 @@ SKILL contract is non-blocking.
 > minimal frontmatter mutation:
 >
 > 1. Read the note's existing frontmatter via
->    `_common.py::read_frontmatter`.
+>    `_common.py::read_frontmatter` — it returns a `(frontmatter, body)`
+>    tuple, or None.
 > 2. Replace the `concepts:` array verbatim with the matcher output
 >    (each entry already passed through `normalize_concept_name`).
 > 3. Apply `domain_resolutions[]` against the note's `domains:` list:
@@ -1970,7 +1971,7 @@ If minor:
 
 After creating EACH file with frontmatter + body that the subagent writes (record, knowledge note, or hub), verify:
 
-- [ ] **Frontmatter fence integrity (deterministic — the load-bearing check).** The frontmatter `---` fence closes BEFORE any `## ` body heading. Verify with `_common.frontmatter_closed_before_body(path)` returning True AND `_common.read_frontmatter(path)` returning non-None. On failure a body heading (typically `## Evidence Trail`) was written before the closing `---` and captured into the YAML — re-emit the note moving the closing `---` to sit immediately after the last frontmatter field and before the first `## ` heading, then re-verify. Deterministic autofix, never a CLARIFICATION. This is the load-bearing check: a valid-YAML self-assertion cannot catch a comment-tolerated misplaced fence, but the helper's column-0 line invariant can. Applies to every note the run writes — both freshly created and updated in place (e.g. the idea Living-Document append).
+- [ ] **Frontmatter fence integrity (deterministic — the load-bearing check).** The frontmatter `---` fence closes BEFORE any `## ` body heading. Verify with `python3 _system/scripts/check_frontmatter_fence.py <path>...` (from `zettelkasten/`; status `ok` per path) — never re-compose the underlying `_common` calls inline. On `fence-misplaced` a body heading (typically `## Evidence Trail`) was written before the closing `---` and captured into the YAML — re-emit the note moving the closing `---` to sit immediately after the last frontmatter field and before the first `## ` heading, then re-verify. Deterministic autofix, never a CLARIFICATION. This is the load-bearing check: a valid-YAML self-assertion cannot catch a comment-tolerated misplaced fence, but the helper's column-0 line invariant can. Applies to every note the run writes — both freshly created and updated in place (e.g. the idea Living-Document append).
 - [ ] Frontmatter has all required fields present
 - [ ] `layer:` field is correct — `record` for records, `knowledge` for knowledge notes
 - [ ] People IDs in `people:` exist in PEOPLE.md OR will be created in Step 3.8
@@ -2573,7 +2574,7 @@ POSTS.md tracks only published posts.
 Run these checks over the ENTIRE processing run's output:
 
 - [ ] Count match: every transcript-grounded source produced exactly one record (kind = meeting | observation per Q9 routing)
-- [ ] **Fence integrity (batch-wide, defence-in-depth):** for every file created OR updated in this run that carries frontmatter + body — knowledge notes, records, **hubs (`5_meta/mocs/`), and person profiles (`3_resources/people/`)** — `_common.frontmatter_closed_before_body(path)` is True and `_common.read_frontmatter(path)` is non-None. Any failure is repaired via `_common.repair_misplaced_fence(path)`; if repair returns False (ambiguous shape), raise a `frontmatter-fence-misplaced` CLARIFICATION rather than shipping an unparseable file. The same corruption (a `## ` body heading captured inside the YAML) can occur in any LLM-composed file, not only knowledge notes.
+- [ ] **Fence integrity (batch-wide, defence-in-depth):** for every file created OR updated in this run that carries frontmatter + body — knowledge notes, records, **hubs (`5_meta/mocs/`), and person profiles (`3_resources/people/`)** — pass every such path to `python3 _system/scripts/check_frontmatter_fence.py --repair <path>...` (or newline-separated on stdin with `--stdin`). `ok` and `repaired` pass; `fence-misplaced` after `--repair` means the shape was ambiguous and nothing was written — raise a `frontmatter-fence-misplaced` CLARIFICATION rather than shipping an unparseable file; `yaml-invalid` → `frontmatter-unfixable-schema`. The same corruption (a `## ` body heading captured inside the YAML) can occur in any LLM-composed file, not only knowledge notes.
 - [ ] No orphan path-link Evidence Trails: every new knowledge note's `## Evidence Trail` wikilink points at a record-id or note-id, never at `_sources/...`
 - [ ] No orphan extracted_from: every `extracted_from:` reference points to an existing record
 - [ ] All hubs exist: every hub referenced in notes exists as a file in `5_meta/mocs/`

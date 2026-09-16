@@ -2,6 +2,16 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.3.1 — Note checks in scheduled runs stop tripping over themselves
+
+After writing notes, a scheduled run checks that each one's header is intact.
+The run used to write that check itself on every run, and sometimes got its own
+code wrong — a failed command in the run log, then a second attempt that
+worked. No note was ever affected, but the noise hid whether a real problem had
+been found. The check is now a ready-made script the run calls, so a failure in
+the log means a note needs attention and nothing else. Nothing to do on your
+side: the next scheduled run uses it.
+
 ## 1.3.0 — Every scheduled delivery says what it was built on
 
 A scheduled run now writes one more line into the commit it delivers: which

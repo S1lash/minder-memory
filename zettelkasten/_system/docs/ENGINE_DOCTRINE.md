@@ -208,7 +208,8 @@ Layers currently qualifying:
   Applied by `/minder:mem:process` §0.0a; `/minder:mem:lint` A.10 is the backstop.
   Ambiguous shapes surface as `source-layout-split-name` CLARIFICATIONs.
 - **Frontmatter fence repair** — `frontmatter_closed_before_body` /
-  `repair_misplaced_fence` (single SoT: `_common.py`). Relocates a `## `
+  `repair_misplaced_fence` (single SoT: `_common.py`; skills run it through
+  `check_frontmatter_fence.py`, never inline). Relocates a `## `
   body heading (typically `## Evidence Trail`) that a producer captured
   inside the YAML fence. Three-property check: (1) deterministic — pure
   line-surgery, same output on re-run; (2) conservative-safe — on any

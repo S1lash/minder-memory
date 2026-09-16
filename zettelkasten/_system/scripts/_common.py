@@ -1561,15 +1561,17 @@ class Principle:
 _FRONTMATTER_RE = re.compile(r"^---\r?\n(.*?)\r?\n---\r?\n?(.*)$", re.DOTALL)
 
 
-def read_frontmatter(path: Path) -> tuple[dict, str] | None:
+def read_frontmatter(path: str | os.PathLike) -> tuple[dict, str] | None:
     """Generic frontmatter reader used by lint helpers.
 
-    Returns (frontmatter_dict, body_text) or None when the file has no
+    Accepts a ``str`` or any path-like. Returns a TUPLE —
+    ``fm, body = read_frontmatter(path)`` — or None when the file has no
     frontmatter block, the YAML cannot be parsed, or the YAML root is
     not a mapping. Tolerant of read errors (returns None) — the caller
     decides whether to skip silently or propagate. Distinct from
     `parse_file()` which is principle-schema-aware.
     """
+    path = Path(path)
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
@@ -1586,7 +1588,7 @@ def read_frontmatter(path: Path) -> tuple[dict, str] | None:
     return fm, m.group(2)
 
 
-def write_frontmatter(path: Path, fm: dict, body: str) -> None:
+def write_frontmatter(path: str | os.PathLike, fm: dict, body: str) -> None:
     """Round-trip frontmatter back to disk preserving body verbatim.
 
     YAML serialised with sort_keys=False, default_flow_style=False,
@@ -1597,7 +1599,7 @@ def write_frontmatter(path: Path, fm: dict, body: str) -> None:
         fm, sort_keys=False, default_flow_style=False,
         allow_unicode=True, width=10000,
     ).rstrip("\n")
-    path.write_text(f"---\n{yaml_text}\n---\n{body}", encoding="utf-8")
+    Path(path).write_text(f"---\n{yaml_text}\n---\n{body}", encoding="utf-8")
 
 
 def append_frontmatter_list_value(
@@ -1704,7 +1706,7 @@ def apply_hub_trio(
     }
 
 
-def frontmatter_closed_before_body(path: Path) -> bool:
+def frontmatter_closed_before_body(path: str | os.PathLike) -> bool:
     """True when the YAML fence closes before any body ``## `` heading.
 
     Detects the producer corruption where a body section (e.g.
@@ -1729,6 +1731,7 @@ def frontmatter_closed_before_body(path: Path) -> bool:
     False when a ``## `` heading appears before the closing fence, or the
     opening fence never closes.
     """
+    path = Path(path)
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
@@ -1745,7 +1748,7 @@ def frontmatter_closed_before_body(path: Path) -> bool:
     return False  # opening fence never closes
 
 
-def repair_misplaced_fence(path: Path) -> bool:
+def repair_misplaced_fence(path: str | os.PathLike) -> bool:
     """Deterministically move a misplaced closing fence above the body.
 
     For a note broken per :func:`frontmatter_closed_before_body` — where
@@ -1763,6 +1766,7 @@ def repair_misplaced_fence(path: Path) -> bool:
     notes are left for a CLARIFICATION rather than risk silent content
     mutation. Idempotent: re-running on a repaired note is a no-op True.
     """
+    path = Path(path)
     if frontmatter_closed_before_body(path):
         # No misplaced fence. True only if the note actually parses — a
         # clean fence with unrelated broken YAML is not this helper's to fix.

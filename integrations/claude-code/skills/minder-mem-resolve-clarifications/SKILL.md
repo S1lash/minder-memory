@@ -520,7 +520,7 @@ queue.
      `cited_records` for `open_thread_add`) resolves to a knowledge
      note or record whose frontmatter `types:` array contains
      `decision`. Use `_system/scripts/_common.py::read_frontmatter` to
-     read each cited path; treat unparseable / missing frontmatter as
+     read each cited path (it returns a `(frontmatter, body)` tuple, or None); treat unparseable / missing frontmatter as
      «not values-bearing» (fail-closed for inclusion).
    - SOUL focus match (best-effort, optional layer). When a SOUL
      focus extractor exists in `_system/scripts/`, additionally check

@@ -581,9 +581,9 @@ LLM error:
 A Stage 2 output is an LLM-composed file (frontmatter + `## Observation N` body) —
 structurally identical to a knowledge note, so it carries the same risk of a `## `
 body heading being captured inside the YAML fence (breaks `yaml.safe_load`). Before
-the schema branches: `_common.frontmatter_closed_before_body(path)` must be True AND
-`_common.read_frontmatter(path)` non-None. On failure, attempt
-`_common.repair_misplaced_fence(path)`; if it still does not parse, treat as a
+the schema branches, run `python3 _system/scripts/check_frontmatter_fence.py --repair <path>`
+(from `zettelkasten/`) — it applies both fence helpers and the deterministic repair,
+so they are never re-composed inline. Any status other than `ok` / `repaired` is a
 validator **Fail** (save to rejected, do not write to `_system/agent-lens/`) — never
 ship an unparseable observation file. Deterministic, no LLM.
 

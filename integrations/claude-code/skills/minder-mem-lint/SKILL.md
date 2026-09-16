@@ -238,10 +238,10 @@ Suppression applies к ALL scans (A–H) producing surfaced-tier CLARIFICATIONS.
 - Missing `layer:` → infer from folder path (`strong` → silent)
 - Missing `tags:` → empty list `tags: []` (`strong` → silent)
 - `tags:` string not list → wrap in list (`strong` → silent)
-- Frontmatter invalid YAML → **first attempt deterministic fence repair** via `_common.repair_misplaced_fence(path)`. This fixes the producer corruption where a `## ` body heading (typically `## Evidence Trail` and its `- **date** …` bullet) was written inside the frontmatter fence, captured into the YAML, and broke `yaml.safe_load`. Detection is `_common.frontmatter_closed_before_body(path)` False AND `_common.read_frontmatter(path)` None.
-  - Repair returns True → `strong` → silent autofix, fix-id `frontmatter-fence-repair-autofix` logged in `log_lint.md` (same shape as other Scan A fixes).
-  - Repair returns False (ambiguous split point) → `weak`, CLARIFICATION `frontmatter-fence-misplaced`.
-  - Invalid YAML for any other reason (not a misplaced fence) → `weak`, CLARIFICATION `frontmatter-unfixable-schema`.
+- Frontmatter invalid YAML → **first attempt deterministic fence repair** via `check_frontmatter_fence.py --repair`. This fixes the producer corruption where a `## ` body heading (typically `## Evidence Trail` and its `- **date** …` bullet) was written inside the frontmatter fence, captured into the YAML, and broke `yaml.safe_load`. Detection and repair are one call: `python3 _system/scripts/check_frontmatter_fence.py --repair <path>...` (from `zettelkasten/`), which applies `_common.frontmatter_closed_before_body` AND `_common.read_frontmatter` and relocates the fence via `repair_misplaced_fence` — never re-compose those calls inline.
+  - Status `repaired` → `strong` → silent autofix, fix-id `frontmatter-fence-repair-autofix` logged in `log_lint.md` (same shape as other Scan A fixes).
+  - Status `fence-misplaced` (ambiguous split point, nothing written) → `weak`, CLARIFICATION `frontmatter-fence-misplaced`.
+  - Status `yaml-invalid` (not a misplaced fence) → `weak`, CLARIFICATION `frontmatter-unfixable-schema`.
 
 **A.3 Duplicate hub bullets:**
 - For each hub в `5_meta/mocs/`, scan `## Открытые вопросы` for exact-duplicate bullets (same wikilink + same text)
