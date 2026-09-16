@@ -133,7 +133,8 @@ instead:
 
 1. `git push origin HEAD:<sandbox-branch>` (proxy-allowed).
 2. `gh pr create --base main --head <sandbox-branch>`.
-3. `gh pr merge --squash --delete-branch`.
+3. `gh pr merge --squash --delete-branch` with an explicit commit body — left
+   empty, GitHub writes its own and credits the sandbox's commit author.
 
 End state: `main` has one squash commit, sandbox branch deleted.
 
@@ -142,7 +143,7 @@ When `finalize-tick.sh` exits 2 with `"gh CLI not found in PATH"`, the
 scheduler prompts have an explicit Step 5b that routes through the
 `github` MCP server: push HEAD to the sandbox branch via plain `git
 push`, call MCP `create_pull_request`, call MCP `merge_pull_request`
-with `merge_method: squash`. Branch cleanup falls to the repo setting
+with `merge_method: squash` and an explicit `commit_message`. Branch cleanup falls to the repo setting
 described in the next section. Step 5b is the **only** authorized
 non-script git/MCP path in the prompts.
 

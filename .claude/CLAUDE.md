@@ -181,15 +181,16 @@ When you change a SKILL.md, ask: *does this affect anything in the table above?*
   engine paths copy verbatim. That is why
   `zettelkasten/_sources/inbox/describe-me/PROFILE.template.md` is listed under
   `engine:`.
-- **The update reads the LOCAL `.engine-manifest.yml` to decide what to check
-  out.** A path newly added to `engine:` therefore reaches friends one
-  `/minder:mem:update` cycle late: run N lands the new manifest, run N+1 checks
-  out the path it lists. `scripts/` is the exception — `/minder:mem:update`
-  Step 1.5 and `sync_engine.sh --self-heal` check it out FIRST, so the runner,
-  the shared libs and any newly-added migration are always current within the
-  same run. Design a migration to rely on `scripts/` and on itself being
-  current, but NOT on a newly-listed engine file outside `scripts/` being
-  present yet.
+- **The update reads the UPSTREAM `.engine-manifest.yml` to decide what to check
+  out**, falling back to the local copy only when the remote one cannot be read.
+  A path newly added to `engine:` therefore lands on the SAME update that adds
+  it — verified end to end by updating a 1.1.3 clone against a 1.2.0 skeleton and
+  finding `.claude/hooks/` in place afterwards. `scripts/` is landed earlier
+  still: `/minder:mem:update` Step 1.5 and `sync_engine.sh --self-heal` check it
+  out FIRST, so the runner, the shared libs and any newly-added migration are
+  current before anything reads them — which is why a migration may rely on
+  `scripts/` and on itself, both of which are guaranteed, rather than on the
+  order the rest of the tree arrives in.
 - **`release_engine.py` requires an empty `--target` and never prunes.** Real
   releases go: release to a fresh mktemp dir → `rsync -a` (no `--delete`) onto
   the skeleton clone → manually `git rm` paths removed from the engine set →

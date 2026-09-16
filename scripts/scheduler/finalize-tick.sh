@@ -346,7 +346,13 @@ fi
 echo "finalize-tick: PR #$PR_NUMBER ready for squash-merge"
 
 set +e
-MERGE_OUT="$(gh pr merge "$PR_NUMBER" --squash --delete-branch --subject "$MESSAGE" --body "" 2>&1)"
+# The body is explicit and non-empty on purpose. An empty or absent body lets
+# GitHub compose the squash message itself, and that message carries a
+# `Co-authored-by` trailer for every commit author other than the merger — the
+# sandbox commit's author included, which puts an assistant-authorship mark on
+# `main`. The same text is passed by the prompts' MCP fallback (Step 5b).
+MERGE_BODY="Autonomous scheduler tick."
+MERGE_OUT="$(gh pr merge "$PR_NUMBER" --squash --delete-branch --subject "$MESSAGE" --body "$MERGE_BODY" 2>&1)"
 MERGE_RC=$?
 set -e
 if [ "$MERGE_RC" -eq 0 ]; then

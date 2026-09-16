@@ -347,6 +347,7 @@ case "$1" in
         while [ $# -gt 0 ]; do
           case "$1" in
             --delete-branch) delete=1; shift ;;
+            --body) printf '%s' "$2" > "$state_dir/merge-body"; shift 2 ;;
             *) shift ;;
           esac
         done
@@ -470,6 +471,11 @@ def test_routines_mode_push_to_sandbox_and_pr_merge(tmp_path: Path) -> None:
     )
     assert "scheduler/process:" in main_log.stdout
     assert "[scheduled]" in main_log.stdout
+
+    # An empty squash body lets GitHub compose its own, which credits the sandbox
+    # commit's author with a Co-authored-by trailer on main.
+    merge_body = (tmp_path / "fake-gh-state" / "merge-body").read_text(encoding="utf-8")
+    assert merge_body.strip(), "squash merge must pass an explicit, non-empty body"
 
 
 def _second_clone(tmp_path: Path, origin: Path, name: str) -> Path:

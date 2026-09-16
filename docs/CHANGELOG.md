@@ -2,6 +2,15 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.2.1 — Scheduled commits are yours alone
+
+A run in the cloud delivers through a pull request that is squash-merged, and
+when a squash is merged without a message of its own, GitHub writes one — adding
+a `Co-authored-by` line for the sandbox's commit author. Every commit a cloud run
+delivered to your `main` carried it. The merge now passes its own message, so the
+commit is yours alone. Nothing to do on your side: the next scheduled run picks
+it up.
+
 ## 1.2.0 — A scheduled run can no longer delete a day of your notes
 
 A nightly run that took a long time could erase everything that arrived while it
