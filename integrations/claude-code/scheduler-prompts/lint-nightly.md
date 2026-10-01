@@ -98,9 +98,8 @@ Then exit `partial` immediately.
    and exit `partial`. The durable fix is real-file skills delivered via
    the skeleton + `/minder:mem:update`, not an in-tick repair.
 
-1. `bash scripts/scheduler/pin-main.sh` — get on fresh `origin/main`,
-   capture the starting sandbox branch, and best-effort recover any
-   stranded scheduler work from prior ticks via PR-merge sweep.
+1. `bash scripts/scheduler/pin-main.sh` — get on fresh `origin/main`
+   and capture the starting sandbox branch.
 
 2. `bash scripts/scheduler/lock-check.sh` — abort if any pipeline lock
    (process / maintain / lint / agent-lens / content / resolve / roles) is

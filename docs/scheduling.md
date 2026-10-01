@@ -362,17 +362,38 @@ scheduler prompts are not for you yet.
 
 ## Partial-tick handling
 
-If a tick aborts between push and PR-merge (network glitch, MCP error,
-PR creation failure), the sandbox branch on origin holds the unmerged
-commit. There is **no automatic recovery sweep** — the new architecture
-keeps the design minimal. The next tick processes fresh state from
-`_sources/inbox/` and produces a new commit. The stranded sandbox
-branch is harmless (work content is re-derivable from inputs) and can
-be removed manually if it accumulates:
+If a tick aborts between push and PR-merge — `gh` rejecting its token,
+a failed PR creation, a network error — the sandbox branch on origin
+holds the tick's one unmerged commit, and nothing replays it: the next
+tick starts from a fresh clone of `main` and never sees that branch.
+
+Whether the work comes back depends on the pipeline:
+
+- **process** re-derives it. Its sources stay in `_sources/inbox/`, so
+  the next tick that delivers processes them again and the stranded
+  commit is superseded. Delete the branch once a later process commit
+  on `main` shows the same sources in `_sources/processed/`.
+- **lint, roles, agent-lens, content** do not. Their output is a
+  function of the moment they ran — a sealed monthly context, a resolve
+  session, a role's memory between runs, a weekly lens window — and the
+  next run does not redo it. A stranded commit from these pipelines is
+  lost unless it is replayed.
+
+Replay from a local clone, oldest first, onto a branch cut from
+`origin/main`:
 
 ```bash
-git push origin --delete <branch>   # from a local clone with push rights
+git cherry-pick <stranded-sha>
 ```
+
+Conflicts are expected in three shapes, each with one correct answer:
+generated views (`_system/views/*`, the `Last regenerated` stamp in
+`SOUL.md`) differ only by timestamp — keep `main`'s side; queues the
+pipelines prepend to (`CLARIFICATIONS.md`) and logs they append to
+(`log_*.md`) — keep both blocks, newest first in `CLARIFICATIONS.md`;
+the append-only ledgers resolve themselves through `merge=union` in
+`.gitattributes`. Deliver through a PR, then delete the replayed
+sandbox branches.
 
 Routines tick output ends with the contract status: `success <SHA>`,
 `partial`, or `sync-blocked`. Owner sees the line in the Routine's

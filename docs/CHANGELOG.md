@@ -2,6 +2,22 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.3.2 — Two runs at once no longer cost one of them its work
+
+Every scheduled run adds a line to the same few ledgers — the one that records
+how much each run cost, the lens and role run logs. When two runs overlapped,
+the later one could not fit its line in beside the earlier one's, gave up, and
+delivered nothing: a whole processing batch could vanish because of one line of
+bookkeeping. Those ledgers now accept both lines, so overlapping runs both land.
+
+The scheduling docs also now say plainly what happens to a run whose delivery
+fails. Processing comes back on its own — its transcripts are still waiting in
+the inbox. Lint, roles and lenses do not: their result is lost unless it is
+replayed, and the docs show how. A leftover branch from a scheduled run on your
+GitHub repository is the sign to look.
+
+Nothing to do on your side: the next update brings it in.
+
 ## 1.3.1 — Note checks in scheduled runs stop tripping over themselves
 
 After writing notes, a scheduled run checks that each one's header is intact.

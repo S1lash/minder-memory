@@ -20,3 +20,17 @@
 # PowerShell (if ever added as the Windows-equivalent of a shell path) is the
 # one exception — it prefers CRLF.
 *.ps1   text eol=crlf
+
+# Append-only ledgers merge by union. Every scheduler tick appends a line to the
+# end of the same file, so two ticks that overlap ALWAYS conflict when the later
+# one rebases onto the earlier — and a conflicted rebase delivers nothing, losing
+# the whole tick. Union keeps both sides' lines, which is the only correct result
+# for a file whose writers never edit or remove a line. Only files that are
+# strictly append-only belong here: union on a file that is rewritten (the
+# candidate buffers, which lint archives in place) would resurrect removed lines.
+zettelkasten/_system/state/tick-telemetry.jsonl          merge=union
+zettelkasten/_system/state/agent-lens-runs.jsonl         merge=union
+zettelkasten/_system/state/check-decision-runs.jsonl     merge=union
+zettelkasten/_system/state/lens-resolution-history.jsonl merge=union
+zettelkasten/_system/state/identity-gate.jsonl           merge=union
+zettelkasten/_system/roles/*/log.jsonl                   merge=union
