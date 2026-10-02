@@ -2,6 +2,27 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.3.3 — Scheduled runs in the cloud deliver again
+
+The cloud sandbox now ships `gh`, the GitHub command line, and a scheduled run
+used it to open and merge its pull request. But `gh pr` and `gh auth status`
+talk to GitHub's GraphQL API, which the Claude Code sandbox refuses outright —
+and `gh` reports that refusal as "the token in GH_TOKEN is invalid", whatever
+the token is. Replacing the token could never fix it, and every run left its
+work parked on a sandbox branch. A run now opens and merges its pull request
+through GitHub's REST API, which the sandbox allows. If `gh` cannot reach the
+repository at all, the run delivers through the GitHub connector instead. When
+a pull request cannot be opened, the run's log carries GitHub's own answer
+instead of a bare "failed".
+
+A run that removes a file with `git rm` — the nightly lint's retention purge
+did — is delivered again. The removal never reached the record of what the run
+had changed, so the guard that keeps a run from touching anything else refused
+the whole delivery, night after night.
+
+Nothing to do on your side: the next update brings it in. Work already parked
+on sandbox branches is not moved by the update.
+
 ## 1.3.2 — Two runs at once no longer cost one of them its work
 
 Every scheduled run adds a line to the same few ledgers — the one that records

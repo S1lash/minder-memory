@@ -139,8 +139,8 @@ Then exit `partial` immediately.
    commit + delivery for this tick. Auto-detects mode:
    - **LOCAL mode** (start branch = main) — direct `git push origin main`.
    - **ROUTINES mode** (start branch = `claude/...` or other non-main) —
-     push HEAD to sandbox branch, `gh pr create --base main --head
-     <sandbox>`, then `gh pr merge --squash --delete-branch`. End state:
+     push HEAD to sandbox branch, a PR to `main` opened and squash-merged
+     through `gh api` (REST). End state:
      `main` updated with one squash commit on origin, sandbox deleted.
 
    Folds any unpushed `[scheduled]` commits from a previous partial tick.
@@ -151,15 +151,16 @@ Then exit `partial` immediately.
    - Exit code 2 → run failure-handling with cause
      `"finalize-tick failed"`, then print final status line.
 
-   **No manual push retries.** If `finalize-tick.sh` exits 2 (push,
-   `gh pr create`, or `gh pr merge` failed), do NOT invent a retry loop
+   **No manual push retries.** If `finalize-tick.sh` exits 2 (push, PR
+   create, or PR merge failed), do NOT invent a retry loop
    with direct git / gh calls. The script makes exactly one delivery
    attempt by design. Surface the failure via failure-handling and exit
    `partial`; the next tick runs fresh.
 
    **Exception — gh missing.** If exit 2 is specifically because
-   `"gh CLI not found in PATH"` (Cloud Routines sandboxes don't ship
-   gh), proceed to Step 5b INSTEAD of failure-handling.
+   `"gh CLI not found in PATH"` (gh is absent, or unable to reach the
+   repository — the script reports both with this marker), proceed to
+   Step 5b INSTEAD of failure-handling.
 
 5b. **MCP delivery fallback** — runs ONLY when Step 5's output contains
    `"gh CLI not found in PATH"` AND a local `[scheduled]` commit was

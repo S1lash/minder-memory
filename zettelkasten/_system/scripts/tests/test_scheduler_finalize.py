@@ -215,6 +215,26 @@ def test_stage_is_idempotent(repo: Path) -> None:
     assert len(staged.stdout.strip().splitlines()) == 1
 
 
+def test_a_deletion_already_staged_with_git_rm_is_delivered(repo: Path) -> None:
+    # A step that deletes with `git rm` leaves the path neither on disk nor in
+    # the index. stage.sh used to drop it as "vanished", so it never reached the
+    # staged-paths record and the delivery rail refused the whole tick.
+    old = repo / "zettelkasten/_system/state/lint-context-old.md"
+    old.write_text("old day\n", encoding="utf-8")
+    _git(repo, "add", str(old.relative_to(repo)))
+    _git(repo, "commit", "-q", "-m", "seed daily")
+    _git(repo, "push", "-q", "origin", "main")
+
+    (repo / "zettelkasten/_system/state/lint-context-new.md").write_text("today\n", encoding="utf-8")
+    _git(repo, "rm", "-q", str(old.relative_to(repo)))
+
+    result = _run_script(repo, "finalize-tick.sh", "scheduler/lint")
+    assert result.returncode == 0, result.stderr
+    tree = _git(repo, "ls-tree", "-r", "--name-only", "origin/main").stdout
+    assert "zettelkasten/_system/state/lint-context-old.md" not in tree
+    assert "zettelkasten/_system/state/lint-context-new.md" in tree
+
+
 def test_fold_recovery_collapses_previous_scheduled_commits(repo: Path) -> None:
     (repo / "zettelkasten/_records/x.md").write_text("x\n", encoding="utf-8")
     _git(repo, "add", "zettelkasten/_records/x.md")
@@ -301,115 +321,79 @@ def test_message_heuristic_records_only(repo: Path) -> None:
 
 
 FAKE_GH_SCRIPT = r"""#!/usr/bin/env bash
-# Fake gh CLI for tests. Honours FAKE_GH_BARE (path to bare origin repo)
-# and FAKE_GH_STATE_DIR (per-test marker dir).
+# Fake gh CLI for tests, shaped like the Claude Code sandbox: every GraphQL-backed
+# command (`gh pr ...`, `gh auth status`, `gh repo view`) is refused with the
+# proxy's 403, and only `gh api` against REST endpoints works. Honours
+# FAKE_GH_BARE (path to bare origin repo) and FAKE_GH_STATE_DIR (marker dir).
 set -u
 state_dir="${FAKE_GH_STATE_DIR:-/tmp/fake-gh-state}"
 mkdir -p "$state_dir"
 bare="${FAKE_GH_BARE:-}"
 
-slug() { printf '%s' "$1" | tr '/' '_'; }
+if [ "$1" != "api" ]; then
+  echo "HTTP 403: GitHub GraphQL is not available from Claude Code sessions" >&2
+  exit 1
+fi
+shift
 
-case "$1" in
-  repo)
-    if [ "$2" = "view" ]; then
-      echo "test-owner/test-repo"
-      exit 0
-    fi
-    ;;
-  pr)
-    sub="$2"; shift 2
-    case "$sub" in
-      list)
-        head=""
-        while [ $# -gt 0 ]; do
-          if [ "$1" = "--head" ]; then head="$2"; shift 2; continue; fi
-          shift
-        done
-        marker="$state_dir/pr-$(slug "$head")"
-        if [ -f "$marker" ]; then
-          cat "$marker"
-        fi
-        exit 0
-        ;;
-      create)
-        head=""; title=""
-        while [ $# -gt 0 ]; do
-          case "$1" in
-            --head) head="$2"; shift 2 ;;
-            --title) title="$2"; shift 2 ;;
-            *) shift ;;
-          esac
-        done
-        pr_num=$((42 + RANDOM % 1000))
-        slug_head="$(slug "$head")"
-        echo "$pr_num" > "$state_dir/pr-$slug_head"
-        echo "$head" > "$state_dir/pr-$slug_head.branch"
-        echo "$title" > "$state_dir/pr-$slug_head.title"
-        echo "https://github.com/test-owner/test-repo/pull/$pr_num"
-        exit 0
-        ;;
-      merge)
-        pr="$1"; shift 1
-        delete=0
-        while [ $# -gt 0 ]; do
-          case "$1" in
-            --delete-branch) delete=1; shift ;;
-            --body) printf '%s' "$2" > "$state_dir/merge-body"; shift 2 ;;
-            *) shift ;;
-          esac
-        done
-        for f in "$state_dir"/pr-*; do
-          [ -f "$f" ] || continue
-          case "$f" in *.branch|*.title|*.state) continue ;; esac
-          stored="$(cat "$f")"
-          if [ "$stored" = "$pr" ]; then
-            slug_head="$(basename "$f")"
-            slug_head="${slug_head#pr-}"
-            branch="$(cat "$state_dir/pr-$slug_head.branch")"
-            if [ -n "$bare" ]; then
-              GIT_DIR="$bare" git update-ref refs/heads/main "refs/heads/$branch" || exit 1
-              if [ "$delete" -eq 1 ]; then
-                GIT_DIR="$bare" git update-ref -d "refs/heads/$branch" || true
-              fi
-              echo "MERGED" > "$state_dir/pr-$pr.state"
-              exit 0
-            fi
-            exit 0
-          fi
-        done
-        echo "fake-gh: PR $pr not found" >&2
-        exit 1
-        ;;
-      view)
-        pr="$1"; shift 1
-        if [ -f "$state_dir/pr-$pr.state" ]; then
-          cat "$state_dir/pr-$pr.state"
-        else
-          echo "OPEN"
-        fi
-        exit 0
-        ;;
-    esac
-    ;;
-  api)
-    method=""; endpoint=""
-    while [ $# -gt 0 ]; do
-      case "$1" in
-        -X|--method) method="$2"; shift 2 ;;
-        repos/*) endpoint="$1"; shift ;;
-        *) shift ;;
+method=GET; endpoint=""; jq=""
+head=""; title=""; body=""; commit_message=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -X|--method) method="$2"; shift 2 ;;
+    --jq) jq="$2"; shift 2 ;;
+    -f|--raw-field)
+      case "$2" in
+        head=*) head="${2#head=}" ;;
+        title=*) title="${2#title=}" ;;
+        body=*) body="${2#body=}" ;;
+        commit_message=*) commit_message="${2#commit_message=}" ;;
       esac
-    done
-    if [ "${method:-}" = "DELETE" ] && [ -n "$bare" ]; then
-      branch="${endpoint##*/heads/}"
-      GIT_DIR="$bare" git update-ref -d "refs/heads/$branch" 2>/dev/null || true
-      exit 0
-    fi
-    exit 0
-    ;;
+      shift 2 ;;
+    *) endpoint="$1"; shift ;;
+  esac
+done
+
+slug() { printf '%s' "$1" | tr '/:' '__'; }
+path="${endpoint%%\?*}"
+query=""
+case "$endpoint" in *\?*) query="${endpoint#*\?}" ;; esac
+
+case "$method $path" in
+  "GET repos/"*/pulls)
+    want="${query##*head=}"; want="${want%%&*}"; want="${want#*:}"
+    marker="$state_dir/pr-$(slug "$want")"
+    [ -f "$marker" ] && [ ! -f "$state_dir/pr-$(cat "$marker").state" ] && cat "$marker"
+    exit 0 ;;
+  "POST repos/"*/pulls)
+    pr_num=$((42 + RANDOM % 1000))
+    echo "$pr_num" > "$state_dir/pr-$(slug "$head")"
+    echo "$head" > "$state_dir/num-$pr_num.branch"
+    echo "$title" > "$state_dir/num-$pr_num.title"
+    echo "$pr_num"
+    exit 0 ;;
+  "PUT repos/"*/pulls/*/merge)
+    pr="${path%/merge}"; pr="${pr##*/}"
+    [ -f "$state_dir/num-$pr.branch" ] || { echo "fake-gh: PR $pr not found" >&2; exit 1; }
+    branch="$(cat "$state_dir/num-$pr.branch")"
+    printf '%s' "$commit_message" > "$state_dir/merge-body"
+    GIT_DIR="$bare" git update-ref refs/heads/main "refs/heads/$branch" || exit 1
+    echo "MERGED" > "$state_dir/pr-$pr.state"
+    echo '{"merged":true}'
+    exit 0 ;;
+  "GET repos/"*/pulls/*)
+    pr="${path##*/}"
+    if [ -f "$state_dir/pr-$pr.state" ]; then echo true; else echo false; fi
+    exit 0 ;;
+  "DELETE repos/"*/git/refs/heads/*)
+    branch="${path#*/git/refs/heads/}"
+    GIT_DIR="$bare" git update-ref -d "refs/heads/$branch" 2>/dev/null || true
+    exit 0 ;;
+  "GET repos/"*)
+    echo "${path#repos/}"
+    exit 0 ;;
 esac
-echo "fake-gh: unknown command: $*" >&2
+echo "fake-gh: unknown call: $method $endpoint" >&2
 exit 1
 """
 
@@ -799,6 +783,97 @@ def test_routines_mode_gh_missing_fails_gracefully(tmp_path: Path) -> None:
     local_head = _git(work, "log", "--format=%s", "-1").stdout.strip()
     assert "scheduler/process:" in local_head
 
+
+REJECTING_GH_SCRIPT = r"""#!/usr/bin/env bash
+# gh that reaches the repository but cannot open a PR on it.
+case "$*" in
+  *"-X POST"*) echo "HTTP 422: Validation Failed (head: invalid)" >&2; exit 1 ;;
+  *pulls\?*) exit 0 ;;
+  "api repos/"*) echo "test/repo"; exit 0 ;;
+esac
+exit 1
+"""
+
+DEAD_GH_SCRIPT = """#!/usr/bin/env bash
+echo "HTTP 401: Bad credentials (https://api.github.com/repos/x/y)" >&2
+exit 1
+"""
+
+
+def test_a_rejected_pr_create_names_its_cause(tmp_path: Path) -> None:
+    # The tick's transcript is the only log a cloud run leaves, so gh's own
+    # reason has to reach it — otherwise a dead token reads exactly like any
+    # other delivery failure.
+    work, _origin = _seed_repo(tmp_path)
+    state_dir = work / ".scheduler-state"
+    state_dir.mkdir()
+    (state_dir / "start-branch").write_text("claude/bad-token-XYZ\n", encoding="utf-8")
+    (work / "zettelkasten/_records/r1.md").write_text("rec1\n", encoding="utf-8")
+
+    bin_dir = tmp_path / "rejecting-bin"
+    bin_dir.mkdir()
+    gh = bin_dir / "gh"
+    gh.write_text(REJECTING_GH_SCRIPT, encoding="utf-8")
+    gh.chmod(0o755)
+
+    result = subprocess.run(
+        ["bash", "scripts/scheduler/finalize-tick.sh", "scheduler/process"],
+        cwd=work,
+        capture_output=True,
+        text=True, encoding="utf-8",
+        env={
+            **os.environ,
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "GIT_AUTHOR_NAME": "test",
+            "GIT_AUTHOR_EMAIL": "test@example.com",
+            "GIT_COMMITTER_NAME": "test",
+            "GIT_COMMITTER_EMAIL": "test@example.com",
+        },
+    )
+    assert result.returncode == 2
+    assert "PR create failed" in result.stderr
+    assert "Validation Failed" in result.stderr
+
+
+
+def test_a_gh_that_cannot_reach_the_repo_routes_to_the_mcp_fallback(tmp_path: Path) -> None:
+    # A gh that cannot reach the repository must read as "no gh" to the
+    # scheduler prompts, whose MCP fallback keys on the gh-missing marker.
+    # Otherwise the tick fails at PR creation and strands its work on the
+    # sandbox branch with no fallback.
+    work, origin = _seed_repo(tmp_path)
+    state_dir = work / ".scheduler-state"
+    state_dir.mkdir()
+    (state_dir / "start-branch").write_text("claude/dead-token-XYZ\n", encoding="utf-8")
+    (work / "zettelkasten/_records/r1.md").write_text("rec1\n", encoding="utf-8")
+
+    bin_dir = tmp_path / "rejecting-bin"
+    bin_dir.mkdir()
+    gh = bin_dir / "gh"
+    gh.write_text(DEAD_GH_SCRIPT, encoding="utf-8")
+    gh.chmod(0o755)
+
+    result = subprocess.run(
+        ["bash", "scripts/scheduler/finalize-tick.sh", "scheduler/process"],
+        cwd=work,
+        capture_output=True,
+        text=True, encoding="utf-8",
+        env={
+            **os.environ,
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "GIT_AUTHOR_NAME": "test",
+            "GIT_AUTHOR_EMAIL": "test@example.com",
+            "GIT_COMMITTER_NAME": "test",
+            "GIT_COMMITTER_EMAIL": "test@example.com",
+        },
+    )
+    assert result.returncode == 2
+    assert "gh CLI not found in PATH" in result.stderr
+    assert "Bad credentials" in result.stderr
+    assert "finalize-tick: committed" in result.stdout
+    # Step 5b pushes the sandbox branch itself; the script must not have.
+    pushed = _git(origin, "branch", "--list", "claude/dead-token-XYZ").stdout.strip()
+    assert pushed == ""
 
 
 def test_classifier_uses_manifest(tmp_path: Path) -> None:

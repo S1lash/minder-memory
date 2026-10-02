@@ -39,15 +39,23 @@ Actions running with full push rights). Single `git push origin main`.
 Routines' git proxy refuses direct push to `main`. The script instead:
 
 1. `git push origin HEAD:<sandbox-branch>` (proxy-allowed)
-2. `gh pr create --base main --head <sandbox-branch>`
-3. `gh pr merge --squash --delete-branch` with an explicit commit body —
+2. opens a PR `<sandbox-branch>` → `main` with `gh api` (REST)
+3. squash-merges it with `gh api` and an explicit commit body —
    `tick_identity.py squash-body`, which carries the tick's declared base
 
 End state: `main` updated with one squash commit on origin, sandbox
 branch deleted on origin.
 
-**MCP fallback** — Anthropic Cloud Routines sandboxes don't ship `gh`.
-When `finalize-tick.sh` exits 2 with `"gh CLI not found in PATH"`, the
+Every GitHub call is `gh api` against REST, never `gh pr` / `gh auth status`:
+those run on GraphQL, which the Claude Code sandbox proxy refuses with HTTP
+403 — and gh words that refusal as "the token in GH_TOKEN is invalid", whatever
+the token is. The proxy authenticates REST calls itself.
+
+**MCP fallback** — a Cloud Routines sandbox may have no `gh`, or a `gh` that
+cannot reach the repository (not logged in — no `GH_TOKEN` — or refused).
+`finalize-tick.sh` probes the repository with `gh api` before delivering and
+reports both cases the same way.
+When it exits 2 with `"gh CLI not found in PATH"`, the
 scheduler prompts have an explicit Step 5b that:
 
 1. Pushes the local commit to the sandbox branch via plain `git push`.
