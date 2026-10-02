@@ -132,15 +132,25 @@ refuses `git push origin --delete <branch>` (both HTTP 403). The script
 instead:
 
 1. `git push origin HEAD:<sandbox-branch>` (proxy-allowed).
-2. `gh pr create --base main --head <sandbox-branch>`.
-3. `gh pr merge --squash --delete-branch` with an explicit commit body — left
+2. Opens a PR `<sandbox-branch>` → `main` with `gh api` (REST).
+3. Squash-merges it with `gh api` and an explicit commit body — left
    empty, GitHub writes its own and credits the sandbox's commit author. The body
    is `tick_identity.py squash-body`, so the tick's declared base (below) reaches
    `main`.
 
 End state: `main` has one squash commit, sandbox branch deleted.
 
-**MCP fallback** — Cloud Routines sandboxes typically don't ship `gh`.
+Every GitHub call is `gh api` against REST, never `gh pr` / `gh auth status`.
+Those run on GraphQL, which the Claude Code sandbox proxy refuses with HTTP 403,
+and gh words that refusal as "the token in GH_TOKEN is invalid" — whatever the
+token is. A fresh token changes nothing there; the proxy authenticates REST calls
+itself. gh still needs *some* `GH_TOKEN` in the routine's environment to send a
+request at all.
+
+**MCP fallback** — a Cloud Routines sandbox may have no `gh`, or a `gh` that
+cannot reach the repository (no `GH_TOKEN`, or the call refused).
+`finalize-tick.sh` probes the repository with `gh api` before delivering and
+reports both the same way, so neither strands a tick.
 When `finalize-tick.sh` exits 2 with `"gh CLI not found in PATH"`, the
 scheduler prompts have an explicit Step 5b that routes through the
 `github` MCP server: push HEAD to the sandbox branch via plain `git

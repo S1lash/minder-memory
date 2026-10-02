@@ -2118,6 +2118,8 @@ quiet_day: {true|false}
 
 After all daily writes, scan `_system/state/lint-context/daily/`, delete files с `{date}.md` date < today − 30 days.
 
+Delete with a plain filesystem removal (`rm`, `Path.unlink`) — never `git rm`. Staging belongs to the caller: a scheduler tick stages through `scripts/scheduler/stage.sh`, which reads the working tree, and the owner through `/minder:mem:save`. A deletion already pushed into the index bypasses that step.
+
 ---
 
 ## Step 6 — Lint Context Store — Monthly Generation (gap-aware catch-up)
