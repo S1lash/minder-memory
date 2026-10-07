@@ -932,8 +932,9 @@ happened. That is precisely the shape no content scan can see.
 
 The second check in the A.12 family — it watches for a step that stopped
 happening rather than for a file that came out wrong. Every scheduler tick
-runs `record_tick_telemetry.py` at its Step 4.9 and appends one line to
-`_system/state/tick-telemetry.jsonl` in the same commit as its work. That helper
+runs `record_tick_telemetry.py` inside its closing step (`close-tick.sh`) and
+appends one line to `_system/state/tick-telemetry.jsonl` in the same commit as
+its work. That helper
 exits 0 unconditionally, by design, so the tick cannot die of a broken
 odometer — which means nothing except this scan notices when the odometer
 stops.
@@ -944,6 +945,7 @@ stops.
   for sha in $(git log --since="26 hours ago" -F --grep='[scheduled]' --format='%H'); do
     git ls-tree -r --name-only "$sha" -- scripts/scheduler/record_tick_telemetry.py \
       | grep -q . || continue
+    git log -1 --format=%s "$sha" | grep -q -F ': checkpoint — ' && continue
     git show --name-only --format= "$sha" | grep -q 'tick-telemetry\.jsonl' \
       && echo "OK   $sha" || echo "MISS $sha"
   done
@@ -966,6 +968,12 @@ stops.
   every commit gets skipped and the scan reports clean forever. A check whose
   shell decides whether it checks anything is worse than no check, so this one
   uses a form with no shell-parsed punctuation in it.
+
+  The `checkpoint —` line is a skip too. Process delivers twice per tick —
+  its records before maintain, the rest after — and the first delivery is
+  marked `checkpoint —` in its subject. A tick is measured once, at its final
+  close, so a checkpoint carries no telemetry line by design; without the skip
+  every process tick would be reported un-measured every day.
 
   Two properties of that command are load-bearing, and both fail silently
   rather than loudly when dropped:

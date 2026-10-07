@@ -2,6 +2,32 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.4.0 — A scheduled run no longer loses its work quietly
+
+About one scheduled run in four used to end without its work reaching your
+base, and nothing said so. Three things caused almost all of it, and each now
+has a guard:
+
+- **A run that stopped before saving.** The model running a tick sometimes
+  finished its work, wrote its report, and simply stopped — before the step
+  that saves. A run can no longer end that way: it is reminded of the step it
+  skipped, and if it still will not finish, the run saves itself. Work that
+  was interrupted halfway is never saved half-done — the next run redoes it
+  whole, so nothing turns up twice.
+- **Two runs touching the same file.** When one run saved first, the other
+  used to give up and lose everything. Now lines both runs added are kept
+  side by side, real overlaps are merged by the run itself, and only if that
+  fails does the one file keep the other run's version — the rest still saves,
+  and the dropped file is named in your clarifications.
+- **A hiccup on the way to GitHub.** Saving now retries instead of giving up
+  at the first network error.
+
+Processing now saves twice — once with the new records, once after they are
+woven into your threads and hubs — so a run cut short late keeps its records.
+
+One step on your side: the safety net is registered in `.claude/settings.json`,
+which the update brings in — nothing to edit by hand.
+
 ## 1.3.3 — Scheduled runs in the cloud deliver again
 
 The cloud sandbox now ships `gh`, the GitHub command line, and a scheduled run

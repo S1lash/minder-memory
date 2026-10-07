@@ -33,8 +33,20 @@
 
 set -euo pipefail
 
+# `--note-only` ships the note and nothing else: every other dirty path is held
+# back (`stage.sh`'s hold-back list). The closing guard uses it for a tick that
+# was abandoned in the middle of a skill — its half-written work must not land,
+# because the next tick redoes it whole from the inbox, and half of it delivered
+# now is what would turn that redo into duplicates. Commits the tick already
+# made (a roles tick commits each finished role) are complete work and still go.
+NOTE_ONLY=0
+if [ "${1:-}" = "--note-only" ]; then
+  NOTE_ONLY=1
+  shift
+fi
+
 if [ $# -lt 2 ]; then
-  echo "usage: $0 \"<cause>\" <tick-name>" >&2
+  echo "usage: $0 [--note-only] \"<cause>\" <tick-name>" >&2
   exit 1
 fi
 
@@ -53,12 +65,46 @@ done
 CLAR="$BASE_NAME/_system/state/CLARIFICATIONS.md"
 TS="$(date -u +%Y-%m-%dT%H:%MZ)"
 
+# Note-only: the unfinished work leaves the working tree before anything is
+# staged. Holding it back for one delivery is not enough in a clone that
+# persists between runs (a local scheduler) — the next tick's staging would
+# pick it up and deliver it half-done after all. A stash keeps it out of every
+# later tick and still recoverable; the note names it.
+if [ "$NOTE_ONLY" -eq 1 ]; then
+  mkdir -p .scheduler-state
+  . scripts/lib/git.sh
+  # Owner data only — the same classifier staging uses. Engine files are never
+  # the tick's work, and are never moved.
+  ABANDONED=()
+  while IFS=$'\t' read -r label path || [ -n "${path:-}" ]; do
+    [ -z "${path:-}" ] && continue
+    [ "$label" = "ENGINE" ] && continue
+    [ "$path" = "$CLAR" ] && continue
+    # A pipeline lock is the skill's own marker, never work to set aside.
+    case "$path" in */_sources/.*.lock) continue ;; esac
+    ABANDONED+=("$path")
+  done < <(git_status_paths | python3 scripts/scheduler/_classify_paths.py)
+  if [ ${#ABANDONED[@]} -gt 0 ]; then
+    STASH_MSG="minder: unfinished $TICK run $TS"
+    if git stash push --include-untracked -q -m "$STASH_MSG" -- "${ABANDONED[@]}" 2>/dev/null; then
+      CAUSE="$CAUSE — its unfinished files were set aside in git stash \"$STASH_MSG\""
+    else
+      # The stash refused (nothing it can save, or a path it cannot take):
+      # hold the paths back from this delivery instead.
+      printf '%s\n' "${ABANDONED[@]}" > .scheduler-state/hold-back
+    fi
+  fi
+fi
+
 mkdir -p "$(dirname "$CLAR")"
 touch "$CLAR"
 grep -q '^### Scheduler failures$' "$CLAR" || printf '\n### Scheduler failures\n' >> "$CLAR"
 printf -- '- %s scheduler-%s: %s\n' "$TS" "$TICK" "$CAUSE" >> "$CLAR"
 
-if bash scripts/scheduler/finalize-tick.sh "scheduler/failure" "$TICK failed: $CAUSE"; then
+# Whatever happens below, this tick has ended through failure handling.
+python3 scripts/scheduler/tick_state.py set --for "$TICK" closed "failure: $CAUSE"
+
+if bash scripts/scheduler/finalize-tick.sh --resolve-by-main "scheduler/failure" "$TICK failed: $CAUSE"; then
   exit 0
 fi
 

@@ -163,6 +163,11 @@ engine:
   # consent for every clone rather than on one machine.
   - .claude/hooks/approve_role_artifact.py
 
+  # The closing guard every scheduled run is held by: a tick cannot end with
+  # its work undelivered (see the file's header). Ships for the same reason —
+  # hooks are the one repository mechanism a fresh cloud clone honours.
+  - .claude/hooks/tick_guard.py
+
   # Project-local skill discoverability for Claude Code Routines (cloud
   # cron). Routines clone the repo fresh and discover skills only at the
   # canonical `.claude/skills/<name>/SKILL.md` path. Each entry under here

@@ -305,7 +305,7 @@ indistinguishable from no lock at all.
 | `_system/state/PROCESSED.md` | `/minder:mem:process` | yes |
 | `_system/state/agent-lens-runs.jsonl` | `/minder:mem:agent-lens` | yes |
 | `_system/state/check-decision-runs.jsonl` | `/minder:mem:check-decision` (run + optional followup lines per invocation) | yes |
-| `_system/state/tick-telemetry.jsonl` | `scripts/scheduler/record_tick_telemetry.py` (Step 4.9 of every scheduler tick) | yes |
+| `_system/state/tick-telemetry.jsonl` | `scripts/scheduler/record_tick_telemetry.py` (the closing step of every scheduler tick) | yes |
 | `_system/state/identity-gate.jsonl` | `identity_gate.py`, from `/minder:mem:resolve-clarifications` Class I.5 (one line per per-identity residue scan) | yes |
 | `_system/roles/{id}/log.jsonl` | `/minder:mem:roles` (one line per **executed** run — a role whose cadence has not elapsed writes nothing) | yes |
 | Knowledge note `## Evidence Trail` | every skill that touches the note | yes |

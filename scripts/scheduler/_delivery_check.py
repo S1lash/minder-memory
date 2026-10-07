@@ -15,7 +15,10 @@ test waves it through. Here every differing path must be in the tick's own
 surface, and the surface is read from the tick's own record of what it wrote.
 
 Usage:
-  python3 scripts/scheduler/_delivery_check.py <remote-ref> <surface-file>
+  python3 scripts/scheduler/_delivery_check.py <remote-ref> <surface-file> [<refused-out>]
+
+With `<refused-out>`, the refused paths are also written there, one per line, so
+the caller can drop exactly those and deliver the rest.
 
 `<surface-file>` holds one repo-relative path per line (LF, UTF-8) — the union of
 what `stage.sh` staged and what the folded commits carried. A missing or empty
@@ -61,9 +64,11 @@ def git(*args: str) -> str:
 def main(argv: list[str]) -> int:
     configure_std_streams()
     if len(argv) < 2:
-        print("usage: _delivery_check.py <remote-ref> <surface-file>", file=sys.stderr)
+        print("usage: _delivery_check.py <remote-ref> <surface-file> [<refused-out>]",
+              file=sys.stderr)
         return 2
     remote_ref, surface_path = argv[0], argv[1]
+    refused_out = argv[2] if len(argv) > 2 else ""
 
     surface: set[str] = set()
     path = Path(surface_path)
@@ -81,6 +86,9 @@ def main(argv: list[str]) -> int:
     unauthorised = sorted(p for p in changed if p not in surface)
 
     if unauthorised:
+        if refused_out:
+            with open(refused_out, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write("".join(p + "\n" for p in unauthorised))
         print(f"finalize-tick: refusing to push — {len(unauthorised)} path(s) differ from "
               f"{remote_ref} that this tick never wrote:", file=sys.stderr)
         for p in unauthorised[:40]:

@@ -15,11 +15,11 @@ For full design rationale, cadence, and plug-in instructions see
 
 | File | What it runs | Recommended cadence |
 |---|---|---|
-| `process-scheduled.md` | `/minder:mem:sync-data` → `/minder:mem:process` → `/minder:mem:maintain --no-sync-check` → `finalize-tick.sh scheduler/process` | ≥ 3× per day, e.g. cron `0 9,14,19 * * *` |
-| `agent-lens-nightly.md` | `/minder:mem:sync-data` → `/minder:mem:agent-lens --all-due` → `finalize-tick.sh scheduler/agent-lens` | 1× nightly, e.g. cron `0 3 * * *` |
-| `lint-nightly.md` | `/minder:mem:sync-data` → `/minder:mem:lint` (Step 7.5 dispatches `/minder:mem:resolve-clarifications --auto-mode` inline) → `finalize-tick.sh scheduler/lint` | 1× nightly, e.g. cron `0 5 * * *` |
-| `content-tick.md` | `/minder:mem:sync-data` → `/minder:mem:content --maintain` (draft-maintainer) → `finalize-tick.sh scheduler/content` | 1× weekly Tuesday, e.g. cron `0 6 * * 2` |
-| `roles-nightly.md` | `/minder:mem:sync-data` → `/minder:mem:roles` (every due role, sequentially) → `finalize-tick.sh scheduler/roles` | 1× daily, e.g. cron `0 7 * * *` |
+| `process-scheduled.md` | `/minder:mem:sync-data` → `/minder:mem:process` → `/minder:mem:maintain --no-sync-check` → `close-tick.sh scheduler/process` | ≥ 3× per day, e.g. cron `0 9,14,19 * * *` |
+| `agent-lens-nightly.md` | `/minder:mem:sync-data` → `/minder:mem:agent-lens --all-due` → `close-tick.sh scheduler/agent-lens` | 1× nightly, e.g. cron `0 3 * * *` |
+| `lint-nightly.md` | `/minder:mem:sync-data` → `/minder:mem:lint` (Step 7.5 dispatches `/minder:mem:resolve-clarifications --auto-mode` inline) → `close-tick.sh scheduler/lint` | 1× nightly, e.g. cron `0 5 * * *` |
+| `content-tick.md` | `/minder:mem:sync-data` → `/minder:mem:content --maintain` (draft-maintainer) → `close-tick.sh scheduler/content` | 1× weekly Tuesday, e.g. cron `0 6 * * 2` |
+| `roles-nightly.md` | `/minder:mem:sync-data` → `/minder:mem:roles` (every due role, sequentially) → `close-tick.sh scheduler/roles` | 1× daily, e.g. cron `0 7 * * *` |
 
 The `content-synthesis` lens (the content pipeline's classifier) is NOT a
 separate tick — it is a registered agent-lens (`weekly (mon)`), so the existing
@@ -129,10 +129,16 @@ prompts forbid it explicitly.
 
 ## Single-commit guarantee
 
-Every scheduler tick produces **exactly one commit on `origin/main`**.
+Every scheduler tick produces **exactly one commit on `origin/main`** — except
+process, which delivers twice: its records before maintain, the rest after.
 
 - `scripts/scheduler/stage.sh` — staging-only helper (idempotent). May
   be called any number of times during a tick; commits nothing.
+- `scripts/scheduler/close-tick.sh <tag> [--checkpoint]` — the closing step
+  every prompt runs: telemetry, then `finalize-tick.sh`, then the outcome in
+  the tick's record (`tick_state.py`), which the closing guard
+  (`.claude/hooks/tick_guard.py`) reads before it lets the run end. See
+  `docs/scheduling.md` → «A tick cannot end undelivered».
 - `scripts/scheduler/finalize-tick.sh <tag>` — single commit + delivery
   (LOCAL: direct push, ROUTINES: push-to-sandbox + PR + squash-merge).
   Folds any unpushed `[scheduled]` commits from a previous partial tick.
@@ -198,8 +204,8 @@ guard, not a normal autonomy boundary.
 
 ## Per-tick telemetry
 
-Every tick runs `python3 scripts/scheduler/record_tick_telemetry.py <tag>` at Step
-4.9 and appends one line to `_system/state/tick-telemetry.jsonl`, delivered in the
+Every tick runs `python3 scripts/scheduler/record_tick_telemetry.py <tag>` inside
+Step 5 (`close-tick.sh`, before it delivers) and appends one line to `_system/state/tick-telemetry.jsonl`, delivered in the
 tick's own single commit. The line is read from the run's own session
 transcript — the main session plus every sub-agent it spawned — and carries
 input, output, thinking, cache writes split by TTL, cache reads, per-model
@@ -211,8 +217,8 @@ cache reads or sub-agents, so a self-reported number would be fabrication.
 
 Three properties are deliberate and should survive any edit to these prompts:
 
-- **It runs before Step 5**, because Step 5 commits and there is no second
-  commit to carry a later line. The tick's own closing messages therefore go
+- **It runs before the delivery**, because the delivery commits and there is
+  no later commit to carry the line. The tick's own closing messages therefore go
   uncounted; `measured_through` states the horizon instead of hiding it.
 - **It always exits 0**, so a broken odometer can never cost a tick its real
   work. When it measures nothing it writes `status: unmeasured` and the
