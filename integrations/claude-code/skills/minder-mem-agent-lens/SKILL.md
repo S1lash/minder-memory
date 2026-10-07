@@ -253,7 +253,7 @@ cumulative LLM-cache state to protect; the guard exists only to prevent
 accidental double-runs from the owner re-firing while a tick is queueing.
 
 The scheduled tick passes `--force` implicitly via cron timing alignment
-(daily at 07:00 — never <30min from prior tick by construction).
+(once a night — never <30min from prior tick by construction).
 
 ---
 
