@@ -61,19 +61,70 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/../lib/git.sh"
 
+# `--resolve-by-main` is the last resort for a conflict the tick could not
+# resolve itself: each still-conflicted file takes main's version, the rest of
+# the tick is delivered, and the file is named in CLARIFICATIONS. Only the
+# closing guard passes it, after the tick had its chance (Step 5c).
+RESOLVE_BY_MAIN=0
+# `--checkpoint` marks the commit as the first of a tick's two deliveries
+# (process, before maintain). The mark is in the subject because that is what
+# survives a squash onto main, and `/minder:mem:lint` A.13 reads it: a
+# checkpoint carries no telemetry line by design — the tick is measured once,
+# at its final close.
+CHECKPOINT=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --resolve-by-main) RESOLVE_BY_MAIN=1; shift ;;
+    --checkpoint) CHECKPOINT=1; shift ;;
+    *) break ;;
+  esac
+done
+ORIG_ARGS=("$@")
+
 if [ $# -lt 1 ]; then
-  echo "usage: $0 <tag> [override-message]" >&2
+  echo "usage: $0 [--resolve-by-main] <tag> [override-message]" >&2
   exit 2
 fi
 
 TAG="$1"
 OVERRIDE_MSG="${2:-}"
 
-git fetch origin main --quiet 2>/dev/null || true
+STATE_DIR=".scheduler-state"
+CONFLICT_FILE="$STATE_DIR/conflict"
+SNAPSHOT_FILE="$STATE_DIR/conflict-snapshot.json"
+MESSAGE_FILE="$STATE_DIR/tick-message"
+
+# A network blip or a GitHub hiccup is not a reason to lose a run. Every call
+# that leaves this machine gets three tries with a growing pause; what still
+# fails after that is a real failure and is reported as one.
+retry() {
+  local n=0
+  until "$@"; do
+    n=$((n + 1))
+    if [ "$n" -ge 3 ]; then
+      return 1
+    fi
+    sleep $((n * 3))
+  done
+}
+
+retry git fetch origin main --quiet 2>/dev/null || true
 
 AUTHORED_SHAS_FILE=".scheduler-state/authored-shas"
 AUTHORED=""
 [ -f "$AUTHORED_SHAS_FILE" ] && AUTHORED="$(cat "$AUTHORED_SHAS_FILE")"
+
+# RESUME: an earlier call stopped on a conflict the tick has now resolved (or
+# the guard asks for the last resort). The commit already exists and the merge
+# is open; building another commit here would fold the merge itself.
+RESUME=0
+if [ -f "$CONFLICT_FILE" ] && git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+  RESUME=1
+elif [ -f "$CONFLICT_FILE" ]; then
+  rm -f "$CONFLICT_FILE"
+fi
+
+if [ "$RESUME" -eq 0 ]; then
 
 # A commit an earlier tick explicitly DISOWNED is never folded, by any tick,
 # whatever its subject says. Without this the refusal was single-tick only:
@@ -264,6 +315,10 @@ fi
 # made to parse (`scripts/lib/tick_identity.py`).
 BODY="$(printf '%s' "$BODY" | tr '\r\n' '  ')"
 
+if [ "$CHECKPOINT" -eq 1 ]; then
+  BODY="checkpoint — $BODY"
+fi
+
 case "$BODY" in
   "$TAG:"*) MESSAGE="$BODY [scheduled]" ;;
   *) MESSAGE="$TAG: $BODY [scheduled]" ;;
@@ -296,36 +351,260 @@ fi
 LOCAL_SHA="$(git rev-parse --short HEAD)"
 echo "finalize-tick: committed $LOCAL_SHA — $MESSAGE"
 
-# Integration. The commit sits on the fork point, so it is behind a tip that
-# moved while the tick ran; replaying it forward is what makes the delivery a
-# fast-forward honestly instead of by overwriting. A rebase carries the tick's
-# own patch, so a concurrent change inside a file this tick also touched is kept
-# rather than reverted.
-if ! git merge-base --is-ancestor origin/main HEAD 2>/dev/null; then
-  echo "finalize-tick: integrating onto origin/main"
-  if ! git rebase origin/main >/dev/null 2>&1; then
-    git rebase --abort >/dev/null 2>&1 || git rebase --quit >/dev/null 2>&1 || true
-    echo "finalize-tick: integration conflicted; nothing pushed" >&2
-    echo "  The tick's commit $LOCAL_SHA stays local and unpushed. The next tick folds" >&2
-    echo "  and retries it. Conflicting paths need a look if this repeats:" >&2
-    git --no-pager diff --name-only "origin/main...HEAD" 2>/dev/null | sed 's/^/    /' >&2 || true
-    exit 2
+fi  # RESUME -eq 0
+
+LOCAL_SHA="$(git rev-parse --short HEAD)"
+
+# Paths whose conflict was settled by taking main's version — named afterwards.
+TAKEN_FROM_MAIN=""
+
+# Collapse a finished merge into ONE commit on top of the target, carrying the
+# tick's own message (and with it the identity it declared). The delivery stays
+# a single squash-shaped change, exactly as a clean rebase would have made it.
+collapse_onto() {
+  local target="$1"
+  if git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+    git commit --no-edit -q >/dev/null 2>&1 || git commit --no-edit -q --allow-empty >/dev/null || return 1
   fi
-  # A rebase rewrites the commit, and authorship is by exact SHA — recording the
-  # new one is what keeps a later tick from reading this tick's own work as
-  # foreign and refusing to fold it forever.
+  git reset --soft "$target" || return 1
+  if git diff --cached --quiet; then
+    echo "finalize-tick: everything this tick changed is already on origin/main"
+    return 0
+  fi
+  git commit -q -F "$MESSAGE_FILE" || return 1
   if [ -n "$AUTHORED" ]; then
     git rev-parse HEAD >> "$AUTHORED_SHAS_FILE"
   fi
-  LOCAL_SHA="$(git rev-parse --short HEAD)"
-  echo "finalize-tick: integrated as $LOCAL_SHA"
+  return 0
+}
+
+# Settle each still-conflicted path by main's version: main's content when main
+# has the file, its absence when it does not.
+take_main() {
+  local target="$1"; shift
+  local f
+  for f in "$@"; do
+    if git_ref_has_path "$target" "$f"; then
+      MSYS_NO_PATHCONV=1 git checkout "$target" -- "$f" >/dev/null 2>&1 || return 1
+      git add -- "$f" || return 1
+    else
+      git rm -q -f --ignore-unmatch -- "$f" >/dev/null 2>&1 || return 1
+    fi
+    TAKEN_FROM_MAIN="$TAKEN_FROM_MAIN $f"
+  done
+  return 0
+}
+
+# Stage the tick's resolution of each listed path: an edited file is added, a
+# file the tick removed is removed. Prints, one per line, the paths that are
+# still open — carrying markers, or exactly as they were when the closing step
+# stopped. "Untouched" matters because some conflicts carry no markers at all:
+# a binary file, or one deleted on one side and edited on the other, sits in
+# the tree as one side's version. Reading "no markers" as "resolved" staged that
+# side silently — over main.
+stage_resolution() {
+  local f open
+  open="$(python3 "$SCRIPT_DIR/_resolve_conflicts.py" open "$SNAPSHOT_FILE" "$@")" || return 1
+  for f in "$@"; do
+    if printf '%s\n' "$open" | grep -qxF -- "$f"; then
+      printf '%s\n' "$f"
+      continue
+    fi
+    if [ -e "$f" ]; then
+      git add -- "$f" || return 1
+    else
+      git rm -q --ignore-unmatch -- "$f" >/dev/null 2>&1 || return 1
+    fi
+  done
+}
+
+# Read LF-separated paths from stdin into the array LINES. Paths can contain
+# spaces (a person's name in a note title), so word splitting is never used.
+read_lines() {
+  LINES=()
+  local line
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [ -n "$line" ]; then
+      LINES+=("$line")
+    fi
+  done
+  return 0
+}
+
+stop_for_resolution() {
+  local target="$1"; shift
+  {
+    printf 'target %s\n' "$target"
+    printf '%s\n' "$@"
+  } > "$CONFLICT_FILE"
+  python3 "$SCRIPT_DIR/_resolve_conflicts.py" snapshot "$SNAPSHOT_FILE" "$@" || true
+  python3 "$SCRIPT_DIR/tick_state.py" set --for "$TAG" conflict "$*"
+  echo "finalize-tick: CONFLICT — these files changed both here and on main since this tick began:" >&2
+  printf '  %s\n' "$@" >&2
+  echo "finalize-tick: resolve them (Step 5c), then run the closing step again." >&2
+  exit 3
+}
+
+# Integration. The commit sits on the fork point, so it is behind a tip that
+# moved while the tick ran. Main is merged INTO the tick's commit (three-way,
+# so a concurrent change inside a file this tick also touched is kept rather
+# than reverted), and the result is collapsed back into one commit on top of
+# main. Conflicts are settled in three layers, and none of them loses the run:
+#   1. both sides only ADDED lines at the same place → both kept, mechanically
+#      (`_resolve_conflicts.py`);
+#   2. anything else → the tick resolves it itself (Step 5c) and calls again;
+#   3. the guard's last resort (`--resolve-by-main`) → main's version for the
+#      files still open, the rest delivered, the files named in CLARIFICATIONS.
+# Main can move again while that happens, so this repeats until it holds.
+ATTEMPT=0
+while :; do
+  if [ "$RESUME" -eq 1 ]; then
+    TARGET="$(sed -n 's/^target //p' "$CONFLICT_FILE" | head -n 1)"
+    read_lines < <(sed -n '2,$p' "$CONFLICT_FILE")
+    STILL_OUT=""
+    # bash 3.2 (macOS) treats an empty "${a[@]}" as unbound under `set -u`.
+    if [ ${#LINES[@]} -gt 0 ]; then
+      STILL_OUT="$(stage_resolution "${LINES[@]}")" || exit 2
+    fi
+    read_lines <<< "$STILL_OUT"
+    if [ ${#LINES[@]} -gt 0 ]; then
+      if [ "$RESOLVE_BY_MAIN" -eq 1 ]; then
+        take_main "$TARGET" "${LINES[@]}" || exit 2
+      else
+        stop_for_resolution "$TARGET" "${LINES[@]}"
+      fi
+    fi
+    collapse_onto "$TARGET" || { echo "finalize-tick: could not complete the merge" >&2; exit 2; }
+    rm -f "$CONFLICT_FILE" "$SNAPSHOT_FILE"
+    # Only a record waiting on this conflict goes back to open: a tick that
+    # already ended through failure handling stays closed.
+    python3 "$SCRIPT_DIR/tick_state.py" resolved --for "$TAG"
+    # The same line a first call prints after it commits — Step 5b of the
+    # prompts keys on it, and reads the PR title from it.
+    echo "finalize-tick: committed $(git rev-parse --short HEAD) — $(git log -1 --format=%s HEAD)"
+    RESUME=0
+    retry git fetch origin main --quiet 2>/dev/null || true
+  fi
+
+  if git merge-base --is-ancestor origin/main HEAD 2>/dev/null; then
+    break
+  fi
+  ATTEMPT=$((ATTEMPT + 1))
+  if [ "$ATTEMPT" -gt 3 ]; then
+    echo "finalize-tick: main kept moving during integration; nothing pushed" >&2
+    exit 2
+  fi
+
+  TARGET="$(git rev-parse origin/main)"
+  echo "finalize-tick: integrating onto origin/main ($(git rev-parse --short "$TARGET"))"
+  mkdir -p "$STATE_DIR"
+  git log -1 --format=%B HEAD > "$MESSAGE_FILE"
+  if git -c merge.conflictStyle=diff3 merge --no-ff --no-commit "$TARGET" >/dev/null 2>&1; then
+    collapse_onto "$TARGET" || { echo "finalize-tick: could not complete the merge" >&2; exit 2; }
+    retry git fetch origin main --quiet 2>/dev/null || true
+    continue
+  fi
+  if ! git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+    echo "finalize-tick: integration could not start a merge; nothing pushed" >&2
+    exit 2
+  fi
+  OPEN="$(python3 "$SCRIPT_DIR/_resolve_conflicts.py" auto)" || {
+    git merge --abort >/dev/null 2>&1 || true
+    echo "finalize-tick: could not read the conflicts; nothing pushed" >&2
+    exit 2
+  }
+  read_lines <<< "$OPEN"
+  if [ ${#LINES[@]} -gt 0 ]; then
+    if [ "$RESOLVE_BY_MAIN" -eq 1 ]; then
+      take_main "$TARGET" "${LINES[@]}" || exit 2
+    else
+      stop_for_resolution "$TARGET" "${LINES[@]}"
+    fi
+  else
+    echo "finalize-tick: overlapping additions kept from both sides"
+  fi
+  collapse_onto "$TARGET" || { echo "finalize-tick: could not complete the merge" >&2; exit 2; }
+  retry git fetch origin main --quiet 2>/dev/null || true
+done
+
+# When every change the tick made was settled by main's version, nothing of
+# its own is left beyond main — but the drop must still be named, so the note
+# becomes a commit of its own rather than an amendment of main's.
+NOTE_AS_NEW_COMMIT=0
+if git merge-base --is-ancestor HEAD origin/main 2>/dev/null; then
+  if [ -z "$TAKEN_FROM_MAIN" ]; then
+    rm -f "$AUTHORED_SHAS_FILE" ".scheduler-state/staged-paths"
+    echo "finalize-tick: nothing new to deliver"
+    exit 0
+  fi
+  NOTE_AS_NEW_COMMIT=1
 fi
+
+note_in_clarifications() {
+  local base_name="" d clar ts
+  for d in */; do
+    [ -f "$d/_system/scripts/roles_run.py" ] || continue
+    [ -n "$base_name" ] && base_name="" && break
+    base_name="${d%/}"
+  done
+  [ -z "$base_name" ] && base_name="zettelkasten"
+  clar="$base_name/_system/state/CLARIFICATIONS.md"
+  ts="$(date -u +%Y-%m-%dT%H:%MZ)"
+  mkdir -p "$(dirname "$clar")"
+  touch "$clar"
+  grep -q '^### Scheduler failures$' "$clar" || printf '\n### Scheduler failures\n' >> "$clar"
+  printf -- '- %s %s: %s\n' "$ts" "$TAG" "$1" >> "$clar"
+  git add -- "$clar"
+  mkdir -p "$STATE_DIR"
+  printf '%s\n' "$clar" >> .scheduler-state/staged-paths
+  if [ "$NOTE_AS_NEW_COMMIT" -eq 1 ]; then
+    git commit -q -F "$MESSAGE_FILE" || return 1
+    NOTE_AS_NEW_COMMIT=0
+  else
+    git commit -q --amend --no-edit || return 1
+  fi
+  if [ -n "$AUTHORED" ]; then
+    git rev-parse HEAD >> "$AUTHORED_SHAS_FILE"
+  fi
+}
+
+if [ -n "$TAKEN_FROM_MAIN" ]; then
+  note_in_clarifications "conflict with a concurrent run could not be resolved; main's version kept, this run's change to these files dropped:$TAKEN_FROM_MAIN" || exit 2
+fi
+LOCAL_SHA="$(git rev-parse --short HEAD)"
+# A resumed call never built the commit, so its subject comes from the commit.
+MESSAGE="${MESSAGE:-$(git log -1 --format=%s HEAD)}"
 
 # The rail: nothing may differ from origin/main except what this tick wrote.
 # This is the check that fails loudly if a stale tree ever reaches delivery by
 # some other route — the guarantee does not rest on the fold staying correct.
-if ! python3 "$SCRIPT_DIR/_delivery_check.py" origin/main ".scheduler-state/staged-paths"; then
-  exit 2
+# A refusal drops only what it names: those paths are put back to main's
+# version (so nothing the tick never wrote can move), the rest is delivered, and
+# the dropped paths are named in CLARIFICATIONS. Dropping is always safe — it
+# can only lose this tick's own change to a path, never anyone else's.
+REFUSED_FILE="$STATE_DIR/refused-paths"
+rm -f "$REFUSED_FILE"
+if ! python3 "$SCRIPT_DIR/_delivery_check.py" origin/main ".scheduler-state/staged-paths" "$REFUSED_FILE"; then
+  if [ ! -s "$REFUSED_FILE" ]; then
+    exit 2
+  fi
+  REFUSED=""
+  while IFS= read -r rp || [ -n "$rp" ]; do
+    [ -z "$rp" ] && continue
+    if git_ref_has_path origin/main "$rp"; then
+      MSYS_NO_PATHCONV=1 git checkout origin/main -- "$rp" >/dev/null 2>&1 || exit 2
+    else
+      git rm -q --cached --ignore-unmatch -- "$rp" >/dev/null 2>&1 || exit 2
+    fi
+    REFUSED="$REFUSED $rp"
+  done < "$REFUSED_FILE"
+  git commit -q --amend --no-edit --allow-empty || exit 2
+  note_in_clarifications "delivery check dropped changes this run never recorded making:$REFUSED" || exit 2
+  if ! python3 "$SCRIPT_DIR/_delivery_check.py" origin/main ".scheduler-state/staged-paths"; then
+    exit 2
+  fi
+  echo "finalize-tick: dropped$REFUSED; delivering the rest"
+  LOCAL_SHA="$(git rev-parse --short HEAD)"
 fi
 
 START_BRANCH=""
@@ -340,8 +619,22 @@ fi
 # push to a remote branch called `HEAD`.
 if ! git_is_branch_name "$START_BRANCH" || [ "$START_BRANCH" = "main" ]; then
   echo "finalize-tick: LOCAL mode (start branch '$START_BRANCH') — direct push to origin/main"
-  git push origin main || exit 2
-  rm -f "$AUTHORED_SHAS_FILE" ".scheduler-state/staged-paths"
+  if ! retry git push origin main; then
+    # Rejected most often because main moved between integration and push.
+    # Integrate again — once — rather than give the run up: the commit is
+    # still here, and a second pass folds and merges it like the first.
+    if [ -z "${FINALIZE_REINTEGRATED:-}" ] && retry git fetch origin main --quiet 2>/dev/null \
+        && ! git merge-base --is-ancestor origin/main HEAD 2>/dev/null; then
+      echo "finalize-tick: main moved during delivery; integrating again"
+      FLAGS=""
+      [ "$RESOLVE_BY_MAIN" -eq 1 ] && FLAGS="$FLAGS --resolve-by-main"
+      [ "$CHECKPOINT" -eq 1 ] && FLAGS="$FLAGS --checkpoint"
+      # shellcheck disable=SC2086
+      FINALIZE_REINTEGRATED=1 exec bash "$0" $FLAGS "${ORIG_ARGS[@]}"
+    fi
+    exit 2
+  fi
+  rm -f "$AUTHORED_SHAS_FILE" ".scheduler-state/staged-paths" "$MESSAGE_FILE"
   echo "finalize-tick: delivered to origin/main"
   exit 0
 fi
@@ -369,24 +662,47 @@ REPO_OWNER="${REPO_SLUG%%/*}"
 # such repo — is, for delivery, the same as no gh at all. It is reported with the
 # marker the scheduler prompts key their MCP fallback (Step 5b) on, and before
 # the sandbox push, which Step 5b performs itself.
-if ! GH_REPO_OUT="$(gh api "repos/$REPO_SLUG" --jq .full_name 2>&1)"; then
+gh_reach() { gh api "repos/$REPO_SLUG" --jq .full_name >/dev/null 2>&1; }
+if ! retry gh_reach; then
+  GH_REPO_OUT="$(gh api "repos/$REPO_SLUG" --jq .full_name 2>&1 || true)"
   echo "finalize-tick: gh cannot reach $REPO_SLUG — handled as gh CLI not found in PATH; cannot complete Routines-mode delivery" >&2
   printf '%s\n' "$GH_REPO_OUT" | sed 's/^/  gh: /' >&2
   echo "finalize-tick: local commit $LOCAL_SHA persists" >&2
   exit 2
 fi
 
-if ! git push origin "HEAD:$START_BRANCH" 2>&1; then
+# The sandbox branch belongs to this run, and an earlier delivery of the same
+# run can still be on it — process's first delivery, or an attempt that failed
+# after its push. The commit now is a sibling of that one, not a descendant, so
+# a plain push is refused. Replacing exactly what is there (a lease on the sha
+# just read) is safe; if the platform refuses even that, the delivery goes out
+# on a fresh branch of its own.
+DELIVER_BRANCH="$START_BRANCH"
+push_sandbox() {
+  local remote_sha
+  if retry git push origin "HEAD:refs/heads/$DELIVER_BRANCH" 2>&1; then
+    return 0
+  fi
+  remote_sha="$(git ls-remote origin "refs/heads/$DELIVER_BRANCH" 2>/dev/null | cut -f1)"
+  if [ -n "$remote_sha" ] && git push --force-with-lease="refs/heads/$DELIVER_BRANCH:$remote_sha" \
+      origin "HEAD:refs/heads/$DELIVER_BRANCH" 2>&1; then
+    echo "finalize-tick: replaced this run's earlier delivery on origin/$DELIVER_BRANCH"
+    return 0
+  fi
+  DELIVER_BRANCH="$START_BRANCH-$(date -u +%Y%m%d%H%M%S)"
+  echo "finalize-tick: delivering on a fresh branch, $DELIVER_BRANCH"
+  retry git push origin "HEAD:refs/heads/$DELIVER_BRANCH" 2>&1
+}
+if ! push_sandbox; then
   echo "finalize-tick: push to sandbox branch '$START_BRANCH' failed" >&2
-  echo "finalize-tick: if non-fast-forward, the platform put commits on the sandbox branch unexpectedly" >&2
   exit 2
 fi
-echo "finalize-tick: pushed $LOCAL_SHA to origin/$START_BRANCH"
+echo "finalize-tick: pushed $LOCAL_SHA to origin/$DELIVER_BRANCH"
 
 PR_BODY="Autonomous scheduler tick. Tag: \`$TAG\`. Generated by finalize-tick.sh. Squash-merge expected."
 
 open_pr_number() {
-  gh api "repos/$REPO_SLUG/pulls?state=open&base=main&head=$REPO_OWNER:$START_BRANCH" \
+  gh api "repos/$REPO_SLUG/pulls?state=open&base=main&head=$REPO_OWNER:$DELIVER_BRANCH" \
     --jq '.[0].number // empty' 2>/dev/null || true
 }
 
@@ -396,14 +712,26 @@ if [ -z "$PR_NUMBER" ]; then
   # gh's own message is the only place the cause appears — a missing
   # permission, a closed branch — and a tick's transcript is the only log there
   # is. gh never prints the token itself.
-  if ! PR_CREATE_OUT="$(gh api -X POST "repos/$REPO_SLUG/pulls" \
-      -f base=main -f head="$START_BRANCH" -f title="$MESSAGE" -f body="$PR_BODY" \
-      --jq .number 2>&1)"; then
-    echo "finalize-tick: PR create failed for $START_BRANCH" >&2
-    printf '%s\n' "$PR_CREATE_OUT" | sed 's/^/  gh: /' >&2
-    exit 2
-  fi
-  PR_NUMBER="$PR_CREATE_OUT"
+  # A create whose answer was lost may still have opened the PR, so every retry
+  # looks for it first rather than opening a second one.
+  n=0
+  while :; do
+    if PR_CREATE_OUT="$(gh api -X POST "repos/$REPO_SLUG/pulls" \
+        -f base=main -f head="$DELIVER_BRANCH" -f title="$MESSAGE" -f body="$PR_BODY" \
+        --jq .number 2>&1)"; then
+      PR_NUMBER="$PR_CREATE_OUT"
+      break
+    fi
+    PR_NUMBER="$(open_pr_number)"
+    [ -n "$PR_NUMBER" ] && break
+    n=$((n + 1))
+    if [ "$n" -ge 3 ]; then
+      echo "finalize-tick: PR create failed for $DELIVER_BRANCH" >&2
+      printf '%s\n' "$PR_CREATE_OUT" | sed 's/^/  gh: /' >&2
+      exit 2
+    fi
+    sleep $((n * 3))
+  done
 fi
 
 case "$PR_NUMBER" in
@@ -429,10 +757,21 @@ if ! MERGE_BODY="$(python3 "$SCRIPT_DIR/../lib/tick_identity.py" squash-body 2>/
 fi
 
 set +e
-MERGE_OUT="$(gh api -X PUT "repos/$REPO_SLUG/pulls/$PR_NUMBER/merge" \
-  -f merge_method=squash -f commit_title="$MESSAGE" -f commit_message="$MERGE_BODY" 2>&1)"
-MERGE_RC=$?
-MERGED="$(gh api "repos/$REPO_SLUG/pulls/$PR_NUMBER" --jq .merged 2>/dev/null || echo unknown)"
+n=0
+while :; do
+  MERGE_OUT="$(gh api -X PUT "repos/$REPO_SLUG/pulls/$PR_NUMBER/merge" \
+    -f merge_method=squash -f commit_title="$MESSAGE" -f commit_message="$MERGE_BODY" 2>&1)"
+  MERGE_RC=$?
+  MERGED="$(gh api "repos/$REPO_SLUG/pulls/$PR_NUMBER" --jq .merged 2>/dev/null || echo unknown)"
+  if [ "$MERGE_RC" -eq 0 ] || [ "$MERGED" = "true" ]; then
+    break
+  fi
+  n=$((n + 1))
+  [ "$n" -ge 3 ] && break
+  # GitHub computes mergeability lazily; a fresh PR can answer "not mergeable
+  # yet" for a few seconds.
+  sleep $((n * 3))
+done
 set -e
 
 if [ "$MERGE_RC" -eq 0 ] || [ "$MERGED" = "true" ]; then
@@ -440,10 +779,17 @@ if [ "$MERGE_RC" -eq 0 ] || [ "$MERGED" = "true" ]; then
   # The repository may delete merged head branches itself; asking again is
   # harmless, and a sandbox branch the platform still holds may refuse — the
   # merge has landed either way.
-  if ! gh api -X DELETE "repos/$REPO_SLUG/git/refs/heads/$START_BRANCH" >/dev/null 2>&1; then
+  if ! gh api -X DELETE "repos/$REPO_SLUG/git/refs/heads/$DELIVER_BRANCH" >/dev/null 2>&1; then
     echo "finalize-tick: PR #$PR_NUMBER merged; sandbox branch not deleted here (already gone or retained by the platform)"
   fi
   echo "finalize-tick: PR #$PR_NUMBER squash-merged into main"
+  # Continue from the main that now carries this delivery, so a later step of
+  # the same tick (process delivers before and after maintain) builds on it
+  # instead of on a commit main no longer has.
+  if retry git fetch origin main --quiet 2>/dev/null; then
+    git reset -q --keep origin/main 2>/dev/null || true
+  fi
+  rm -f "$MESSAGE_FILE"
   exit 0
 fi
 

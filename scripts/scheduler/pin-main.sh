@@ -18,7 +18,11 @@
 # after its PR is squash-merged. No in-script sweep is needed.
 #
 # Usage:
-#   bash scripts/scheduler/pin-main.sh
+#   bash scripts/scheduler/pin-main.sh [<tag>]
+#
+# With a tag (`scheduler/process`, `scheduler/lint`, …) it also opens this
+# tick's record (`tick_state.py`), which the closing guard reads: from here on
+# the session that ran this cannot end its turn until the tick is closed.
 #
 # Exit codes:
 #   0 — on main, HEAD = origin/main (or local commits replayed on top)
@@ -31,6 +35,22 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 STATE_DIR=".scheduler-state"
 mkdir -p "$STATE_DIR"
+
+# Another pipeline's tick still running in this same clone (a local scheduler
+# whose runs overlap) owns the record, any conflict it is resolving, and any
+# merge it has open. Touch none of them: Step 2's lock check stops this tick a
+# moment later, and the running one must not lose its guard or its merge.
+if [ -n "${1:-}" ] && python3 "$SCRIPT_DIR/tick_state.py" live-for-other "$1"; then
+  echo "pin-main: another pipeline's tick is live in this clone; leaving its record and merge alone" >&2
+  LIVE_OTHER=1
+else
+  LIVE_OTHER=0
+  # A conflict left by a previous run is that run's business, never this one's.
+  rm -f "$STATE_DIR/conflict" "$STATE_DIR/conflict-snapshot.json" "$STATE_DIR/conflict-checkpoint"
+  if [ -n "${1:-}" ]; then
+    python3 "$SCRIPT_DIR/tick_state.py" open "$1"
+  fi
+fi
 
 # `git_current_branch_or` — never `rev-parse --abbrev-ref`, which exits 0 and
 # prints the literal string `HEAD` on a detached checkout, so an `|| echo
@@ -49,6 +69,12 @@ git fetch origin main || { echo "pin-main: fetch failed" >&2; exit 1; }
 if [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; then
   echo "pin-main: an interrupted rebase is in progress; aborting it (scheduler-owned clone)" >&2
   git rebase --abort >/dev/null 2>&1 || git rebase --quit >/dev/null 2>&1 || true
+fi
+# The same for a merge: finalize-tick.sh integrates by merging, and a run that
+# died mid-resolution leaves one open.
+if [ "$LIVE_OTHER" -eq 0 ] && git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+  echo "pin-main: an interrupted merge is in progress; aborting it (scheduler-owned clone)" >&2
+  git merge --abort >/dev/null 2>&1 || true
 fi
 
 if [ "$START_BRANCH" = "main" ]; then

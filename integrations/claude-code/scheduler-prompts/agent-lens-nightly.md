@@ -16,7 +16,7 @@ skill's own architecture. Outputs land in `_system/agent-lens/{id}/{date}.md`
 plus the runs index `_system/state/agent-lens-runs.jsonl`.
 
 **Single-commit guarantee.** This tick produces **exactly one git commit
-+ one git push**, both from `bash scripts/scheduler/finalize-tick.sh` at
++ one git push**, both from `bash scripts/scheduler/close-tick.sh` at
 Step 5. No other path in this prompt commits or pushes. `/minder:mem:save` is
 **forbidden** in scheduler ticks. Any intermediate `git commit`,
 `git push`, or `git add` outside the helper scripts listed below is a
@@ -24,7 +24,7 @@ contract violation.
 
 **Hard prohibitions:**
 
-- Do NOT invoke `/minder:mem:save` in any form. Use `finalize-tick.sh` at Step 5.
+- Do NOT invoke `/minder:mem:save` in any form. Use `close-tick.sh` at Step 5.
 - Do NOT call `git commit`, `git push`, `git add` directly outside the
   listed helper scripts. **One explicit exception:** Step 5b (MCP
   delivery fallback, runs only when finalize-tick reports `gh CLI not
@@ -55,7 +55,7 @@ contract violation.
   failure-handling, because a blocked prompt is not an error. A result that did
   not arrive by its normal return path is a failed step; handle it as one
   instead of reconstructing it from what the runtime wrote about itself.
-  The single exception is `record_tick_telemetry.py` at Step 4.9: it reads
+  The single exception is `record_tick_telemetry.py`, inside Step 5: it reads
   this run's own transcript because measuring the run is its whole purpose,
   it is a declared step invoking a declared helper, and it degrades to
   `status: unmeasured` rather than prompting. The prohibition is on YOU
@@ -65,7 +65,7 @@ contract violation.
 - Do NOT narrate or summarise between steps.
 - If the working tree looks "dirty across many lens outputs" after Step
   4, that is NORMAL. Do NOT try to "group by lens" or "save progress" —
-  Step 5's `finalize-tick.sh` collapses every dirty owner path into one
+  Step 5's `close-tick.sh` collects every dirty owner path into one
   commit.
 
 **Bash is permitted only for the helper invocations explicitly listed
@@ -82,6 +82,9 @@ bash scripts/scheduler/ship-failure-note.sh "<one-line cause>" agent-lens-nightl
 
 Then exit `partial` immediately.
 
+Exit code 3 from `close-tick.sh` is NOT a failure and never goes here: it
+means a conflict this tick resolves itself — go to Step 5c.
+
 ## Steps
 
 0. `bash scripts/scheduler/ensure-skills.sh` — verify the project-level
@@ -97,7 +100,7 @@ Then exit `partial` immediately.
    and exit `partial`. The durable fix is real-file skills delivered via
    the skeleton + `/minder:mem:update`, not an in-tick repair.
 
-1. `bash scripts/scheduler/pin-main.sh` — get on fresh `origin/main`
+1. `bash scripts/scheduler/pin-main.sh scheduler/agent-lens` — get on fresh `origin/main`
    and capture the starting sandbox branch.
 
 2. `bash scripts/scheduler/lock-check.sh` — abort if any pipeline lock
@@ -116,24 +119,10 @@ Then exit `partial` immediately.
      failure-handling, exit `partial`.
    - When the skill returns, the immediate next action is step 5.
 
-4.9. `python3 scripts/scheduler/record_tick_telemetry.py agent-lens` — append this
-   tick's own token consumption to `_system/state/tick-telemetry.jsonl`, read from
-   the run's own transcript (main session plus every sub-agent it spawned).
-
-   It runs HERE, before Step 5, because Step 5 is what commits and the
-   single-commit guarantee leaves no second commit to carry a line written
-   after it. The cost of that ordering is that this tick's own closing
-   messages are not in the count; the line records `measured_through` so the
-   horizon is explicit rather than implied.
-
-   **This helper always exits 0 and never triggers failure-handling**, even
-   when it measures nothing — it writes `status: unmeasured` with the reason
-   instead. Its output is informational. Do NOT retry it, do NOT repair it,
-   and never abandon a tick because its odometer failed: the tick's real work
-   is already done and losing it to a broken measurement would invert every
-   priority this step exists to serve.
-
-5. `bash scripts/scheduler/finalize-tick.sh scheduler/agent-lens` — the
+5. `bash scripts/scheduler/close-tick.sh scheduler/agent-lens` — measures this
+   tick (one line of token consumption in `_system/state/tick-telemetry.jsonl`,
+   read from the run's own transcript; that measurement never fails the tick),
+   then makes the
    single commit + delivery for this tick. Auto-detects mode:
    - **LOCAL mode** (start branch = main) — direct `git push origin main`.
    - **ROUTINES mode** (start branch = `claude/...` or other non-main) —
@@ -149,10 +138,18 @@ Then exit `partial` immediately.
    - Exit code 2 → run failure-handling with cause
      `"finalize-tick failed"`, then print final status line.
 
-   **No manual push retries.** If `finalize-tick.sh` exits 2 (push, PR
+   - Exit code 3 → a run that delivered first overlaps this one; go to
+     Step 5c.
+
+   **This tick cannot end before Step 5 has delivered it.** The closing guard
+   (`.claude/hooks/tick_guard.py`) reads the tick's record: ending the turn
+   earlier is refused with the remaining step named, and after two refusals
+   the guard closes the tick itself. Finish the steps instead.
+
+   **No manual push retries.** If Step 5 exits 2 (push, PR
    create, or PR merge failed), do NOT invent a retry loop
-   with direct git / gh calls. The script makes exactly one delivery
-   attempt by design. Surface the failure via failure-handling and exit
+   with direct git / gh calls. The script already retries transient
+   failures itself. Surface the failure via failure-handling and exit
    `partial`; the next tick runs fresh.
 
    **Exception — gh missing.** If exit 2 is specifically because
@@ -198,10 +195,36 @@ Then exit `partial` immediately.
       head branches» enabled in GitHub Settings → General → Pull
       Requests; GitHub removes `<SANDBOX_BRANCH>` the moment the squash
       merge in step 4 completes. No manual delete call is needed.
-   6. Print final status: `success <merged-SHA>` and skip Step 6
+   6. Run `python3 scripts/scheduler/tick_state.py set closed delivered-mcp`.
+   7. Print final status: `success <merged-SHA>` and skip Step 6
       failure-handling.
 
    This is the ONE authorized non-script git/MCP path in this prompt.
+
+5c. **Conflict resolution** — runs ONLY when the closing step exits 3. A run that
+   delivered first changed the same place in some files as this tick did.
+   `.scheduler-state/conflict` lists them, from its second line on. Each still
+   carries conflict markers: `<<<<<<<` opens this tick's version, `|||||||` the
+   version both started from, `=======` main's version, `>>>>>>>` closes.
+   (Where both sides only ADDED lines, the closing step already kept both —
+   what is listed here is a real overlap.)
+
+   For each listed file, edit it so it keeps what BOTH sides meant — main's
+   change and this tick's change together, never one instead of the other —
+   and remove every marker line. A file this tick should no longer have may be
+   deleted. Touch no other file and run no git command: the closing step stages
+   your resolution itself.
+
+   Some conflicts carry no markers: a binary file, or a file one side deleted
+   and the other edited, sits in the tree as one side's version. Decide those
+   too — write the version to keep, or delete the file. A listed file left
+   exactly as it was counts as unresolved.
+
+   Then run again the command that exited 3, exactly as before (with
+   `--checkpoint` if it had it). If it exits 3 again (main moved once more),
+   repeat this step. A file you cannot resolve, leave as it is: the
+   closing guard settles what is left by main's version and names it in
+   CLARIFICATIONS, and the rest of the tick is still delivered.
 
 ## Forbidden in this tick
 

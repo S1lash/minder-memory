@@ -63,10 +63,13 @@ creation is owner-driven (wizard-style); see
 
 ## Single-commit guarantee
 
-Every scheduler tick produces **exactly one commit on `origin/main`**.
-The contract is enforced by `scripts/scheduler/finalize-tick.sh` — the
-single point in the prompt that commits + delivers. Two helpers feed
-into it:
+Every scheduler tick produces **exactly one commit on `origin/main`** — except
+process, which delivers twice: once with its records, before maintain starts,
+and once with what maintain integrated, so a run cut short during maintain no
+longer takes its records with it. The prompts close a tick with
+`scripts/scheduler/close-tick.sh <tag>` (`--checkpoint` for process's first
+delivery), which measures the tick and runs `scripts/scheduler/finalize-tick.sh`
+— the single point that commits + delivers. Two helpers feed into it:
 
 - `scripts/scheduler/stage.sh` — staging-only (idempotent). Engine
   paths are filtered (defined in `.engine-manifest.yml` + a small
@@ -367,8 +370,42 @@ scheduler prompts are not for you yet.
 | `/minder:mem:resolve-clarifications` interactive | Resolution is the human-in-loop step by design. The auto-mode dispatch inside lint Step 7.5 is the exception. |
 | `/minder:mem:update` | Engine sync needs owner attention (VERSION delta, migrations, divergence resolution). |
 | Pause and ask the owner | No human in this loop. Anything that would be a question becomes a CLARIFICATIONS row. |
-| Retry push on failure | The script makes exactly one delivery attempt per tick. A failed delivery surfaces as `partial`; next tick processes fresh state from inbox. |
+| Retry delivery by hand | The closing script already retries each network call three times and integrates again when main moved. What still fails surfaces as `partial`; the model never improvises its own retry loop. |
 | Skip commit on «small» changes | Every tick commits, even routine state-only churn. Predictability beats minimalism. |
+
+## A tick cannot end undelivered
+
+Most lost ticks were not delivery failures at all: the model running the tick
+finished its skills, wrote its report, and ended its turn before the closing
+step, and the platform recorded a success. Three pieces make that impossible
+to do silently:
+
+- **The tick's record.** `pin-main.sh <tag>` opens it
+  (`.scheduler-state/tick.json`, via `scripts/scheduler/tick_state.py`);
+  `close-tick.sh` and `ship-failure-note.sh` close it. It is bound to the
+  session that opened it, and ignored once it is hours old, so an owner's own
+  session in the same clone is never affected.
+- **The closing guard** (`.claude/hooks/tick_guard.py`, registered in
+  `.claude/settings.json` for the `Stop` and `PostToolUse` events). When that
+  session tries to end with its tick open, the guard refuses twice and names
+  the step that is left. The third time it closes the tick itself: work that
+  finished (no pipeline lock held) is delivered; work interrupted mid-skill is
+  NOT — only a failure note ships, because half of it delivered now is what
+  would turn the next tick's redo into duplicates. The unfinished files are
+  set aside in a git stash named in the note, so a clone that persists between
+  runs does not deliver them with its next tick either. (A skill that reports
+  its own error still goes through ordinary failure handling, which delivers
+  what is in the tree.)
+- **Conflicts are settled, not fatal.** A run that delivered first and touched
+  the same files used to cost the later run everything. Now, where both sides
+  only added lines, both are kept mechanically
+  (`scripts/scheduler/_resolve_conflicts.py`); a real overlap stops the
+  closing step with exit 3 and the tick resolves it itself (Step 5c of each
+  prompt, keeping what both sides meant); and if it cannot, the guard's last
+  resort keeps main's version for those files only, delivers the rest, and
+  names the files in CLARIFICATIONS. The delivery rail behaves the same way: a
+  path the tick never recorded writing is put back and named, and everything
+  else still lands. Every call that leaves the machine is retried three times.
 
 ## Partial-tick handling
 

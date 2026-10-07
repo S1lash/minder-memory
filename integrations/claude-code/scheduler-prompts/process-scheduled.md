@@ -11,16 +11,18 @@ runtime loads them automatically — write the slash command literally as
 the next action and it executes. Step 0 verifies this layout resolved in
 the clone before any slash invocation.
 
-**Single-commit guarantee.** This tick produces **exactly one git commit
-+ one git push**, both from `bash scripts/scheduler/finalize-tick.sh` at
-Step 5. No other path in this prompt commits or pushes. `/minder:mem:save` is
+**Two-delivery guarantee.** This tick delivers to `main` at most twice, and
+only from `bash scripts/scheduler/close-tick.sh`: once at Step 4.1, with the
+processed records, before maintain begins, and once at Step 5, with what
+maintain integrated. A run cut short during maintain — the longest stretch of
+the tick — no longer takes its records down with it. No other path in this prompt commits or pushes. `/minder:mem:save` is
 **forbidden** in scheduler ticks — it is an owner-interactive tool. Any
 intermediate `git commit`, `git push`, or `git add` outside the helper
 scripts listed below is a contract violation.
 
 **Hard prohibitions:**
 
-- Do NOT invoke `/minder:mem:save` in any form. Use `finalize-tick.sh` at Step 5.
+- Do NOT invoke `/minder:mem:save` in any form. Use `close-tick.sh` at Step 5.
 - Do NOT call `git commit`, `git push`, `git add` directly. The only
   allowed git mutations come from the helper scripts listed in the
   steps, with one explicit exception: Step 5b (MCP delivery fallback,
@@ -53,7 +55,7 @@ scripts listed below is a contract violation.
   failure-handling, because a blocked prompt is not an error. A result that did
   not arrive by its normal return path is a failed step; handle it as one
   instead of reconstructing it from what the runtime wrote about itself.
-  The single exception is `record_tick_telemetry.py` at Step 4.9: it reads
+  The single exception is `record_tick_telemetry.py`, inside Step 5: it reads
   this run's own transcript because measuring the run is its whole purpose,
   it is a declared step invoking a declared helper, and it degrades to
   `status: unmeasured` rather than prompting. The prohibition is on YOU
@@ -65,7 +67,7 @@ scripts listed below is a contract violation.
 - If the working tree looks "dirty across many categories" after Steps 4
   and 4.5, that is NORMAL output of `/minder:mem:process` + `/minder:mem:maintain`. Do
   NOT try to "group by theme" or "save progress" — Step 5's
-  `finalize-tick.sh` collapses every dirty owner path into one commit.
+  the closing step collects every dirty owner path into its commit.
 
 **Bash is permitted only for the helper invocations explicitly listed
 in the steps below.** Anything else is a contract violation.
@@ -80,6 +82,9 @@ bash scripts/scheduler/ship-failure-note.sh "<one-line cause>" process-scheduled
 ```
 
 Then exit `partial` immediately. Do not retry.
+
+Exit code 3 from `close-tick.sh` is NOT a failure and never goes here: it
+means a conflict this tick resolves itself — go to Step 5c.
 
 ## Steps
 
@@ -96,7 +101,7 @@ Then exit `partial` immediately. Do not retry.
    and exit `partial`. The durable fix is real-file skills delivered via
    the skeleton + `/minder:mem:update`, not an in-tick repair.
 
-1. `bash scripts/scheduler/pin-main.sh` — get on fresh `origin/main`
+1. `bash scripts/scheduler/pin-main.sh scheduler/process` — get on fresh `origin/main`
    and capture the starting sandbox branch.
 
 2. `bash scripts/scheduler/lock-check.sh` — abort if any pipeline lock
@@ -125,8 +130,16 @@ Then exit `partial` immediately. Do not retry.
    Do NOT pass `--limit` here — the default is the intended scheduler
    behaviour, and passing a number would duplicate the canonical value.
    - On skill error → run failure-handling, exit `partial`.
-   - When the skill returns, the immediate next action is step 4.5 with
+   - When the skill returns, the immediate next action is step 4.1 with
      no intermediate text.
+
+4.1. `bash scripts/scheduler/close-tick.sh scheduler/process --checkpoint` —
+   delivers what Step 4 produced and keeps the tick open.
+   - Exit code 0 → go straight to step 4.5.
+   - Exit code 3 → do Step 5c, then run this same command again.
+   - Any other exit (including `"gh CLI not found in PATH"`) → do NOT run
+     failure-handling and do NOT do Step 5b here; go on to step 4.5. Nothing
+     is lost: the work stays in this tick, and Step 5 delivers all of it.
 
 4.5. `/minder:mem:maintain --no-sync-check` — exactly ONE invocation, always,
    whatever Step 4 reported. This is the after-batch integrator, and it
@@ -151,30 +164,16 @@ Then exit `partial` immediately. Do not retry.
    - Empty unprocessed set → the skill exits immediately with "nothing to
      integrate". That is a normal outcome, not an error.
    - On skill error → run failure-handling, exit `partial`. Step 4's work
-     is not stranded: `ship-failure-note.sh` ships through
-     `finalize-tick.sh`, so the tick still lands its one commit.
+     is not stranded: it was delivered at Step 4.1, or — if that delivery
+     failed — `ship-failure-note.sh` ships it through `finalize-tick.sh`.
    - When the skill returns, the immediate next action is step 5 with
      no intermediate text.
 
-4.9. `python3 scripts/scheduler/record_tick_telemetry.py process` — append this
-   tick's own token consumption to `_system/state/tick-telemetry.jsonl`, read from
-   the run's own transcript (main session plus every sub-agent it spawned).
-
-   It runs HERE, before Step 5, because Step 5 is what commits and the
-   single-commit guarantee leaves no second commit to carry a line written
-   after it. The cost of that ordering is that this tick's own closing
-   messages are not in the count; the line records `measured_through` so the
-   horizon is explicit rather than implied.
-
-   **This helper always exits 0 and never triggers failure-handling**, even
-   when it measures nothing — it writes `status: unmeasured` with the reason
-   instead. Its output is informational. Do NOT retry it, do NOT repair it,
-   and never abandon a tick because its odometer failed: the tick's real work
-   is already done and losing it to a broken measurement would invert every
-   priority this step exists to serve.
-
-5. `bash scripts/scheduler/finalize-tick.sh scheduler/process` — the
-   single commit + delivery for this tick. The script auto-detects mode:
+5. `bash scripts/scheduler/close-tick.sh scheduler/process` — measures this
+   tick (one line of token consumption in `_system/state/tick-telemetry.jsonl`,
+   read from the run's own transcript; that measurement never fails the tick),
+   then makes the
+   final commit + delivery for this tick. The script auto-detects mode:
    - **LOCAL mode** (start branch = main) — single direct
      `git push origin main`.
    - **ROUTINES mode** (start branch = `claude/...` or other non-main) —
@@ -193,10 +192,18 @@ Then exit `partial` immediately. Do not retry.
    - Exit code 2 → run failure-handling with cause
      `"finalize-tick failed"`, then print the final status line.
 
-   **No manual push retries.** If `finalize-tick.sh` exits 2 because
+   - Exit code 3 → a run that delivered first overlaps this one; go to
+     Step 5c.
+
+   **This tick cannot end before Step 5 has delivered it.** The closing guard
+   (`.claude/hooks/tick_guard.py`) reads the tick's record: ending the turn
+   earlier is refused with the remaining step named, and after two refusals
+   the guard closes the tick itself. Finish the steps instead.
+
+   **No manual push retries.** If Step 5 exits 2 because
    `git push`, the PR create, or the PR merge failed (HTTP 403,
    network, anything), do NOT invent a retry loop with direct git / gh
-   calls. The script makes exactly one delivery attempt by design. If
+   calls. The script already retries transient failures itself. If
    work could not be delivered, surface the failure via failure-handling
    and exit `partial`; the next tick processes fresh inbox state.
 
@@ -244,7 +251,8 @@ Then exit `partial` immediately. Do not retry.
       head branches» enabled in GitHub Settings → General → Pull
       Requests; GitHub removes `<SANDBOX_BRANCH>` the moment the squash
       merge in step 4 completes. No manual delete call is needed.
-   6. Print final status: `success <merged-SHA>` and skip Step 6
+   6. Run `python3 scripts/scheduler/tick_state.py set closed delivered-mcp`.
+   7. Print final status: `success <merged-SHA>` and skip Step 6
       failure-handling.
 
    This is the ONE authorized non-script git/MCP path in this prompt.
@@ -252,6 +260,31 @@ Then exit `partial` immediately. Do not retry.
    when gh is missing. Outside of «`gh CLI not found in PATH`» exit, do
    NOT invoke any github MCP tool from this prompt — failure-handling
    covers other failure modes.
+
+5c. **Conflict resolution** — runs ONLY when the closing step exits 3. A run that
+   delivered first changed the same place in some files as this tick did.
+   `.scheduler-state/conflict` lists them, from its second line on. Each still
+   carries conflict markers: `<<<<<<<` opens this tick's version, `|||||||` the
+   version both started from, `=======` main's version, `>>>>>>>` closes.
+   (Where both sides only ADDED lines, the closing step already kept both —
+   what is listed here is a real overlap.)
+
+   For each listed file, edit it so it keeps what BOTH sides meant — main's
+   change and this tick's change together, never one instead of the other —
+   and remove every marker line. A file this tick should no longer have may be
+   deleted. Touch no other file and run no git command: the closing step stages
+   your resolution itself.
+
+   Some conflicts carry no markers: a binary file, or a file one side deleted
+   and the other edited, sits in the tree as one side's version. Decide those
+   too — write the version to keep, or delete the file. A listed file left
+   exactly as it was counts as unresolved.
+
+   Then run again the command that exited 3, exactly as before (with
+   `--checkpoint` if it had it). If it exits 3 again (main moved once more),
+   repeat this step. A file you cannot resolve, leave as it is: the
+   closing guard settles what is left by main's version and names it in
+   CLARIFICATIONS, and the rest of the tick is still delivered.
 
 ## Forbidden in this tick
 

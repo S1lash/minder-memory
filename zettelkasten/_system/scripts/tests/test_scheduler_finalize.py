@@ -77,6 +77,10 @@ _SCHEDULER_SCRIPTS = (
     "pin-main.sh",
     "_classify_paths.py",
     "_delivery_check.py",
+    "_resolve_conflicts.py",
+    "tick_state.py",
+    "close-tick.sh",
+    "record_tick_telemetry.py",
 )
 
 
@@ -573,15 +577,15 @@ def test_a_stale_version_of_a_staged_file_cannot_reach_origin(tmp_path: Path) ->
                     "scheduler/process: 1 record(s) updated [scheduled]")
 
     result = _run_script(work, "finalize-tick.sh", "scheduler/roles")
-    assert result.returncode != 0, (
-        "a tick whose tree predates the concurrent change must not deliver:\n"
-        f"stdout={result.stdout}\nstderr={result.stderr}")
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
 
+    # Both sides only added a line at the same place: both are kept, the
+    # concurrent one first. Neither run's work is lost, and the stale tree
+    # never overwrote anything.
     delivered = subprocess.run(
         ["git", "show", "main:zettelkasten/_records/shared.md"],
         cwd=origin, capture_output=True, text=True, encoding="utf-8")
-    assert "CONCURRENT LINE" in delivered.stdout, (
-        "the concurrent content must still be what origin/main holds")
+    assert delivered.stdout == "line one\nCONCURRENT LINE\ntick line\n", delivered.stdout
 
 
 def test_delivery_refuses_a_change_the_tick_never_staged(tmp_path: Path) -> None:
@@ -609,13 +613,23 @@ def test_delivery_refuses_a_change_the_tick_never_staged(tmp_path: Path) -> None
         "zettelkasten/_system/state/log_lint.md\n", encoding="utf-8")
 
     result = _run_script(work, "finalize-tick.sh", "scheduler/roles")
-    assert result.returncode == 2, f"stdout={result.stdout}\nstderr={result.stderr}"
+    # The refused path is dropped — put back to main's version — and the rest
+    # of the tick is delivered, with the drop named in CLARIFICATIONS.
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
     assert "owner-note" in result.stderr
 
     still_there = subprocess.run(
         ["git", "show", "main:zettelkasten/_records/owner-note.md"],
         cwd=origin, capture_output=True, text=True, encoding="utf-8")
-    assert still_there.returncode == 0, "nothing may be pushed when the invariant trips"
+    assert still_there.returncode == 0, "a path the tick never recorded may not move"
+    delivered = subprocess.run(
+        ["git", "show", "main:zettelkasten/_system/state/log_lint.md"],
+        cwd=origin, capture_output=True, text=True, encoding="utf-8")
+    assert delivered.stdout == "tick\n", "the rest of the tick is delivered"
+    clar = subprocess.run(
+        ["git", "show", "main:zettelkasten/_system/state/CLARIFICATIONS.md"],
+        cwd=origin, capture_output=True, text=True, encoding="utf-8")
+    assert "owner-note" in clar.stdout
 
 
 def test_pinning_moves_a_clean_main_forward_and_leaves_local_commits_alone(
