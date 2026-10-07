@@ -565,7 +565,7 @@ configuration. Used at Step 6 internal translation.
 | «strengths I underestimate» | psyche | records | monthly 1 | longitudinal | counterweight to imposter |
 | «overcommit / saying yes too easily» | psyche | records | weekly | longitudinal | behavioral pattern |
 
-Cadence anchor defaults (cron tick fires 07:00 each day; anchor = day
+Cadence anchor defaults (the nightly tick fires once a day; anchor = day
 the lens reads on, so trailing-window logic captures full prior week
 when anchored to Monday):
 - mechanical work-themed → monday (full Mon-Sun previous week)

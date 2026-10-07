@@ -16,6 +16,11 @@ Five scheduled jobs.
 | `minder-mem-content` | 1× weekly (Tue 06:00) | `/minder:mem:sync-data` → `/minder:mem:content --maintain` → `finalize-tick.sh scheduler/content` | `integrations/claude-code/scheduler-prompts/content-tick.md` |
 | `minder-mem-roles` | 1× daily (07:00) | `/minder:mem:sync-data` → `/minder:mem:roles` → `finalize-tick.sh scheduler/roles` | `integrations/claude-code/scheduler-prompts/roles-nightly.md` |
 
+The times here and in every cron line below are your local time. A cloud
+routine reads its cron in UTC, so convert them when you enter them — and convert
+all of them by the same offset, because the order and the gaps between the ticks
+are what the slots are for.
+
 The content pipeline runs across two ticks a day apart: the `content-synthesis`
 lens (the classifier) is a registered agent-lens (`weekly mon`), so the existing
 `minder-mem-agent-lens` tick runs it on Mondays; the `minder-mem-content` maintainer drafts on
@@ -51,6 +56,18 @@ slot, in order of weight:
 
 Like agent-lens, one fire ≠ one run per role: the tick runs only the roles whose
 own cadence has elapsed, sequentially, never two at once.
+
+**Keep at least five and a half hours between the last process tick and
+agent-lens.** Every tick draws on the same account's usage, and a subscription
+meters it in five-hour windows. The evening process tick is the heaviest of the
+day — up to two hours on a full inbox — and when it shares a window with the
+night sequence, the ticks at the end of that sequence are the ones refused for
+the limit: roles, which runs last, is the one that goes missing. Starting
+agent-lens a full window after the last process tick gives the night sequence a
+window of its own. The night sequence itself needs about an hour per tick; the
+slots above keep that spacing. Shift the whole night sequence together if the
+evening process tick runs late — the order and the spacing are what matter, not
+the clock.
 
 There is no `minder-mem-maintain` schedule — maintain has no cadence of its own
 and runs as Step 4.5 of the process tick, once `/minder:mem:process` has
