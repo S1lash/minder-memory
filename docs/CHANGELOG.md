@@ -2,6 +2,15 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.4.1 — The safety net no longer stops a run that is still working
+
+The safety net added in 1.4.0 mistook a run waiting for its own helper for a
+run walking away. A processing run that hands its batch to a helper and waits
+for it was closed after a few minutes as «interrupted», and the helper's work
+was dropped — nothing was lost, the next run redoes it from the inbox, but the
+run was wasted. The safety net now waits while a run has work going in the
+background, and steps in only once that work is done.
+
 ## 1.4.0 — A scheduled run no longer loses its work quietly
 
 About one scheduled run in four used to end without its work reaching your

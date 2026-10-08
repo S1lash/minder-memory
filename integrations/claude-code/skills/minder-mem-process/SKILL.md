@@ -781,7 +781,12 @@ subagent context, not summaries).
 
 - Tool: `Task`, `subagent_type: general-purpose` (inherits Opus from
   orchestrator), **always `run_in_background: false`**. Never background a
-  batch, and never poll for one.
+  batch, and never poll for one. If the runtime starts a batch in the
+  background anyway — the cloud does — end your turn and wait: the batch's
+  completion notification carries its result, and that result is its
+  manifest. A scheduler tick's closing guard lets a turn end while a batch is
+  running. Never read the runtime's own files to recover a manifest; a batch
+  whose notification carries no manifest is a failed batch.
 
   **This does not make batches sequential.** A wave still goes out as §3.0.2
   specifies — up to three `Task` blocks in one tool-use message, running
