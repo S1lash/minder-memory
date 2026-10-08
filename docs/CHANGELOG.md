@@ -2,6 +2,37 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.5.0 — Minder Memory stops weighing down your other sessions
+
+Every Claude Code session on your machine — including ones that have nothing
+to do with your notes, like a work project — was loading the engine's full
+operating doctrine: about 44,000 characters, read before you typed a word.
+It got there through `~/.claude/rules/`, a folder Claude Code loads on its
+own, even though the list in your `~/.claude/CLAUDE.md` never mentioned it.
+
+Now there is one list, and it is the whole truth:
+
+- **Outside your Minder Memory folder**, a session carries only the five
+  files it needs — how to search your notes, the capture hook, your
+  constitution, and the two baselines for how answers are reached and
+  presented. Each is listed in the Minder Memory block of `~/.claude/CLAUDE.md`,
+  and they now live in `~/.claude/minder-memory/`, a folder Claude Code does
+  not load by itself.
+- **In a session started in your Minder Memory folder**, the doctrine still
+  loads — and now loads on its own in scheduled cloud runs too, where until
+  now only the skills that read it explicitly saw it.
+
+Sessions inside the folder got lighter too: reference tables the engine's
+guides carried in full — which docs move with which change, every engine path,
+the registry of self-resolving checks — now live in documents opened when
+needed, not read at the start of every session.
+
+The update moves everything for you and removes the six links it once put in
+`~/.claude/rules/`. Anything of your own in that folder is left alone — if
+you keep an edited copy there under one of those names, `check_update.py`
+points it out, since it now loads beside the engine's own. Open a new Claude
+Code session afterwards to feel the difference.
+
 ## 1.4.1 — The safety net no longer stops a run that is still working
 
 The safety net added in 1.4.0 mistook a run waiting for its own helper for a

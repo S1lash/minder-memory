@@ -291,8 +291,8 @@ engine line changes, so it cannot quietly outlive what it excused.
 
 ## Engine boundaries — what the engine is not allowed to do
 
-Codified in `zettelkasten/_system/docs/ENGINE_DOCTRINE.md` (auto-loaded
-into every Claude Code session). The contract:
+Codified in `zettelkasten/_system/docs/ENGINE_DOCTRINE.md` (loaded into
+every Claude Code session started at this repository's root). The contract:
 
 - Never auto-create a knowledge profile in `3_resources/people/<id>.md`
   without surfacing the threshold-crossing → CLARIFICATION first.

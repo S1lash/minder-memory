@@ -12,7 +12,7 @@
 >    the actual harness view of your constitution.
 >
 > The installer (`integrations/claude-code/install.sh`) symlinks this
-> file into `~/.claude/rules/constitution-core.md`. Until you run the
+> file into `~/.claude/minder-memory/constitution-core.md`. Until you run the
 > regen step, the symlink resolves to this stub — engine prompts that
 > @-reference it will read these instructions and behave gracefully.
 

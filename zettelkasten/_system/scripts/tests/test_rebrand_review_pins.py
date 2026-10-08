@@ -119,7 +119,7 @@ class InstallerMarkersTests(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             md = (home / "CLAUDE.md").read_text(encoding="utf-8")
             self.assertEqual(md.count("BEGIN — managed by install.sh"), 1, md)
-            self.assertIn("@~/.claude/rules/minder-memory.md", md)
+            self.assertIn("@~/.claude/minder-memory/minder-memory.md", md)
             self.assertNotIn("stale.md", md)
             self.assertLess(md.index("- above"), md.index("MINDER-MEMORY BEGIN"))
             self.assertLess(md.index("MINDER-MEMORY END"), md.index("- below"))

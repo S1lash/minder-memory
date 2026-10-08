@@ -144,10 +144,12 @@ If you want to override an engine prompt or script for your instance,
 **don't edit the engine path directly** — the next sync will overwrite
 your change. Instead:
 
-- For Claude rules / commands / skills: edit your local
-  `~/.claude/{rules,commands,skills}/` file after install. The
-  installer respects existing files (it backs them up before
-  symlinking, but you can replace the symlink with a real file).
+- For the always-on files (`~/.claude/minder-memory/`), commands and
+  skills: don't edit what the installer links — every run re-links it and
+  moves a file you put in its place into `~/.claude/.minder-memory-backup-*`.
+  Write your own file instead and `@`-import it from `~/.claude/CLAUDE.md`
+  outside the managed `MINDER-MEMORY` block, which the installer never
+  touches.
 - For system prompts that the engine reads from `_system/`: copy the
   engine file to a sibling path under `2_areas/personal/`, edit there,
   and update your `~/.claude/CLAUDE.md` to @-reference your version.

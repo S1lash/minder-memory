@@ -25,6 +25,9 @@ _THIS = Path(__file__).resolve()
 _REPO_ROOT = _THIS.parents[4]
 CHECK = _REPO_ROOT / "scripts" / "check_update.py"
 
+HOT_FILES = ("minder-memory.md", "constitution-capture.md", "communication-baseline.md",
+             "advisory-baseline.md", "constitution-core.md")
+
 SKILL_NAMES = (
     "bootstrap", "process", "maintain", "lint", "agent-lens", "agent-lens-add",
     "capture-candidate", "content", "check-decision", "regen-constitution",
@@ -176,9 +179,9 @@ class CheckUpdateTests(unittest.TestCase):
         _write(self.home, "CLAUDE.md",
                "# My harness\n"
                "<!-- MINDER-MEMORY BEGIN — managed by install.sh, do not edit by hand -->\n"
-               "@~/.claude/rules/minder-memory.md\n"
-               "<!-- MINDER-MEMORY END -->\n")
-        for rel in ("rules/minder-memory.md", "rules/minder-memory-engine-doctrine.md",
+               + "".join(f"- @~/.claude/minder-memory/{name}\n" for name in HOT_FILES)
+               + "<!-- MINDER-MEMORY END -->\n")
+        for rel in (*(f"minder-memory/{name}" for name in HOT_FILES),
                     "agents/minder-mem-role.md", "commands/minder/mem/recap.md",
                     "commands/minder/mem/search.md"):
             _write(self.home, rel, "x\n")
@@ -207,7 +210,7 @@ class CheckUpdateTests(unittest.TestCase):
         # The probes that CAN be answered from this fixture must actually be
         # answered — a suite where everything skips proves nothing.
         for probe in ("managed-block", "harness-paths", "skill-count",
-                      "legacy-harness-entries", "dashboard", "migration-ledger",
+                      "legacy-harness-entries", "rules-dir-clean", "dashboard", "migration-ledger",
                       "conflict-markers", "clone-residue", "sources-untouched"):
             self.assertEqual(statuses[probe], "ok", f"{probe}: {statuses[probe]}")
 
@@ -227,6 +230,93 @@ class CheckUpdateTests(unittest.TestCase):
         self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
         self.assertEqual(self._failed(res), {"legacy-harness-entries"})
         self.assertIn("ztn-process", res.stdout)
+
+    def test_a_link_of_ours_left_in_rules_fails(self):
+        """`rules/` is auto-loaded: a link left there loads beside the block, in every session."""
+        doctrine = _write(self.clone, "zettelkasten/_system/docs/ENGINE_DOCTRINE.md", "x\n")
+        (self.home / "rules").mkdir(parents=True, exist_ok=True)
+        os.symlink(doctrine, self.home / "rules" / "minder-memory-engine-doctrine.md")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        self.assertEqual(self._failed(res), {"rules-dir-clean"})
+        self.assertIn("minder-memory-engine-doctrine.md", res.stdout)
+
+    def test_what_is_not_ours_in_rules_passes(self):
+        _write(self.home, "rules/mine.md", "mine\n")
+        _write(self.home, "rules/constitution-core.md", "my own, under a name the engine once used\n")
+        elsewhere = self.home.parent / "elsewhere.md"
+        elsewhere.write_text("x\n", encoding="utf-8")
+        os.symlink(elsewhere, self.home / "rules" / "other.md")
+        playbook = _write(self.clone, "zettelkasten/_system/long-form-playbook.md", "x\n")
+        os.symlink(playbook, self.home / "rules" / "my-playbook.md")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        probe = next(p for p in json.loads(res.stdout)["probes"] if p["probe"] == "rules-dir-clean")
+        self.assertIn("my-playbook.md", probe["evidence"])
+
+    def test_a_retired_link_into_another_clone_fails_and_names_it(self):
+        """Not removed by this clone's installer — so it must not be silent either."""
+        other = self.home.parent / "other-clone"
+        doctrine = _write(other, "zettelkasten/_system/docs/ENGINE_DOCTRINE.md", "x\n")
+        (self.home / "rules").mkdir(parents=True, exist_ok=True)
+        os.symlink(doctrine, self.home / "rules" / "minder-memory-engine-doctrine.md")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        self.assertEqual(self._failed(res), {"rules-dir-clean"})
+        self.assertIn("other-clone", res.stdout)
+
+    def test_a_dangling_retired_link_is_reported_not_failed(self):
+        """A moved clone's old link loads nothing; failing on it would teach the reader to ignore the probe."""
+        (self.home / "rules").mkdir(parents=True, exist_ok=True)
+        gone = self.home.parent / "moved-away/zettelkasten/_system/docs/ENGINE_DOCTRINE.md"
+        os.symlink(gone, self.home / "rules" / "minder-memory-engine-doctrine.md")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        probe = next(p for p in json.loads(res.stdout)["probes"] if p["probe"] == "rules-dir-clean")
+        self.assertIn("minder-memory-engine-doctrine.md", probe["evidence"])
+
+    def test_a_block_that_imports_nothing_fails(self):
+        """Every file present and nothing loading it is the quietest way to lose all five."""
+        md = self.home / "CLAUDE.md"
+        md.write_text("".join(ln for ln in md.read_text(encoding="utf-8").splitlines(True)
+                              if "@~/.claude/minder-memory/" not in ln), encoding="utf-8")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        self.assertEqual(self._failed(res), {"managed-block"})
+
+    def test_an_owners_file_under_a_retired_name_is_named_not_failed(self):
+        _write(self.home, "rules/constitution-capture.md", "my edited copy\n")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        probe = next(p for p in json.loads(res.stdout)["probes"] if p["probe"] == "rules-dir-clean")
+        self.assertIn("constitution-capture.md", probe["evidence"])
+        self.assertIn("minder-memory/constitution-capture.md", probe["evidence"])
+
+    def test_a_relative_link_into_this_clone_is_ours(self):
+        doctrine = _write(self.clone, "zettelkasten/_system/docs/ENGINE_DOCTRINE.md", "x\n")
+        rules = self.home / "rules"
+        rules.mkdir(parents=True, exist_ok=True)
+        os.symlink(os.path.relpath(doctrine, rules), rules / "minder-memory-engine-doctrine.md")
+        res = self._run("--json")
+        self.assertEqual(self._failed(res), {"rules-dir-clean"})
+        self.assertIn("this clone", res.stdout)
+
+    def test_a_block_still_importing_from_rules_fails(self):
+        md = self.home / "CLAUDE.md"
+        md.write_text(md.read_text(encoding="utf-8").replace(
+            "- @~/.claude/minder-memory/minder-memory.md\n",
+            "- @~/.claude/minder-memory/minder-memory.md\n- @~/.claude/rules/minder-memory.md\n"),
+            encoding="utf-8")
+        _write(self.home, "rules/minder-memory.md", "x\n")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        self.assertEqual(self._failed(res), {"rules-dir-clean"})
+
+    def test_the_doctrine_is_not_required_in_the_harness_home(self):
+        payload = json.loads(self._run("--json").stdout)
+        paths = next(p for p in payload["probes"] if p["probe"] == "harness-paths")
+        self.assertEqual(paths["status"], "ok")
+        self.assertFalse((self.home / "rules").exists())
 
     def test_a_former_managed_block_marker_fails(self):
         _write(self.home, "CLAUDE.md",

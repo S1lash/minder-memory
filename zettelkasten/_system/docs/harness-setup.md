@@ -20,18 +20,54 @@ stable local path:
 
 | Symlink | Repo source |
 |---|---|
-| `~/.claude/rules/minder-memory.md` | `integrations/claude-code/built/rules/minder-memory.md` (rendered) |
-| `~/.claude/rules/constitution-capture.md` | `zettelkasten/_system/docs/constitution-capture.md` |
-| `~/.claude/rules/constitution-core.md` | `zettelkasten/_system/views/constitution-core.md` |
-| `~/.claude/rules/communication-baseline.md` | `zettelkasten/_system/docs/communication-baseline.md` |
-| `~/.claude/rules/minder-memory-engine-doctrine.md` | `zettelkasten/_system/docs/ENGINE_DOCTRINE.md` |
+| `~/.claude/minder-memory/minder-memory.md` | `integrations/claude-code/built/rules/minder-memory.md` (rendered) |
+| `~/.claude/minder-memory/constitution-capture.md` | `zettelkasten/_system/docs/constitution-capture.md` |
+| `~/.claude/minder-memory/communication-baseline.md` | `zettelkasten/_system/docs/communication-baseline.md` |
+| `~/.claude/minder-memory/advisory-baseline.md` | `zettelkasten/_system/docs/advisory-baseline.md` |
+| `~/.claude/minder-memory/constitution-core.md` | `zettelkasten/_system/views/constitution-core.md` |
 | `~/.claude/skills/minder-mem-*` (one per skill dir) | `integrations/claude-code/skills/minder-mem-*` (direct, no render step) |
 | `~/.claude/commands/minder/mem` (one link for the product's namespace directory; `commands/minder/` itself stays a real directory shared with sibling Minder products) | `integrations/claude-code/built/commands/minder/mem/` (rendered; `recap.md`, `search.md`) |
+| `~/.claude/agents/minder-mem-role.md` | `.claude/agents/minder-mem-role.md` |
+
+### One mechanism for what loads into every session
+
+`~/.claude/minder-memory/` is a directory Claude Code does **not** load by
+itself. Each file in it reaches a session through an `@`-import in the
+managed block the installer writes into `~/.claude/CLAUDE.md`:
+
+```markdown
+<!-- MINDER-MEMORY BEGIN — managed by install.sh, do not edit by hand -->
+## Zettelkasten (Minder Memory) — Personal Knowledge Base
+- @~/.claude/minder-memory/minder-memory.md
+…one heading and one import per file in the table above…
+<!-- MINDER-MEMORY END -->
+```
+
+So the block is the complete list of what the engine puts into a session
+outside this repository. The links and the block are generated from one
+table at the top of `install.sh` (`HOT_FILES`); neither is written by hand.
+Nothing of the engine's goes into `~/.claude/rules/`, which Claude Code loads
+on its own: a file there would load in every session on the machine beside
+the block, whether the block lists it or not. The installer removes the
+links an earlier version left there — by the exact names `lib/ownership.py`
+declares (`ENGINE_RETIRED_HARNESS`), and only when the link points into this
+repository. The post-update check (`scripts/check_update.py`, probe
+`rules-dir-clean`) fails while one remains.
+
+The engine doctrine (`_system/docs/ENGINE_DOCTRINE.md`) is not global. The
+repository's `.claude/CLAUDE.md` imports it, so it loads in every session
+started at the repository root or under `zettelkasten/` — interactive, a
+cloud routine's fresh clone, a role's subagent — and in no other session on
+the machine. A session started in another repository subdirectory sees the
+import as external: interactively Claude Code asks once, headless it skips
+it. Skills that bind on the doctrine also read it in their own Step 1.
 
 `built/` is gitignored. The installer renders **rules and commands**
 from `integrations/claude-code/{rules,commands}/` into `built/` by
 substituting `{{MINDER_MEMORY_BASE}}` with the absolute path to
-`<repo>/zettelkasten`. **Skills carry no placeholder** (sources use
+`<repo>/zettelkasten`. It renders into a staging directory and swaps it in
+only when complete, so the links of the current wiring never point at a
+half-rendered tree. **Skills carry no placeholder** (sources use
 repo-relative `zettelkasten/...` paths) — they are NOT rendered, and
 `~/.claude/skills/minder-mem-*` symlinks point directly at the source tree.
 Re-running the installer (after `git pull`, after moving the repo)
@@ -61,13 +97,8 @@ cd <wherever-you-cloned>/minder-memory
 bash integrations/claude-code/install.sh
 ```
 
-After install, add the constitution-capture import to `~/.claude/CLAUDE.md`
-once if not already present:
-
-```markdown
-## Constitution Capture — Global Hook
-- @~/.claude/rules/constitution-capture.md
-```
+The installer writes the managed block itself; nothing is added to
+`~/.claude/CLAUDE.md` by hand.
 
 ## Scheduler / headless environments
 
@@ -76,6 +107,9 @@ The installer is idempotent and non-interactive. In a fresh container:
 1. `git clone <your-fork-url>` (or `gh repo create my-minder-memory --template <upstream>`)
 2. `pip install -r minder-memory/zettelkasten/_system/scripts/requirements.txt`
 3. `bash minder-memory/integrations/claude-code/install.sh`
+
+A cloud routine needs none of this for the doctrine and the skills: both
+reach it from the clone (`.claude/CLAUDE.md`, `.claude/skills/`).
 
 ## Why `built/` for rules + commands but not skills
 
@@ -91,7 +125,7 @@ The installer is idempotent and non-interactive. In a fresh container:
   relative paths always resolve. No render step needed; user-level
   symlinks land directly on the source.
 
-## Why not store directly in `~/.claude/rules/`?
+## Why symlinks into the repo rather than files under `~/.claude/`?
 
 - That path is outside the repo — updates cannot be tracked in git.
 - Fresh machines and scheduler containers do not have it populated.
@@ -106,5 +140,5 @@ version control, stable local path, and machine-portable paths.
 2. **Rules / commands:** use `{{MINDER_MEMORY_BASE}}` for any reference to the data root — install.sh substitutes it during render.
    **Skills:** use repo-relative `zettelkasten/...` paths — no placeholder, no render step.
 3. **For a new skill:** add a committed symlink at `.claude/skills/<name> → ../../integrations/claude-code/skills/<name>` so cloud Routines discover it.
-4. Re-run `install.sh` — symlinks are picked up automatically (skills/commands by directory listing).
-5. For new rules: add a row to the table above and the `@` import in `~/.claude/CLAUDE.md`.
+4. **For a new always-on file** (a rule, or a doc every session must carry): add one row to `HOT_FILES` in `install.sh` — the link and the block import both follow from it — and to the table above. A rule under `integrations/claude-code/rules/` without a row is rendered and never loaded; `test_install_hot_wiring.py` fails on it.
+5. Re-run `install.sh` — skills and commands are picked up by directory listing.

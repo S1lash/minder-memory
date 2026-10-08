@@ -14,13 +14,15 @@ and pinned equal to itself by tests.
 
 That is the wrong shape for a rule that decides who owns a name. The rule has one
 home now, and every consumer imports it: the rename map, the post-update check,
-migrations 031 and 033, and the vault seeder. Nothing restates it.
+migrations 031 and 033, the vault seeder, and the installer (through
+`harness_entries.py`, since bash cannot import it). Nothing restates it.
 
 The questions it answers:
 
   is_engine_env_name              — is this environment variable the engine's?
   own_name_spans                  — which spans of this text are names the OWNER chose?
   is_engine_legacy_harness_entry  — did the ENGINE ship this harness file?
+  is_engine_retired_harness_entry — did it ship this name at a place it left?
   in_owner_space                  — is this path the owner's to write, and so to name?
   is_engine_owned_name            — does this token name something the engine owns?
 
@@ -41,6 +43,8 @@ __all__ = [
     "ENGINE_ENV_NAMES",
     "ENGINE_SKILL_NAMES",
     "ENGINE_LEGACY_HARNESS",
+    "ENGINE_RETIRED_HARNESS",
+    "ENGINE_RETIRED_RULE_TARGETS",
     "ENGINE_SLUG_TAILS_HYPHEN",
     "ENGINE_SLUG_TAILS_DOT",
     "ENGINE_SLUG_TAILS_UNDERSCORE",
@@ -54,6 +58,10 @@ __all__ = [
     "owner_env_names",
     "own_name_spans",
     "is_engine_legacy_harness_entry",
+    "is_engine_retired_harness_entry",
+    "removable_retired_rule_links",
+    "link_target",
+    "path_within",
     "in_owner_space",
     "is_engine_owned_name",
     "is_engine_path",
@@ -169,6 +177,80 @@ def is_engine_legacy_harness_entry(name: str, kind: str) -> bool:
     from anything the engine holds.
     """
     return name in ENGINE_LEGACY_HARNESS.get(kind, ())
+
+
+# Harness entries the engine shipped under its CURRENT name at a place it does
+# not use: six links in `rules/`, a directory Claude Code loads by itself, so
+# anything there loads in every session beside the managed block. Each name maps
+# to the repository file its link pointed at — what makes a link under that name
+# the engine's, whichever clone it points into.
+ENGINE_RETIRED_RULE_TARGETS: dict[str, str] = {
+    "minder-memory.md": "integrations/claude-code/built/rules/minder-memory.md",
+    "constitution-capture.md": "zettelkasten/_system/docs/constitution-capture.md",
+    "communication-baseline.md": "zettelkasten/_system/docs/communication-baseline.md",
+    "advisory-baseline.md": "zettelkasten/_system/docs/advisory-baseline.md",
+    "constitution-core.md": "zettelkasten/_system/views/constitution-core.md",
+    "minder-memory-engine-doctrine.md": "zettelkasten/_system/docs/ENGINE_DOCTRINE.md",
+}
+ENGINE_RETIRED_HARNESS: dict[str, tuple[str, ...]] = {
+    "rules": tuple(ENGINE_RETIRED_RULE_TARGETS),
+}
+
+
+def is_engine_retired_harness_entry(name: str, kind: str) -> bool:
+    """Did the engine ship this exact name at a harness place it no longer uses?
+
+    The name alone does not make an entry removable — `rules/constitution-core.md`
+    can be the owner's own file; `removable_retired_rule_links` adds the rest.
+    """
+    return name in ENGINE_RETIRED_HARNESS.get(kind, ())
+
+
+def link_target(link: Path) -> Path | None:
+    """Where a symlink points, made absolute against the link's own directory."""
+    import os  # noqa: PLC0415
+    try:
+        raw = os.readlink(link)
+    except OSError:
+        return None
+    target = Path(raw) if os.path.isabs(raw) else link.parent / raw
+    return Path(os.path.normpath(target))
+
+
+def path_within(target: Path, root: Path) -> bool:
+    """`target` lies in `root`, whichever spelling each was recorded through.
+
+    A link may name the repository through an alias, `/var` for `/private/var`,
+    or a relative path; all of them are the same tree.
+    """
+    for base in {root, root.resolve()}:
+        for path in {target, target.resolve()}:
+            if path == base or base in path.parents:
+                return True
+    return False
+
+
+def removable_retired_rule_links(home: Path, repo: Path) -> list[Path]:
+    """The `rules/` entries the installer of THIS clone removes.
+
+    A retired name, a symlink, and a target inside this repository — all three.
+    An owner's own file under a retired name, a link into another clone, and a
+    link the owner made under a name of their own are not this clone's to remove.
+    The installer (through `harness_entries.py`) and the post-update check both
+    decide by this function, so the check never asks for a re-run that cannot
+    change anything.
+    """
+    rules = home / "rules"
+    if not rules.is_dir():
+        return []
+    found: list[Path] = []
+    for entry in sorted(rules.iterdir()):
+        if not entry.is_symlink() or not is_engine_retired_harness_entry(entry.name, "rules"):
+            continue
+        target = link_target(entry)
+        if target is not None and path_within(target, repo):
+            found.append(entry)
+    return found
 
 
 # --------------------------------------------------------------------------- #

@@ -231,7 +231,7 @@ constitution — 4 узких trigger + 5 anti-trigger.
        │ regen (детерминистичный Python)
        ▼
        ├── _system/views/CONSTITUTION_INDEX.md     (registry для человека)
-       ├── _system/views/constitution-core.md      (~/.claude/rules симлинк — harness)
+       ├── _system/views/constitution-core.md      (~/.claude/minder-memory симлинк — harness)
        └── _system/SOUL.md Values zone       (между markers)
                  │
                  │ SOUL загружается во ВСЕ три пайплайна

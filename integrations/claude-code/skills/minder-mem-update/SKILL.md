@@ -332,7 +332,7 @@ Inspect what changed:
 | Pattern in changed files | Recommendation |
 |---|---|
 | `integrations/claude-code/{rules,commands,skills}/**` changed | «Re-run `bash integrations/claude-code/install.sh` to refresh `~/.claude/` symlinks.» |
-| A NEW file added under `_system/docs/**` that install.sh symlinks as a hot rule (git status `A`; today `communication-baseline.md`, `advisory-baseline.md`, `ENGINE_DOCTRINE.md`, `constitution-capture.md`) | «Re-run `bash integrations/claude-code/install.sh` — a new always-on rule shipped and needs its `~/.claude/rules/` symlink plus its `@`-import in the managed block.» A migration may already have done it; say so rather than repeating the ask when `~/.claude/rules/<name>.md` resolves |
+| `HOT_FILES` in `integrations/claude-code/install.sh` gained a row (a new always-on file) | «Re-run `bash integrations/claude-code/install.sh` — a new always-on file shipped and needs its `~/.claude/minder-memory/` link plus its `@`-import in the managed block.» A migration may already have done it; say so rather than repeating the ask when `~/.claude/minder-memory/<name>` resolves |
 | Any file under `0_constitution/` engine paths or constitution tooling changed | «Run `/minder:mem:regen-constitution` to refresh views.» |
 | `_system/scripts/**` changed | «Run tests: `pytest zettelkasten/_system/scripts/tests/`.» |
 | A NEW file added under `integrations/claude-code/scheduler-prompts/**` (git status `A`) | «A new scheduled job shipped — set up a new `/schedule` routine for it (see `docs/scheduling.md` for the cron slot + its loader prompt).» |
@@ -683,12 +683,13 @@ Ask for more detail on any point?
   owner decides per file.
 - **Push.** Hands off to `/minder:mem:save`.
 - **Run regen-constitution or the tests automatically.** Suggests; owner runs
-  explicitly. `install.sh` is the exception and is NOT in this list: migration
-  031 runs it, because a harness left half-wired imports a rule that no longer
-  exists in every session that follows. Do not ask the owner to run it again
-  after a migration has — a step suggested twice is a step somebody performs
-  twice and then wonders which one counted. Check whether it already ran (031's
-  report says so) before adding it to the follow-ups.
+  explicitly. `install.sh` is the exception and is NOT in this list: migrations
+  031 and 036 run it, because a harness left half-wired imports a rule that no
+  longer exists, or loads one that no longer belongs, in every session that
+  follows. Do not ask the owner to run it again after a migration has — a step
+  suggested twice is a step somebody performs twice and then wonders which one
+  counted. Check whether it already ran (the 031 / 036 report says so) before
+  adding it to the follow-ups.
 - **Rewrite the migration ledger.** If the owner needs to re-run a migration
   that already succeeded, they remove its line from
   `.engine-migrations.jsonl` themselves — guarded territory. A `heal` that

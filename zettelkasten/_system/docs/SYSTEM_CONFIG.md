@@ -274,6 +274,103 @@ restating it.
 4. Dedup (similarity ≥ 95%) is the ONLY body-edit `/minder:mem:lint` performs — it merges, never deletes unilaterally.
 5. CLARIFICATIONS are the universal human-in-the-loop gate — any ambiguity at skill confidence below threshold writes a question, not a decision.
 
+### Sacred state index
+
+The engine's load-bearing state: every skill knows these files' schema and
+respects it. Each row gives schema/purpose and a writer summary. **For any file
+it covers, the Skill Write Territory table above is authoritative on the
+writer — defer to it on any discrepancy;** files without a territory row
+(operational layers, append-only buffers) take the writer named here.
+
+| File | Writer (summary — canonical in SYSTEM_CONFIG) | Purpose |
+|---|---|---|
+| `_system/SOUL.md` | owner (manual) + `/minder:mem:bootstrap` (draft) + `regen` (Values zone) | Identity, values, focus, working style |
+| `_system/TASKS.md`, `CALENDAR.md` | `/minder:mem:process` (derived aggregates; owner owns only the TASKS `## Stale` section) | Aggregated views over note `- [ ]` / `📅` items |
+| `_system/POSTS.md` | owner | Operational layer |
+| `_system/registries/TAGS.md` | `render_tags.py` only (via `/minder:mem:maintain` Step 7.10 and `regen_all.py`) | Census of the `tags:` axis — managed zone regenerated, never hand-written |
+| `_system/registries/SOURCES.md` | `/minder:mem:source-add` (rows), owner (`## Deprecated Sources`) | Inbox source whitelist |
+| `_system/state/OPEN_THREADS.md` | `/minder:mem:bootstrap`, `/minder:mem:maintain`, `/minder:mem:resolve-clarifications` | Strategic open threads (`## Active` opened by maintain / resolve; `/minder:mem:process` context-only) |
+| `_system/state/CLARIFICATIONS.md` | every skill | Owner-gated resolution queue |
+| `_system/state/principle-candidates.jsonl` | `/minder:mem:capture-candidate`, `/minder:mem:bootstrap`, `/minder:mem:lint` (F.5 archive) | Append-only principle buffer |
+| `_system/state/people-candidates.jsonl` | `/minder:mem:process`, `/minder:mem:bootstrap`, `/minder:mem:lint` (dismiss/archive) | Append-only people buffer |
+| `_system/state/check-decision-runs.jsonl` | `/minder:mem:check-decision` | Append-only audit substrate (run + followup lines per invocation); consumed by `decision-review` lens + future cross-source autonomy analysis |
+| `_system/state/tick-telemetry.jsonl` | `record_tick_telemetry.py`, from each scheduler tick | Append-only token-consumption record, one line per tick, read from the tick's own transcript. Ticks only — a manual run writes nothing. Watched by `/minder:mem:lint` A.13, which is the only thing that can see the writer stop, because the writer never fails a tick |
+| `_system/state/identity-gate.jsonl` | `identity_gate.py`, from `/minder:mem:resolve-clarifications` Class I.5 | Append-only record that a per-identity residue scan actually ran — command, exit code, residue count, HEAD. Identity Contract Obligation 4's proof; `/minder:mem:lint` A.8 (9) matches an archived resolution against a line here rather than against a number the resolution wrote about itself |
+| `_system/views/CURRENT_CONTEXT.md` | `/minder:mem:bootstrap`, `/minder:mem:maintain` | Auto-generated focus snapshot |
+| `_system/views/HUB_INDEX.md` | `/minder:mem:maintain` (rebuild) + `/minder:mem:process` (additive on hub create) | Hub registry (auto-generated) |
+| `_system/views/INDEX.md` | `/minder:mem:maintain` (via `render_index.py`) | Surface-line catalog of knowledge + archive + constitution + hubs (auto-generated, faceted by PARA / domains / cross-domain). Records and posts intentionally out of scope — own pipelines |
+| `_system/views/constitution-core.md` | `/minder:mem:regen-constitution` | Harness-loaded core principles |
+| `3_resources/people/PEOPLE.md` | `/minder:mem:bootstrap`, `/minder:mem:process`, `/minder:mem:lint` | People registry with tiers |
+| `1_projects/PROJECTS.md` | owner + `/minder:mem:bootstrap` (candidates) | Project registry |
+| `_system/roles/{id}/role.md` | `/minder:mem:role:add` (create), `/minder:mem:role:edit` (change) | One standing role, whole: frontmatter the engine owns, prose body in the owner's own language that the engine never parses |
+| `_system/roles/{id}/state/` | the role itself, inside a `/minder:mem:roles` tick | The role's memory between runs — arbitrary files it defines and maintains. Read at the start of every run, so a run that leaves them untrue corrupts the next one |
+| `_system/roles/{id}/log.jsonl` | `/minder:mem:roles` | One line per executed run: outcome, write count, reverted and reported-only paths, duration |
+
+### Autonomous resolution layers
+
+The layers that qualify for the «resolve silently» exception of
+`ENGINE_DOCTRINE §3.1`, each having passed its three properties
+(deterministic canonicalisation, conservative-safe failure, high-volume /
+low-per-decision-value). A new layer is admitted only by the same test.
+
+- **Concept-name format** — `normalize_concept_name` /
+  `normalize_concept_list` (single SoT: `_common.py`).
+- **Audience-tag whitelist + format** — `normalize_audience_tag` +
+  AUDIENCES.md whitelist check.
+- **Privacy-trio backfill + hub derivation** — `recompute_hub_trio`,
+  trio backfill in `lint_concept_audit.py`.
+- **Portable filename normalisation** — `normalize_portable_name` /
+  `is_portable_name` (single SoT: `_common.py`). Applied to new
+  `_sources/inbox/` names by `/minder:mem:process` §0.0b pre-scan and
+  `/minder:mem:save` Step 0.5 pre-pass; `/minder:mem:lint` A.10 is the backstop.
+  Collisions are NOT covered by the exception — they surface as
+  `portable-name-collision` CLARIFICATIONs.
+- **Split-name recovery** — `repair_split_names.py`. Rejoins an inbox item
+  whose name a producer's `/` turned into two nested directories, which
+  portable-name normalisation cannot reach (it works on a NAME, and both
+  resulting segments are legal names). Three-property check: (1)
+  deterministic — the join is a pure function of the two segment names,
+  using the same `-` the normaliser substitutes for `/`; (2)
+  conservative-safe — the join runs ONLY when the parent holds exactly one
+  child and that child is a complete item, and refuses on every other
+  shape, so the failure mode is "left in place, surfaced"; (3)
+  low-per-decision-value — for the unambiguous shape the rejoin is the only
+  correct reading, so asking the owner offers them nothing to decide.
+  Applied by `/minder:mem:process` §0.0a; `/minder:mem:lint` A.10 is the backstop.
+  Ambiguous shapes surface as `source-layout-split-name` CLARIFICATIONs.
+- **Frontmatter fence repair** — `frontmatter_closed_before_body` /
+  `repair_misplaced_fence` (single SoT: `_common.py`; skills run it through
+  `check_frontmatter_fence.py`, never inline). Relocates a `## `
+  body heading (typically `## Evidence Trail`) that a producer captured
+  inside the YAML fence. Three-property check: (1) deterministic — pure
+  line-surgery, same output on re-run; (2) conservative-safe — on any
+  ambiguity (more than one candidate `---` in the displaced region) it
+  refuses and surfaces a `frontmatter-fence-misplaced` CLARIFICATION,
+  never guessing; (3) low-per-decision-value — for an unambiguous
+  misplacement the relocation is the only correct action, so surfacing it
+  would give the owner nothing to decide. Rarity does not disqualify: the
+  property is "surfacing yields no actionable choice," which holds. Applied
+  at write time by `/minder:mem:process` Steps 3.6/4.5 and `/minder:mem:agent-lens`
+  Stage 3 validator; `/minder:mem:lint` A.2 is the backstop. This is the first
+  qualifying layer that repairs structural note anatomy rather than
+  normalising a metadata field — hence the explicit property write-up.
+- **Metric-day re-render resolution** — `process_metric_day.run` on a
+  re-collected metric-day source whose content-hash drifted from the
+  existing record. Three-property check: (1) deterministic — the choice is
+  a pure comparison of real-metric counts (richer-or-equal → absorb +
+  `recompute_baselines_forward`; poorer/empty → keep existing); (2)
+  conservative-safe — good data is never overwritten by a degraded
+  re-collect, and the absorbed alternative is the device's own
+  authoritative refresh, so both branches are no-loss; (3)
+  low-per-decision-value — a metric-day record is a deterministic
+  projection of device data with no owner edits to protect, so surfacing
+  "should your recovered biometric data count?" gives the owner nothing to
+  decide. This is why metric-day re-render qualifies where general content
+  drift does not (below): the resolution needs no judgment about meaning,
+  only a count. Backstop: none needed — a poorer re-collect is simply kept,
+  never lost.
+
+
 ### CLARIFICATIONS format
 
 All CLARIFICATION items MUST include:
@@ -395,11 +492,11 @@ zettelkasten/
 │   │   ├── ARCHITECTURE.md           # Системный дизайн как построен
 │   │   ├── CONVENTIONS.md            # Documentation style rules (binding)
 │   │   ├── batch-format.md           # Контракт batch формата
-│   │   ├── constitution-capture.md   # Global hook (symlinked from ~/.claude/rules/)
+│   │   ├── constitution-capture.md   # Global hook (linked into ~/.claude/minder-memory/, imported by the managed block)
 │   │   └── harness-setup.md          # Per-machine install guide
 │   ├── views/                        # Авто-генерируемые представления (read-only)
 │   │   ├── CONSTITUTION_INDEX.md     # Registry активных principles
-│   │   ├── constitution-core.md      # Harness view (symlinked from ~/.claude/rules/)
+│   │   ├── constitution-core.md      # Harness view (linked into ~/.claude/minder-memory/, imported by the managed block)
 │   │   ├── HUB_INDEX.md              # Индекс всех hub-заметок
 │   │   ├── INDEX.md                  # Surface catalog (knowledge + archive + constitution + hubs, faceted)
 │   │   ├── CURRENT_CONTEXT.md        # Live state snapshot

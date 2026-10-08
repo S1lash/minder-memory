@@ -62,14 +62,14 @@ zettelkasten/
 │   ├── long-form-playbook.md     # owner-рецепт лонгформа (читается по требованию)
 │   ├── docs/                     # платформенные документы (binding)
 │   │   ├── SYSTEM_CONFIG.md      # runtime config
-│   │   ├── ENGINE_DOCTRINE.md    # operating philosophy (symlinked from ~/.claude/rules/)
+│   │   ├── ENGINE_DOCTRINE.md    # operating philosophy (imported by the repo's .claude/CLAUDE.md)
 │   │   ├── ARCHITECTURE.md       # системный дизайн как построен
 │   │   ├── CONVENTIONS.md        # documentation style rules (binding)
 │   │   ├── batch-format.md       # контракт batch формата (нарратив)
 │   │   ├── manifest-schema/      # канонический JSON Schema манифеста + fixtures
 │   │   ├── biometric-lens-protocol.md  # общий протокол биометрических линз
-│   │   ├── communication-baseline.md   # universal presentation spine (symlinked from ~/.claude/rules/)
-│   │   ├── constitution-capture.md     # global hook (symlinked from ~/.claude/rules/)
+│   │   ├── communication-baseline.md   # universal presentation spine (linked into ~/.claude/minder-memory/)
+│   │   ├── constitution-capture.md     # global hook (linked into ~/.claude/minder-memory/)
 │   │   └── harness-setup.md      # per-machine install guide
 │   ├── roles/                    # standing roles
 │   │   ├── _run-frame.md         # механика одного прогона (engine)
@@ -80,7 +80,7 @@ zettelkasten/
 │   │       └── log.jsonl         # по строке на исполненный прогон
 │   ├── views/                    # авто-генерируемые представления (read-only)
 │   │   ├── CONSTITUTION_INDEX.md    # registry активных principles
-│   │   ├── constitution-core.md  # harness view (symlinked from ~/.claude/rules/)
+│   │   ├── constitution-core.md  # harness view (linked into ~/.claude/minder-memory/)
 │   │   ├── HUB_INDEX.md          # индекс всех hub-заметок
 │   │   ├── INDEX.md              # surface catalog: knowledge + archive + constitution + hubs (faceted)
 │   │   ├── CURRENT_CONTEXT.md    # live state snapshot

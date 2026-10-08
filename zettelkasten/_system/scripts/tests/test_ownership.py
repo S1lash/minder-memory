@@ -184,6 +184,38 @@ class HarnessEntryTests(unittest.TestCase):
         self.assertFalse(ownership.is_engine_legacy_harness_entry("my-ztn-notes.md", "rules"))
         self.assertFalse(ownership.is_engine_legacy_harness_entry("ztn-notes.md", "rules"))
 
+    def test_the_rule_links_the_installer_retired_are_the_engines(self):
+        for name in ("minder-memory.md", "constitution-capture.md", "communication-baseline.md",
+                     "advisory-baseline.md", "constitution-core.md",
+                     "minder-memory-engine-doctrine.md"):
+            self.assertTrue(ownership.is_engine_retired_harness_entry(name, "rules"), name)
+
+    def test_a_retired_name_is_the_engines_only_where_the_engine_put_it(self):
+        self.assertFalse(ownership.is_engine_retired_harness_entry("constitution-core.md", "skills"))
+        self.assertFalse(ownership.is_engine_retired_harness_entry("minder-memory-notes.md", "rules"))
+        self.assertFalse(ownership.is_engine_retired_harness_entry("Constitution-Core.md", "rules"))
+
+    def test_the_shell_reads_the_same_decision(self):
+        """`install.sh` cannot import the module; it asks this CLI, which must not restate it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, home = Path(tmp) / "repo", Path(tmp) / "home"
+            rules = home / "rules"
+            rules.mkdir(parents=True)
+            target = repo / "zettelkasten/_system/docs/ENGINE_DOCTRINE.md"
+            target.parent.mkdir(parents=True)
+            target.write_text("x\n", encoding="utf-8")
+            (rules / "minder-memory-engine-doctrine.md").symlink_to(target)
+            (rules / "my-link.md").symlink_to(target)
+            (rules / "constitution-core.md").write_text("mine\n", encoding="utf-8")
+            res = subprocess.run(["python3", str(_REPO_ROOT / "scripts/lib/harness_entries.py"),
+                                  "--removable-rule-links", "--home", str(home), "--repo", str(repo)],
+                                 capture_output=True, encoding="utf-8")
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertNotIn("\r", res.stdout)
+            self.assertEqual(res.stdout.splitlines(), [str(rules / "minder-memory-engine-doctrine.md")])
+            self.assertEqual([str(p) for p in ownership.removable_retired_rule_links(home, repo)],
+                             res.stdout.splitlines())
+
 
 class PathTests(unittest.TestCase):
     def test_owner_space_reads_the_manifests_own_exclusions(self):
