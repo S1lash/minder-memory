@@ -1,8 +1,10 @@
-# Claude rules + cross-project skills — install
+# Claude Code wiring — what the installer puts into `~/.claude`
 
-Two coupled install requirements per machine so that:
+What every machine needs so that:
 
-1. The global constitution-capture hook fires in every Claude Code session.
+1. The engine's global files — the Minder Memory rule, the constitution-capture
+   hook, the constitution core and the two baselines — load into every Claude
+   Code session, and the engine doctrine into every session in this repository.
 2. The skills the hook invokes (`/minder:mem:capture-candidate`,
    `/minder:mem:check-decision`, `/minder:mem:regen-constitution`) and the ambient Minder Memory
    commands (`/minder:mem:search`, `/minder:mem:recap`) are discoverable outside this
@@ -43,15 +45,16 @@ managed block the installer writes into `~/.claude/CLAUDE.md`:
 <!-- MINDER-MEMORY END -->
 ```
 
-So the block is the complete list of what the engine puts into a session
-outside this repository. The links and the block are generated from one
+So the block is the complete list of the files the engine loads into every
+session outside this repository (skills, commands and the role agent are
+discovered, not loaded). The links and the block are generated from one
 table at the top of `install.sh` (`HOT_FILES`); neither is written by hand.
 Nothing of the engine's goes into `~/.claude/rules/`, which Claude Code loads
 on its own: a file there would load in every session on the machine beside
 the block, whether the block lists it or not. The installer removes the
-links an earlier version left there — by the exact names `lib/ownership.py`
-declares (`ENGINE_RETIRED_HARNESS`), and only when the link points into this
-repository. The post-update check (`scripts/check_update.py`, probe
+engine's retired links there — by the exact names `lib/ownership.py` declares
+(`ENGINE_RETIRED_HARNESS`), and only when the link points into this
+repository; a link into another clone is that clone's installer's to remove. The post-update check (`scripts/check_update.py`, probe
 `rules-dir-clean`) fails while one remains.
 
 The engine doctrine (`_system/docs/ENGINE_DOCTRINE.md`) is not global. The
@@ -61,6 +64,10 @@ cloud routine's fresh clone, a role's subagent — and in no other session on
 the machine. A session started in another repository subdirectory sees the
 import as external: interactively Claude Code asks once, headless it skips
 it. Skills that bind on the doctrine also read it in their own Step 1.
+
+Install and uninstall take one lock per Claude Code home
+(`scripts/lib/install_lock.sh`), so a manual run and an update's migration —
+or two clones sharing one home — never interleave their writes.
 
 `built/` is gitignored. The installer renders **rules and commands**
 from `integrations/claude-code/{rules,commands}/` into `built/` by
@@ -140,5 +147,5 @@ version control, stable local path, and machine-portable paths.
 2. **Rules / commands:** use `{{MINDER_MEMORY_BASE}}` for any reference to the data root — install.sh substitutes it during render.
    **Skills:** use repo-relative `zettelkasten/...` paths — no placeholder, no render step.
 3. **For a new skill:** add a committed symlink at `.claude/skills/<name> → ../../integrations/claude-code/skills/<name>` so cloud Routines discover it.
-4. **For a new always-on file** (a rule, or a doc every session must carry): add one row to `HOT_FILES` in `install.sh` — the link and the block import both follow from it — and to the table above. A rule under `integrations/claude-code/rules/` without a row is rendered and never loaded; `test_install_hot_wiring.py` fails on it.
+4. **For a new global file** (a rule, or a doc every session must carry): add one row to `HOT_FILES` in `install.sh` — the link, the block import and the post-update check (`ownership.engine_global_files`) all follow from it — and a row to the table above. A rule under `integrations/claude-code/rules/` without a row is rendered and never loaded; `test_install_hot_wiring.py` fails on it. Keep it short: a global file is paid for in every session on the machine, work sessions included.
 5. Re-run `install.sh` — skills and commands are picked up by directory listing.

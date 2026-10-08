@@ -60,6 +60,8 @@ __all__ = [
     "is_engine_legacy_harness_entry",
     "is_engine_retired_harness_entry",
     "removable_retired_rule_links",
+    "engine_global_files",
+    "GlobalFilesUnreadable",
     "link_target",
     "path_within",
     "in_owner_space",
@@ -204,6 +206,43 @@ def is_engine_retired_harness_entry(name: str, kind: str) -> bool:
     can be the owner's own file; `removable_retired_rule_links` adds the rest.
     """
     return name in ENGINE_RETIRED_HARNESS.get(kind, ())
+
+
+_INSTALLER_REL = "integrations/claude-code/install.sh"
+_HOT_TABLE_RE = re.compile(
+    r"HOT_FILES=\"\$\(\s*cat\s*<<-?\s*(['\"]?)TABLE\1[ \t]*\n(.*?)\n[ \t]*TABLE[ \t]*\n", re.S)
+
+
+class GlobalFilesUnreadable(Exception):
+    """The installer's global-files table could not be read — never read as «none»."""
+
+
+def engine_global_files(root: Path) -> list[tuple[str, str]]:
+    """The global files the installer of the engine at `root` links and imports.
+
+    Read from the `HOT_FILES` table in `install.sh` — the one list; the links,
+    the managed block and the post-update check all follow from it. Each item
+    is (link name, source path under the repository). Fails closed: a missing
+    installer, a table that cannot be found or one with no rows raises
+    `GlobalFilesUnreadable`, because a check that read «no global files» would
+    pass with every one of them absent.
+    """
+    installer = Path(root) / _INSTALLER_REL
+    try:
+        text = installer.read_text(encoding="utf-8").replace("\r\n", "\n")
+    except OSError as exc:
+        raise GlobalFilesUnreadable(f"cannot read {installer}: {exc}") from exc
+    match = _HOT_TABLE_RE.search(text)
+    if not match:
+        raise GlobalFilesUnreadable(f"no HOT_FILES table in {installer}")
+    rows = []
+    for line in match.group(2).splitlines():
+        parts = line.split("|")
+        if len(parts) >= 2 and parts[0].strip():
+            rows.append((parts[0].strip(), parts[1].strip()))
+    if not rows:
+        raise GlobalFilesUnreadable(f"the HOT_FILES table in {installer} has no rows")
+    return rows
 
 
 def link_target(link: Path) -> Path | None:

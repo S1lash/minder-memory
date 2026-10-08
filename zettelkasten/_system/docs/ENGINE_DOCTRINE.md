@@ -2,8 +2,10 @@
 
 > **What this is.** The compact, load-bearing operating philosophy of
 > the Minder Memory engine. The repo's `.claude/CLAUDE.md` imports it, so
-> every session started at the repo root (cloud routines, role subagents) runs
-> against it whether or not a skill's Step 1 names it. Never global.
+> every session started at the repo root or under `zettelkasten/` (cloud
+> routines and role subagents included) runs against it whether or not a
+> skill's Step 1 names it. Kept out of `~/.claude/`, where it would load
+> everywhere.
 >
 > **What this is NOT.** Not the full spec. Pointers below lead to the
 > authoritative long-form sources. This file is what every skill
@@ -21,7 +23,7 @@
 > 5. `_system/SOUL.md` — owner identity calibration (Values zone
 >    auto-rendered from constitution; Working Style hand-edited)
 > 6. `0_constitution/` — owner principles (axioms / principles /
->    rules); `constitution-core.md` view hot-loaded via the managed block
+>    rules); `constitution-core.md` view, a global file
 >
 > The engine doctrine is below the system contract and conventions
 > (which are mechanical) but above all skill-level specs (which are
@@ -179,17 +181,18 @@ of these properties hold:
    giving the owner anything actionable to decide — the algorithm is
    already the right answer.
 
-The layers that qualify today, each with the write-up of the three
-properties that admitted it, are listed in `SYSTEM_CONFIG.md → Autonomous
-resolution layers`.
+The qualifying layers are listed in `SYSTEM_CONFIG.md → Autonomous
+resolution layers`; a layer whose admission is not self-evident carries its
+three-property write-up there.
 
 Any new layer added to the engine MUST be tested against the three
 properties before claiming the exception. If even one property fails,
 the universal «surface, don't decide silently» rule applies.
 **Threading, dedup, general content-drift detection, principle promotion,
 people identity, content classification** — all of these involve judgment
-and are explicitly NOT covered by the exception. (Metric-day re-render is
-the narrow, deterministic exception in that list — it turns on a pure
+and are explicitly NOT covered by the exception. (Metric-day re-render —
+a qualifying layer in `SYSTEM_CONFIG.md → Autonomous resolution layers` — is
+the narrow, deterministic carve-out from content drift: it turns on a pure
 metric count, not on judging whether a change is meaningful.)
 
 Per-layer rule sets: `_system/registries/CONCEPT_NAMING.md`,
@@ -416,10 +419,10 @@ Downstream:
 inherit this contract by default. Downstream consumers need no code
 change to integrate. The contract is engine-level, not skill-level.
 
-**What is intentionally NOT in manifest** — staging buffers, working
-memory, HITL queues, audit trails, derived views and the cognitive-model hub.
-The one list, with the reason for each, is `manifest-schema/README.md → What
-is NOT in the manifest`.
+**What is intentionally NOT in manifest** — engine-internal state
+(candidate buffers, working memory, HITL queues, audit trails, derived
+views). The one list, with the reason for each: `manifest-schema/README.md →
+What is NOT in the manifest`.
 
 > **Canonical schema:** `_system/docs/manifest-schema/v{N}.json` (this
 > repo). Reference doc + consumer integration patterns:
@@ -480,7 +483,7 @@ owner chose, which harness entries the engine ever shipped, which paths are the
 owner's to write, and whether a token names something the engine owns — all five
 are answered there and nowhere else. Every consumer imports it: the rename map,
 the post-update check, the harness-wiring and own-names migrations, the vault
-seeder, the installer. The reason it exists is worth keeping, because the failure it prevents
+seeder, and the installer through `harness_entries.py`. The reason it exists is worth keeping, because the failure it prevents
 is not obvious: the rule had lived in three files, held together by tests that
 asserted the copies equal — which makes drift *detectable* rather than
 impossible, and every one of the copies was correct on the day it was written.
@@ -571,10 +574,12 @@ revert loop, and a revert takes the unrelated work sitting beside it.
 
 ## 4. Sacred state
 
-Some files are the engine's load-bearing state: every skill knows their
-schema and respects them. Their index — schema/purpose and a writer summary
-per file — is `SYSTEM_CONFIG.md → Sacred state index`, beside the Skill Write
-Territory table, which is authoritative on the writer.
+Some files are load-bearing state: every other layer reads them as truth, so
+a wrong write here corrupts everything downstream rather than one note. Every
+skill knows their schema; each write-mode has exactly one owning skill; a
+skill that finds one malformed surfaces it rather than repairing by guess. The
+index — purpose and writer per file — is `SYSTEM_CONFIG.md → Sacred state
+index`; the writer is authoritative in `→ Skill Write Territory` beside it.
 
 Skills writing to these files do so per the schema; deviations surface
 as `process-compatibility` CLARIFICATIONS rather than silent format
@@ -602,7 +607,7 @@ After bootstrap completes, the doctrine flows into every subsequent
 skill invocation through:
 
 - the import in the repository's `.claude/CLAUDE.md`
-- explicit Step 1 loads inside each SKILL.md
+- explicit Step 1 / Contracts loads inside the pipeline skills that bind on it
 - the CURRENT_CONTEXT frontmatter pointer
 
 If those three transmission paths drift, the engine drifts.
@@ -623,6 +628,9 @@ If those three transmission paths drift, the engine drifts.
 | Folder routing | `_system/registries/FOLDERS.md` |
 | Inbox source whitelist | `_system/registries/SOURCES.md` |
 | Constitution capture trigger spec (in-the-moment) | `_system/docs/constitution-capture.md` |
+| Engine paths, and what moves with an engine change | `_system/docs/ENGINE_MAP.md` |
+| Sacred state index — purpose and writer per file | `_system/docs/SYSTEM_CONFIG.md → Sacred state index` |
+| Layers that resolve silently (§3.1 exception) | `_system/docs/SYSTEM_CONFIG.md → Autonomous resolution layers` |
 
 A skill that finds itself making a non-obvious judgement should consult
 the relevant long-form file before acting, and surface a CLARIFICATION

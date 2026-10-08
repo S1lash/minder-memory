@@ -235,7 +235,7 @@ list; ENGINE_DOCTRINE.md §3.8 points here.
   Step 7.9, so it is not in the maintain manifest's `hubs.updated[]` (which
   tracks concept-cluster hubs touched by Step 4 thread-linkage). A consumer
   projects it from the principles it already receives — but `cognitive_axes`
-  is not carried on `constitution.principles` yet. When the first such
+  is not carried on `constitution.principles` in the manifest. When the first such
   consumer exists, add it to the principle emission (a MINOR add via
   `section_extras`) — the same posture as the two universal baselines
   (ENGINE_DOCTRINE §3.8).

@@ -18,8 +18,8 @@ Now there is one list, and it is the whole truth:
   presented. Each is listed in the Minder Memory block of `~/.claude/CLAUDE.md`,
   and they now live in `~/.claude/minder-memory/`, a folder Claude Code does
   not load by itself.
-- **In a session started in your Minder Memory folder**, the doctrine still
-  loads — and now loads on its own in scheduled cloud runs too, where until
+- **In a session started at the root of your Minder Memory folder** (or in its
+  `zettelkasten/`), the doctrine still loads — and now loads on its own in scheduled cloud runs too, where until
   now only the skills that read it explicitly saw it.
 
 Sessions inside the folder got lighter too: reference tables the engine's
@@ -32,6 +32,11 @@ The update moves everything for you and removes the six links it once put in
 you keep an edited copy there under one of those names, `check_update.py`
 points it out, since it now loads beside the engine's own. Open a new Claude
 Code session afterwards to feel the difference.
+
+If you once added `@~/.claude/rules/…` lines to `~/.claude/CLAUDE.md` yourself,
+outside the Minder Memory block — older setup guides asked for that — delete
+them: the block imports those files now, and the old lines point at links the
+update removed. `python3 scripts/check_update.py` names any it finds.
 
 ## 1.4.1 — The safety net no longer stops a run that is still working
 

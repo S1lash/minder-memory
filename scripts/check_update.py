@@ -57,21 +57,27 @@ CURRENT_MARKER = "MINDER-MEMORY BEGIN"
 SKILL_PREFIX = "minder-mem-"
 SKILL_COUNT = 20
 
-# The global files the managed block imports, plus the agent and commands. The
-# engine doctrine is not here: it loads inside the repository only, through
-# `.claude/CLAUDE.md`, and nothing of the engine's belongs in `rules/` (see
-# `probe_rules_dir_clean`).
+# The harness paths an update must leave resolving: the global files the managed
+# block imports — read from the installer's own table, the one list
+# (`ownership.engine_global_files`), of the engine this check ships with — plus
+# the agent and the commands. The engine doctrine is not among them: it loads
+# inside the repository only, through `.claude/CLAUDE.md`, and nothing of the
+# engine's belongs in `rules/` (see `probe_rules_dir_clean`).
 HOT_DIR = "minder-memory"
-REQUIRED_HARNESS_PATHS: tuple[str, ...] = (
-    f"{HOT_DIR}/minder-memory.md",
-    f"{HOT_DIR}/constitution-capture.md",
-    f"{HOT_DIR}/communication-baseline.md",
-    f"{HOT_DIR}/advisory-baseline.md",
-    f"{HOT_DIR}/constitution-core.md",
+_ENGINE_ROOT = Path(__file__).resolve().parents[1]
+OTHER_HARNESS_PATHS: tuple[str, ...] = (
     "agents/minder-mem-role.md",
     "commands/minder/mem/recap.md",
     "commands/minder/mem/search.md",
 )
+
+
+def required_harness_paths(engine_root: Path = _ENGINE_ROOT) -> list[str]:
+    """Raises `ownership.GlobalFilesUnreadable` — a probe must fail, not pass, on it."""
+    return ([f"{HOT_DIR}/{name}" for name, _ in ownership.engine_global_files(engine_root)]
+            + list(OTHER_HARNESS_PATHS))
+
+
 HARNESS_SUBDIRS: tuple[str, ...] = ("skills", "rules", HOT_DIR, "commands", "agents")
 
 VERSION_FILE = "integrations/VERSION"
@@ -724,7 +730,7 @@ def probe_credential_store(repo: Path, before: str | None) -> dict:
 # probes — the harness home
 # --------------------------------------------------------------------------- #
 
-def probe_managed_block(home: Path) -> dict:
+def probe_managed_block(home: Path, engine_root: Path = _ENGINE_ROOT) -> dict:
     claude_md = home / "CLAUDE.md"
     if not claude_md.is_file():
         return _result("managed-block", SKIP, f"no {claude_md}")
@@ -733,7 +739,11 @@ def probe_managed_block(home: Path) -> dict:
     legacy = text.count(LEGACY_MARKER)
     if current == 1 and legacy == 0:
         block = _managed_block(text) or ""
-        wanted = [rel for rel in REQUIRED_HARNESS_PATHS if rel.startswith(HOT_DIR + "/")]
+        try:
+            wanted = [rel for rel in required_harness_paths(engine_root) if rel.startswith(HOT_DIR + "/")]
+        except ownership.GlobalFilesUnreadable as exc:
+            return _result("managed-block", FAIL,
+                           f"cannot tell which global files the block must import — {exc}")
         missing = [rel for rel in wanted if f"@~/.claude/{rel}" not in block]
         if missing:
             return _result("managed-block", FAIL,
@@ -746,13 +756,17 @@ def probe_managed_block(home: Path) -> dict:
                    f"in {claude_md}")
 
 
-def probe_harness_paths(home: Path) -> dict:
+def probe_harness_paths(home: Path, engine_root: Path = _ENGINE_ROOT) -> dict:
     if not home.is_dir():
         return _result("harness-paths", SKIP, f"no harness home at {home}")
-    missing = [rel for rel in REQUIRED_HARNESS_PATHS if not (home / rel).exists()]
+    try:
+        required = required_harness_paths(engine_root)
+    except ownership.GlobalFilesUnreadable as exc:
+        return _result("harness-paths", FAIL, f"cannot tell which global files must resolve — {exc}")
+    missing = [rel for rel in required if not (home / rel).exists()]
     if not missing:
         return _result("harness-paths", OK,
-                       f"all {len(REQUIRED_HARNESS_PATHS)} global-file / command / agent paths resolve")
+                       f"all {len(required)} global-file / command / agent paths resolve")
     return _result("harness-paths", FAIL, "does not resolve: " + ", ".join(missing))
 
 
@@ -784,9 +798,19 @@ def probe_rules_dir_clean(home: Path, repo: Path) -> dict:
     notes: list[str] = []
     claude_md = home / "CLAUDE.md"
     if claude_md.is_file():
-        block = _managed_block(_read(claude_md))
+        text = _read(claude_md)
+        block = _managed_block(text)
         if block is not None and "~/.claude/rules/" in block:
             problems.append(f"the managed block in {claude_md} still imports from ~/.claude/rules/")
+        # Older setup docs had friends add some of these imports by hand,
+        # outside the block. Nothing of theirs is rewritten; the check names
+        # the line, which now imports a link that no longer exists.
+        # A former-name block is the managed-block probe's finding, not this one's.
+        outside = "" if LEGACY_MARKER in text else text.replace(block or "", "")
+        for name in ownership.ENGINE_RETIRED_RULE_TARGETS:
+            if f"@~/.claude/rules/{name}" in outside:
+                problems.append(f"{claude_md} imports ~/.claude/rules/{name} outside the managed block — "
+                                f"delete that line; the block imports the file from ~/.claude/{HOT_DIR}/")
     ours = set(ownership.removable_retired_rule_links(home, repo))
     rules = home / "rules"
     for entry in sorted(rules.iterdir()) if rules.is_dir() else []:

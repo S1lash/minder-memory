@@ -541,11 +541,11 @@ Evidence Trail entry, or an archive file. Auditable end-to-end.
 
 ### 12.1 As a Claude agent
 
-- The core (`~/.claude/minder-memory/constitution-core.md`, imported by the managed block) is always loaded. For any
-  non-trivial decision that seems to touch constitution domains (ethics, identity,
+- The core (`~/.claude/minder-memory/constitution-core.md`, imported by the
+  managed block) is always loaded. For any non-trivial decision that seems to touch constitution domains (ethics, identity,
   work philosophy, relationships) — invoke `/check-decision` before acting.
-- When you observe one of the capture triggers (see `~/.claude/CLAUDE.md`
-  "Constitution capture" section) — invoke `/minder:mem:capture-candidate`. Do not ask
+- When you observe one of the capture triggers (see `_system/docs/constitution-capture.md`,
+  imported by the managed block) — invoke `/minder:mem:capture-candidate`. Do not ask
   permission. The buffer is append-only; owner resolves in batch.
 - Do not edit any file under `0_constitution/` directly. The only allowed writes
   are L1 actions through the scripts / skills listed in the matrix above.

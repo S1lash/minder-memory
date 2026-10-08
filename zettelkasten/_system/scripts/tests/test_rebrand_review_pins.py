@@ -88,6 +88,8 @@ class InstallerMarkersTests(unittest.TestCase):
         (repo / "zettelkasten/_system/docs").mkdir(parents=True)
         (repo / "zettelkasten/_system/views").mkdir(parents=True)
         shutil.copy(_REPO_ROOT / "integrations/claude-code/install.sh", repo / "integrations/claude-code/install.sh")
+        shutil.copytree(_REPO_ROOT / "scripts" / "lib", repo / "scripts" / "lib",
+                        ignore=shutil.ignore_patterns("__pycache__"))
         _write(repo, "integrations/claude-code/rules/minder-memory.md", "base {{MINDER_MEMORY_BASE}}\n")
         _write(repo, "integrations/claude-code/commands/minder/mem/recap.md", "cmd\n")
         for name in ("constitution-capture.md", "communication-baseline.md", "advisory-baseline.md", "ENGINE_DOCTRINE.md"):

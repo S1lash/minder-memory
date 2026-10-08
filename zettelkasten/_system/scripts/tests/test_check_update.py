@@ -301,6 +301,24 @@ class CheckUpdateTests(unittest.TestCase):
         self.assertEqual(self._failed(res), {"rules-dir-clean"})
         self.assertIn("this clone", res.stdout)
 
+    def test_a_hand_added_import_of_a_retired_link_outside_the_block_fails(self):
+        """Older setup docs told friends to add these lines by hand; after 036 they import nothing."""
+        md = self.home / "CLAUDE.md"
+        md.write_text(md.read_text(encoding="utf-8")
+                      + "\n## Constitution Capture — Global Hook\n- @~/.claude/rules/constitution-capture.md\n",
+                      encoding="utf-8")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        self.assertEqual(self._failed(res), {"rules-dir-clean"})
+        self.assertIn("delete", res.stdout)
+        self.assertIn("constitution-capture.md", res.stdout)
+
+    def test_an_import_of_the_owners_own_rule_is_not_ours(self):
+        md = self.home / "CLAUDE.md"
+        md.write_text(md.read_text(encoding="utf-8") + "\n- @~/.claude/rules/my-own.md\n", encoding="utf-8")
+        res = self._run("--json")
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+
     def test_a_block_still_importing_from_rules_fails(self):
         md = self.home / "CLAUDE.md"
         md.write_text(md.read_text(encoding="utf-8").replace(

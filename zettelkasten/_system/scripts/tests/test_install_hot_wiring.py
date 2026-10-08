@@ -226,7 +226,7 @@ class InstallHotWiringTests(unittest.TestCase):
 
     def test_without_the_ownership_helper_the_new_wiring_lands_and_the_run_fails(self):
         """Degraded, never broken — and never silently: an exit 0 would retire migration 036 for good."""
-        shutil.rmtree(self.repo / "scripts")
+        (self.repo / "scripts/lib/harness_entries.py").unlink()
         self._legacy_home()
         res = self._run()
         self.assertNotEqual(res.returncode, 0, res.stdout + res.stderr)
@@ -291,14 +291,46 @@ class InstallHotWiringTests(unittest.TestCase):
         self._ok()
         self.assertFalse(os.path.lexists(rules / DOCTRINE_LINK))
 
-    def test_the_hot_table_matches_what_the_post_update_check_requires(self):
+    def test_the_global_files_table_is_read_in_any_heredoc_spelling_and_fails_closed(self):
+        import sys
+        sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+        from lib import ownership  # noqa: PLC0415
+        root = Path(self._tmp.name) / "variants"
+        rows = "a.md|x/a.md|A\nb.md|x/b.md|B\n"
+        for opener in ("HOT_FILES=\"$(cat <<'TABLE'", "HOT_FILES=\"$(cat << 'TABLE'",
+                       "HOT_FILES=\"$(cat <<TABLE", 'HOT_FILES="$(cat <<\"TABLE\"'):
+            with self.subTest(opener=opener):
+                _write(root, "integrations/claude-code/install.sh", f"#!/bin/bash\n{opener}\n{rows}TABLE\n)\"\n")
+                self.assertEqual(ownership.engine_global_files(root), [("a.md", "x/a.md"), ("b.md", "x/b.md")])
+        _write(root, "integrations/claude-code/install.sh", "#!/bin/bash\necho no table\n")
+        with self.assertRaises(ownership.GlobalFilesUnreadable):
+            ownership.engine_global_files(root)
+        with self.assertRaises(ownership.GlobalFilesUnreadable):
+            ownership.engine_global_files(Path(self._tmp.name) / "no-such-clone")
+
+    def test_the_check_fails_when_it_cannot_read_the_global_files(self):
         import sys
         sys.path.insert(0, str(_REPO_ROOT / "scripts"))
         import check_update  # noqa: PLC0415
-        table = re.findall(r"(?m)^([\w.-]+\.md)\|", _INSTALLER.read_text(encoding="utf-8"))
-        required = [p.split("/", 1)[1] for p in check_update.REQUIRED_HARNESS_PATHS
-                    if p.startswith(check_update.HOT_DIR + "/")]
-        self.assertEqual(table, required)
+        bad = Path(self._tmp.name) / "no-such-clone"
+        self.home.mkdir(exist_ok=True)
+        _write(self.home, "CLAUDE.md", f"{BEGIN}\n{END}\n")
+        for probe in (check_update.probe_harness_paths(self.home, engine_root=bad),
+                      check_update.probe_managed_block(self.home, engine_root=bad)):
+            self.assertEqual(probe["status"], check_update.FAIL, probe)
+            self.assertIn("install.sh", probe["evidence"])
+
+    def test_the_post_update_check_reads_the_global_files_from_the_installer(self):
+        """One list: the installer's table. The check derives its required paths from it."""
+        import sys
+        sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+        from lib import ownership  # noqa: PLC0415
+        import check_update  # noqa: PLC0415
+        files = ownership.engine_global_files(_REPO_ROOT)
+        self.assertEqual([name for name, _ in files], list(HOT))
+        required = check_update.required_harness_paths(_REPO_ROOT)
+        for name in HOT:
+            self.assertIn(f"minder-memory/{name}", required)
 
     def test_a_claude_md_kept_in_dotfiles_stays_a_link(self):
         """Replacing the link with a file cut the owner's CLAUDE.md off from their dotfiles repo."""
@@ -317,6 +349,136 @@ class InstallHotWiringTests(unittest.TestCase):
         self.assertEqual(self._uninstall_ok.returncode, 0, self._uninstall_ok.stderr)
         self.assertTrue((self.home / "CLAUDE.md").is_symlink())
         self.assertNotIn("MINDER-MEMORY BEGIN", dotfiles.read_text(encoding="utf-8"))
+
+    def test_malformed_marker_layouts_are_refused_and_nothing_is_lost(self):
+        """Only well-formed BEGIN…END pairs are spliced; anything else would drop the owner's text."""
+        layouts = {
+            "end-before-begin": "# mine\n{END}\nmiddle of mine\n{BEGIN}\n- old\ntail of mine\n",
+            "begin-twice-in-a-row": "# mine\n{BEGIN}\n- old\n{BEGIN}\n- older\n{END}\ntail of mine\n",
+            "end-twice-in-a-row": "# mine\n{BEGIN}\n- old\n{END}\nmiddle\n{END}\ntail of mine\n",
+        }
+        md = self.home / "CLAUDE.md"
+        for name, layout in layouts.items():
+            with self.subTest(layout=name):
+                text = layout.format(BEGIN=BEGIN, END=END)
+                md.write_text(text, encoding="utf-8")
+                for tool in (self._run, self._uninstall):
+                    res = tool()
+                    self.assertNotEqual(res.returncode, 0, f"{tool.__name__}: {res.stdout}{res.stderr}")
+                    self.assertEqual(md.read_text(encoding="utf-8"), text, tool.__name__)
+
+    def test_a_stray_end_marker_with_no_block_is_refused(self):
+        md = self.home / "CLAUDE.md"
+        for eol in ("\n", "\r\n"):
+            text = f"# mine{eol}{END}{eol}tail{eol}"
+            md.write_bytes(text.encode("utf-8"))
+            for tool in (self._run, self._uninstall):
+                res = tool()
+                self.assertNotEqual(res.returncode, 0, f"{tool.__name__}: {res.stdout}{res.stderr}")
+                self.assertEqual(md.read_bytes(), text.encode("utf-8"), tool.__name__)
+
+    def test_two_well_formed_blocks_still_collapse_to_one(self):
+        md = self.home / "CLAUDE.md"
+        md.write_text(f"# mine\n{BEGIN}\n- a\n{END}\nmiddle\n{BEGIN}\n- b\n{END}\ntail\n", encoding="utf-8")
+        self._ok()
+        text = md.read_text(encoding="utf-8")
+        self.assertEqual(text.count(BEGIN), 1)
+        self.assertIn("middle", text)
+        self.assertIn("tail", text)
+
+    def test_concurrent_installs_leave_a_whole_installation(self):
+        """Two runs at once (a manual install while an update runs 036) must not destroy each other's work."""
+        self._legacy_home()
+        installer = self.repo / "integrations/claude-code/install.sh"
+        procs = [subprocess.Popen(["bash", str(installer)], cwd=str(self.repo),  # portability-ok: invoked through bash, never by the executable bit
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  env=self._env()) for _ in range(4)]
+        outs = [(p.wait(timeout=120), p.stdout.read().decode("utf-8", "replace")) for p in procs]
+        for p in procs:
+            p.stdout.close()
+        self.assertTrue(any(rc == 0 for rc, _ in outs), outs)
+        for rc, out in outs:
+            if rc != 0:
+                self.assertIn("another install", out)
+        built = self.repo / "integrations/claude-code/built/rules/minder-memory.md"
+        self.assertTrue(built.is_file())
+        for name in HOT:
+            self.assertTrue((self.home / "minder-memory" / name).exists(), name)
+        self.assertEqual([p.name for p in (self.repo / "integrations/claude-code").iterdir()
+                          if p.name.startswith("built.")], [])
+        self._ok()
+
+    def test_a_lock_left_by_a_dead_run_is_taken_over(self):
+        lock = self.home / ".minder-memory-install.lock"
+        lock.mkdir()
+        (lock / "owner").write_text("999999 dead-run-token\n", encoding="utf-8")
+        self._ok()
+        self.assertFalse(lock.exists())
+
+    def test_many_runs_racing_for_a_dead_runs_lock_leave_a_whole_installation(self):
+        """Every contender sees the same dead holder; only one may take the lock over."""
+        lock = self.home / ".minder-memory-install.lock"
+        self._legacy_home()
+        lock.mkdir()
+        (lock / "owner").write_text("999999 dead-run-token\n", encoding="utf-8")
+        installer = self.repo / "integrations/claude-code/install.sh"
+        procs = [subprocess.Popen(["bash", str(installer)], cwd=str(self.repo),  # portability-ok: invoked through bash, never by the executable bit
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  env=self._env()) for _ in range(6)]
+        outs = [(p.wait(timeout=180), p.stdout.read().decode("utf-8", "replace")) for p in procs]
+        for p in procs:
+            p.stdout.close()
+        self.assertTrue(any(rc == 0 for rc, _ in outs), outs)
+        for rc, out in outs:
+            if rc != 0:
+                self.assertIn("another install", out)
+        self.assertFalse(lock.exists(), "the last owner releases the lock")
+        self.assertEqual([p.name for p in self.home.iterdir() if ".lock" in p.name], [])
+        self.assertTrue((self.repo / "integrations/claude-code/built/rules/minder-memory.md").is_file())
+        self._ok()
+
+    def test_a_live_holders_lock_is_never_removed_by_a_refused_run(self):
+        lock = self.home / ".minder-memory-install.lock"
+        lock.mkdir()
+        (lock / "owner").write_text(f"{os.getpid()} live-token\n", encoding="utf-8")
+        for tool in (self._run, self._uninstall):
+            res = tool()
+            self.assertNotEqual(res.returncode, 0, tool.__name__)
+            self.assertIn("another install", res.stdout + res.stderr)
+            self.assertEqual((lock / "owner").read_text(encoding="utf-8"), f"{os.getpid()} live-token\n")
+
+    def test_uninstall_holds_the_lock_while_it_works(self):
+        self._ok()
+        res = self._uninstall()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("lock", (self.repo / "integrations/claude-code/uninstall.sh").read_text(encoding="utf-8"))
+        self.assertFalse((self.home / ".minder-memory-install.lock").exists())
+
+    def test_an_orphan_stage_under_a_reused_pid_is_never_published(self):
+        """A live pid proves nothing about who left a stage; this run renders into a fresh one."""
+        orphan = self.repo / f"integrations/claude-code/built.new.{os.getpid()}-1-1"
+        _write(orphan, "commands/minder/mem/removed-long-ago.md", "stale\n")
+        _write(orphan, "rules/minder-memory.md", "stale rule\n")
+        self._ok()
+        built = self.repo / "integrations/claude-code/built"
+        self.assertFalse((built / "commands/minder/mem/removed-long-ago.md").exists())
+        self.assertNotIn("stale", (built / "rules/minder-memory.md").read_text(encoding="utf-8"))
+        shutil.rmtree(orphan)
+
+    def test_uninstall_with_no_harness_home_does_nothing(self):
+        shutil.rmtree(self.home)
+        res = self._uninstall()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertFalse(self.home.exists(), "uninstall must not create the home it is removing from")
+
+    def test_staging_of_a_live_run_is_not_cleaned_up(self):
+        live = self.repo / f"integrations/claude-code/built.new.{os.getpid()}-1-1"
+        dead = self.repo / "integrations/claude-code/built.new.999999-1-1"
+        live.mkdir(parents=True); dead.mkdir(parents=True)
+        self._ok()
+        self.assertTrue(live.is_dir(), "another live process's staging is not ours to delete")
+        self.assertFalse(dead.exists())
+        live.rmdir()
 
     def test_rendering_leaves_no_staging_directory_behind(self):
         self._ok()

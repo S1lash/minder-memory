@@ -63,12 +63,14 @@ zettelkasten/
 │   ├── docs/                     # платформенные документы (binding)
 │   │   ├── SYSTEM_CONFIG.md      # runtime config
 │   │   ├── ENGINE_DOCTRINE.md    # operating philosophy (imported by the repo's .claude/CLAUDE.md)
+│   │   ├── ENGINE_MAP.md         # engine paths + what moves with an engine change
 │   │   ├── ARCHITECTURE.md       # системный дизайн как построен
 │   │   ├── CONVENTIONS.md        # documentation style rules (binding)
 │   │   ├── batch-format.md       # контракт batch формата (нарратив)
 │   │   ├── manifest-schema/      # канонический JSON Schema манифеста + fixtures
 │   │   ├── biometric-lens-protocol.md  # общий протокол биометрических линз
 │   │   ├── communication-baseline.md   # universal presentation spine (linked into ~/.claude/minder-memory/)
+│   │   ├── advisory-baseline.md        # universal reasoning spine (linked into ~/.claude/minder-memory/)
 │   │   ├── constitution-capture.md     # global hook (linked into ~/.claude/minder-memory/)
 │   │   └── harness-setup.md      # per-machine install guide
 │   ├── roles/                    # standing roles

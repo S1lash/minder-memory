@@ -354,7 +354,8 @@ owner-set values. Owner может вручную поставить `audience_t
 Surfacing per-decision drowned бы owner queue без actual decision'ов,
 которые owner мог бы принять. Все остальные layers (threading,
 dedup, principle promotion, people identity, и т.д.) сохраняют
-surface-don't-decide правило.
+surface-don't-decide правило. Полный список автономных слоёв —
+`_system/docs/SYSTEM_CONFIG.md → Autonomous resolution layers`.
 
 ### Где искать подробности
 

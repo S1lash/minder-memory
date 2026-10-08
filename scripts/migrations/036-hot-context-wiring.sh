@@ -2,7 +2,7 @@
 # migration-kind: heal
 # 036-hot-context-wiring — one mechanism for what loads into every session.
 #
-# The installer used to link the engine's always-on files into
+# The installer used to link the engine's global files into
 # `~/.claude/rules/`, a directory Claude Code loads on its own, AND import five
 # of them from the managed block in `~/.claude/CLAUDE.md`. The sixth, the engine
 # doctrine, reached every session on the machine through the directory alone.
@@ -13,7 +13,7 @@
 #
 # `heal`, on the README's one question: continuing past a failure is not
 # dangerous. The installer writes the new wiring before it removes the old, so
-# a failed run leaves sessions loading what they loaded before. A non-zero exit
+# a failed run never leaves sessions loading less than before. A non-zero exit
 # is recorded `partial` and the next update tries again.
 #
 # Idempotent: the installer refreshes in place.

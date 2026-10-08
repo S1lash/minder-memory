@@ -10,46 +10,8 @@ are welcome. Personal data layers are not.
 upstream skeleton to friend clones. Anything outside those sections is
 your own data and stays in your repo.
 
-Engine paths in short:
-
-- `integrations/claude-code/{rules,commands,skills}/` — Claude Code
-  prompts and skills.
-- `integrations/minder-memory-mcp/` — MCP integration guide.
-- `integrations/obsidian/` — Obsidian vault config seed (`.obsidian/`
-  defaults + `minder-memory.md` dashboard). Idempotent seeder runs from
-  `claude-code/install.sh`; never overwrites a friend's live `.obsidian/`.
-- `scripts/` — release, sync, gates, migrations; `scripts/lib/` holds
-  the primitives they share.
-- `zettelkasten/_system/{docs,scripts}` and the pure-spec registries
-  `registries/{FOLDERS,CONCEPT_NAMING,CONCEPT_TYPES,AGENT_LENSES}.md`
-  + `registries/lenses/` — authoritative system spec. CONCEPT_NAMING
-  and AUDIENCES define the autonomous resolution contract for the
-  concept and audience layers (engine resolves format issues
-  mechanically — never raises a CLARIFICATION for owner action; see
-  ENGINE_DOCTRINE §3.1 layer-specific exception).
-- `zettelkasten/_system/registries/{AUDIENCES,DOMAINS}.template.md` —
-  seeds for the `audience_tags` whitelist and the domain vocabulary.
-  They ship as templates, not engine, because each file carries an
-  owner-mutable Extensions table beside its spec; the live
-  `AUDIENCES.md` / `DOMAINS.md` are owner data after install.
-- `zettelkasten/_system/roles/{_run-frame,_minder}.md` — the two engine
-  files every role's prompt is assembled from. Everything else under
-  `_system/roles/` is owner data.
-- `zettelkasten/5_meta/{CONCEPT.md,PROCESSING_PRINCIPLES.md,templates/,starter-pack/}`
-- `zettelkasten/5_skills/` — quick-reference cards.
-- `zettelkasten/0_constitution/CONSTITUTION.md` — protocol spec
-  (your `axiom/principle/rule/` files stay yours).
-- `.claude/CLAUDE.md`, `.claude/settings.json` — project-local
-  engine-development guide and permissive Bash allowlist for common
-  dev/CI commands.
-- `.claude/skills/` — the canonical skill-discovery tree (symlinks
-  here, dereferenced into real files on release) and
-  `.claude/agents/minder-mem-role.md`, the subagent the roles tick spawns.
-- `docs/{onboarding,upstream-sync,scheduling,obsidian,privacy,CHANGELOG}.md`
-  — the friend-facing docs.
-- `.gitignore`, `.gitattributes` (forces LF — a CRLF checkout breaks
-  bash and python on Windows), `LICENSE`, `integrations/VERSION`,
-  `CONTRIBUTING.md`.
+What each main engine path is for: `zettelkasten/_system/docs/ENGINE_MAP.md
+→ Engine paths`.
 
 Notably **not** engine: `.github/workflows/` is owner-only CI (a
 friend's clone stays CI-free by design — engine quality is upstream's

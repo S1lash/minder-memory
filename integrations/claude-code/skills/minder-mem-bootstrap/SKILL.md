@@ -206,8 +206,9 @@ For `fresh-onboarding` and `mixed` modes:
 > on promotion** (cheap to add, expensive to canonise); **idempotency**
 > (re-runs add or surface, never overwrite your edits).
 >
-> Long-form: `_system/docs/ENGINE_DOCTRINE.md` (loaded in every session
-> started at this repository's root, through `.claude/CLAUDE.md`). The frame
+> Long-form: `_system/docs/ENGINE_DOCTRINE.md` (loaded, through
+> `.claude/CLAUDE.md`, in every session started at the repo root or under
+> `zettelkasten/`). The frame
 > persists from this point — every future `/minder:mem:process`, `/minder:mem:lint`,
 > `/minder:mem:maintain` operates against it.
 >
@@ -978,7 +979,7 @@ any single point of failure:
 
 - `_system/docs/ENGINE_DOCTRINE.md`, imported by the repository's
   `.claude/CLAUDE.md` (loaded in every Claude Code session started at the
-  repo root, cloud routines included)
+  repo root or under `zettelkasten/`, cloud routines included)
 - `_system/views/CURRENT_CONTEXT.md` frontmatter `engine_doctrine`,
   `processing_principles`, `constitution_core` keys (any skill
   loading just CURRENT_CONTEXT inherits the pointers)

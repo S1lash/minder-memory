@@ -21,7 +21,9 @@
 ### Document Ownership
 
 This file is the **runtime configuration** loaded by `/minder:mem:process` at Step 1.
-It defines note formats, entity types, naming conventions. Folder routing lives
+It defines note formats, entity types, naming conventions, the write-territory
+and sacred-state indexes, and the registry of autonomous-resolution layers.
+Folder routing lives
 in `_system/registries/FOLDERS.md → ## Routing Rules`.
 
 For philosophy and architecture: see `5_meta/CONCEPT.md`.
@@ -48,6 +50,8 @@ report + JSON manifest emission per `emit_batch_manifest.py`).
 
 Цель: система автономна + аудитируема. Owner раз в неделю отвечает на вопросы,
 скиллы применяют ответы при следующем прогоне. Никаких молчаливых compromise.
+Исключение — детерминированные слои из → Autonomous resolution layers ниже:
+они разрешаются молча по трём свойствам `ENGINE_DOCTRINE §3.1`.
 
 ### Canonical CLARIFICATION types (append-only)
 
@@ -111,6 +115,70 @@ migrating existing open items.
 Per-skill SKILL.md may add narrower types for skill-internal flows;
 this table covers the cross-skill canonical set referenced in
 ENGINE_DOCTRINE §3.1.
+
+### Autonomous resolution layers
+
+The layers that qualify for the «resolve silently» exception of
+`ENGINE_DOCTRINE §3.1`, each having passed its three properties
+(deterministic canonicalisation, conservative-safe failure, high-volume /
+low-per-decision-value). A new layer is admitted only by the same test.
+
+- **Concept-name format** — `normalize_concept_name` /
+  `normalize_concept_list` (single SoT: `_common.py`).
+- **Audience-tag whitelist + format** — `normalize_audience_tag` +
+  AUDIENCES.md whitelist check.
+- **Privacy-trio backfill + hub derivation** — `recompute_hub_trio`,
+  trio backfill in `lint_concept_audit.py`.
+- **Portable filename normalisation** — `normalize_portable_name` /
+  `is_portable_name` (single SoT: `_common.py`). Applied to new
+  `_sources/inbox/` names by `/minder:mem:process` §0.0b pre-scan and
+  `/minder:mem:save` Step 0.5 pre-pass; `/minder:mem:lint` A.10 is the backstop.
+  Collisions are NOT covered by the exception — they surface as
+  `portable-name-collision` CLARIFICATIONs.
+- **Split-name recovery** — `repair_split_names.py`. Rejoins an inbox item
+  whose name a producer's `/` turned into two nested directories, which
+  portable-name normalisation cannot reach (it works on a NAME, and both
+  resulting segments are legal names). Three-property check: (1)
+  deterministic — the join is a pure function of the two segment names,
+  using the same `-` the normaliser substitutes for `/`; (2)
+  conservative-safe — the join runs ONLY when the parent holds exactly one
+  child and that child is a complete item, and refuses on every other
+  shape, so the failure mode is "left in place, surfaced"; (3)
+  low-per-decision-value — for the unambiguous shape the rejoin is the only
+  correct reading, so asking the owner offers them nothing to decide.
+  Applied by `/minder:mem:process` §0.0a; `/minder:mem:lint` A.10 is the backstop.
+  Ambiguous shapes surface as `source-layout-split-name` CLARIFICATIONs.
+- **Frontmatter fence repair** — `frontmatter_closed_before_body` /
+  `repair_misplaced_fence` (single SoT: `_common.py`; skills run it through
+  `check_frontmatter_fence.py`, never inline). Relocates a `## `
+  body heading (typically `## Evidence Trail`) that a producer captured
+  inside the YAML fence. Three-property check: (1) deterministic — pure
+  line-surgery, same output on re-run; (2) conservative-safe — on any
+  ambiguity (more than one candidate `---` in the displaced region) it
+  refuses and surfaces a `frontmatter-fence-misplaced` CLARIFICATION,
+  never guessing; (3) low-per-decision-value — for an unambiguous
+  misplacement the relocation is the only correct action, so surfacing it
+  would give the owner nothing to decide. Rarity does not disqualify: the
+  property is "surfacing yields no actionable choice," which holds. Applied
+  at write time by `/minder:mem:process` Steps 3.6/4.5 and `/minder:mem:agent-lens`
+  Stage 3 validator; `/minder:mem:lint` A.2 is the backstop. It repairs
+  structural note anatomy rather than normalising a metadata field.
+- **Metric-day re-render resolution** — `process_metric_day.run` on a
+  re-collected metric-day source whose content-hash drifted from the
+  existing record. Three-property check: (1) deterministic — the choice is
+  a pure comparison of real-metric counts (richer-or-equal → absorb +
+  `recompute_baselines_forward`; poorer/empty → keep existing); (2)
+  conservative-safe — good data is never overwritten by a degraded
+  re-collect, and the absorbed alternative is the device's own
+  authoritative refresh, so both branches are no-loss; (3)
+  low-per-decision-value — a metric-day record is a deterministic
+  projection of device data with no owner edits to protect, so surfacing
+  "should your recovered biometric data count?" gives the owner nothing to
+  decide. This is why metric-day re-render qualifies where general
+  content-drift detection does not (`ENGINE_DOCTRINE §3.1`): the resolution
+  needs no judgment about meaning,
+  only a count. Backstop: none needed — a poorer re-collect is simply kept,
+  never lost.
 
 ---
 
@@ -227,8 +295,8 @@ OPEN_THREADS.md `## Active` is opened by maintain at strategic grain and appende
 by resolve for lens/owner additions) — that is not an overlap, it is distinct
 lanes with distinct owners. Writing outside your lane is a schema violation —
 audits check this via git diff scope. This table is the single source of truth for
-write territory; ENGINE_DOCTRINE §4 and `.claude/CLAUDE.md` point here rather than
-restating it.
+write territory; ENGINE_DOCTRINE §4 points here rather than restating it, and
+`.claude/CLAUDE.md` keeps only an at-a-glance owner-data table for contributors.
 
 | Operation | Authorised skill | Rationale |
 |---|---|---|
@@ -282,7 +350,7 @@ it covers, the Skill Write Territory table above is authoritative on the
 writer — defer to it on any discrepancy;** files without a territory row
 (operational layers, append-only buffers) take the writer named here.
 
-| File | Writer (summary — canonical in SYSTEM_CONFIG) | Purpose |
+| File | Writer (summary — canonical in Skill Write Territory) | Purpose |
 |---|---|---|
 | `_system/SOUL.md` | owner (manual) + `/minder:mem:bootstrap` (draft) + `regen` (Values zone) | Identity, values, focus, working style |
 | `_system/TASKS.md`, `CALENDAR.md` | `/minder:mem:process` (derived aggregates; owner owns only the TASKS `## Stale` section) | Aggregated views over note `- [ ]` / `📅` items |
@@ -305,71 +373,6 @@ writer — defer to it on any discrepancy;** files without a territory row
 | `_system/roles/{id}/role.md` | `/minder:mem:role:add` (create), `/minder:mem:role:edit` (change) | One standing role, whole: frontmatter the engine owns, prose body in the owner's own language that the engine never parses |
 | `_system/roles/{id}/state/` | the role itself, inside a `/minder:mem:roles` tick | The role's memory between runs — arbitrary files it defines and maintains. Read at the start of every run, so a run that leaves them untrue corrupts the next one |
 | `_system/roles/{id}/log.jsonl` | `/minder:mem:roles` | One line per executed run: outcome, write count, reverted and reported-only paths, duration |
-
-### Autonomous resolution layers
-
-The layers that qualify for the «resolve silently» exception of
-`ENGINE_DOCTRINE §3.1`, each having passed its three properties
-(deterministic canonicalisation, conservative-safe failure, high-volume /
-low-per-decision-value). A new layer is admitted only by the same test.
-
-- **Concept-name format** — `normalize_concept_name` /
-  `normalize_concept_list` (single SoT: `_common.py`).
-- **Audience-tag whitelist + format** — `normalize_audience_tag` +
-  AUDIENCES.md whitelist check.
-- **Privacy-trio backfill + hub derivation** — `recompute_hub_trio`,
-  trio backfill in `lint_concept_audit.py`.
-- **Portable filename normalisation** — `normalize_portable_name` /
-  `is_portable_name` (single SoT: `_common.py`). Applied to new
-  `_sources/inbox/` names by `/minder:mem:process` §0.0b pre-scan and
-  `/minder:mem:save` Step 0.5 pre-pass; `/minder:mem:lint` A.10 is the backstop.
-  Collisions are NOT covered by the exception — they surface as
-  `portable-name-collision` CLARIFICATIONs.
-- **Split-name recovery** — `repair_split_names.py`. Rejoins an inbox item
-  whose name a producer's `/` turned into two nested directories, which
-  portable-name normalisation cannot reach (it works on a NAME, and both
-  resulting segments are legal names). Three-property check: (1)
-  deterministic — the join is a pure function of the two segment names,
-  using the same `-` the normaliser substitutes for `/`; (2)
-  conservative-safe — the join runs ONLY when the parent holds exactly one
-  child and that child is a complete item, and refuses on every other
-  shape, so the failure mode is "left in place, surfaced"; (3)
-  low-per-decision-value — for the unambiguous shape the rejoin is the only
-  correct reading, so asking the owner offers them nothing to decide.
-  Applied by `/minder:mem:process` §0.0a; `/minder:mem:lint` A.10 is the backstop.
-  Ambiguous shapes surface as `source-layout-split-name` CLARIFICATIONs.
-- **Frontmatter fence repair** — `frontmatter_closed_before_body` /
-  `repair_misplaced_fence` (single SoT: `_common.py`; skills run it through
-  `check_frontmatter_fence.py`, never inline). Relocates a `## `
-  body heading (typically `## Evidence Trail`) that a producer captured
-  inside the YAML fence. Three-property check: (1) deterministic — pure
-  line-surgery, same output on re-run; (2) conservative-safe — on any
-  ambiguity (more than one candidate `---` in the displaced region) it
-  refuses and surfaces a `frontmatter-fence-misplaced` CLARIFICATION,
-  never guessing; (3) low-per-decision-value — for an unambiguous
-  misplacement the relocation is the only correct action, so surfacing it
-  would give the owner nothing to decide. Rarity does not disqualify: the
-  property is "surfacing yields no actionable choice," which holds. Applied
-  at write time by `/minder:mem:process` Steps 3.6/4.5 and `/minder:mem:agent-lens`
-  Stage 3 validator; `/minder:mem:lint` A.2 is the backstop. This is the first
-  qualifying layer that repairs structural note anatomy rather than
-  normalising a metadata field — hence the explicit property write-up.
-- **Metric-day re-render resolution** — `process_metric_day.run` on a
-  re-collected metric-day source whose content-hash drifted from the
-  existing record. Three-property check: (1) deterministic — the choice is
-  a pure comparison of real-metric counts (richer-or-equal → absorb +
-  `recompute_baselines_forward`; poorer/empty → keep existing); (2)
-  conservative-safe — good data is never overwritten by a degraded
-  re-collect, and the absorbed alternative is the device's own
-  authoritative refresh, so both branches are no-loss; (3)
-  low-per-decision-value — a metric-day record is a deterministic
-  projection of device data with no owner edits to protect, so surfacing
-  "should your recovered biometric data count?" gives the owner nothing to
-  decide. This is why metric-day re-render qualifies where general content
-  drift does not (below): the resolution needs no judgment about meaning,
-  only a count. Backstop: none needed — a poorer re-collect is simply kept,
-  never lost.
-
 
 ### CLARIFICATIONS format
 
@@ -491,6 +494,10 @@ zettelkasten/
 │   │   ├── SYSTEM_CONFIG.md          # Этот файл — runtime config
 │   │   ├── ARCHITECTURE.md           # Системный дизайн как построен
 │   │   ├── CONVENTIONS.md            # Documentation style rules (binding)
+│   │   ├── ENGINE_DOCTRINE.md        # Operating philosophy (imported by the repo's .claude/CLAUDE.md)
+│   │   ├── ENGINE_MAP.md             # Engine paths + what moves with an engine change
+│   │   ├── communication-baseline.md # Universal presentation spine (global file)
+│   │   ├── advisory-baseline.md      # Universal reasoning spine (global file)
 │   │   ├── batch-format.md           # Контракт batch формата
 │   │   ├── constitution-capture.md   # Global hook (linked into ~/.claude/minder-memory/, imported by the managed block)
 │   │   └── harness-setup.md          # Per-machine install guide

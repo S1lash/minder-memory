@@ -1,9 +1,9 @@
 # Engine map
 
-Which paths are engine, and which docs move when engine behaviour changes.
-`.engine-manifest.yml` is the source of truth for the boundary; this map says
-what each engine path is for. Open it when a path's side of the boundary is
-unclear, and before closing any engine change.
+What the engine's paths are for, and what has to move when engine behaviour
+changes. The complete set of engine paths is `.engine-manifest.yml`; this map
+explains the main ones. Open it when a path's side of the boundary is unclear,
+and before closing any engine change.
 
 ## Engine paths
 
@@ -23,31 +23,35 @@ Normal code edits land here.
 - `zettelkasten/5_skills/` — engine quick-reference cards
 - `zettelkasten/0_constitution/CONSTITUTION.md` — protocol spec (NOT the `axiom/principle/rule/` subdirs)
 - `zettelkasten/{1_projects,2_areas,3_resources,_records}/README.md` — PARA explainers
-- `.claude/CLAUDE.md`, `.claude/settings.json` — project-local engine-development guide (`AGENTS.md` is its Codex twin) and permissive command allowlist
+- `.claude/CLAUDE.md`, `.claude/settings.json` — project-local engine-development guide and permissive command allowlist
+- `AGENTS.md` — the same engine-development contract for Codex
+- `.claude/hooks/` — the hooks the engine registers in `.claude/settings.json`
 - `.claude/skills/` — the canonical skill-discovery tree (symlinks here; `release_engine.py` dereferences them into real files on release, because a git symlink does not survive a Windows clone)
 - `.claude/agents/minder-mem-role.md` — the subagent definition the `/minder:mem:roles` tick spawns per due role
-- Root meta: `.gitignore`, `.gitattributes`, `LICENSE`, `integrations/VERSION`, `CONTRIBUTING.md`, `README.template.md`, `docs/{onboarding,upstream-sync,scheduling,obsidian,privacy,CHANGELOG,upgrade-1.0.0}.md`
+- Root meta: `.gitignore`, `.gitattributes`, `LICENSE`, `integrations/VERSION`, `CONTRIBUTING.md`, `docs/{onboarding,upstream-sync,scheduling,obsidian,privacy,CHANGELOG,upgrade-1.0.0}.md`
+- Templates (`template:` in the manifest — seeded once, renamed on release): `README.template.md`, the `*.template.md` registry and view seeds
 
-## Docs that move with the engine
+## What moves with an engine change
 
 When engine behaviour changes, these are the docs that must move with it.
 Drift between them is the engine's largest entropy risk.
 
 | File | Purpose |
 |---|---|
-| `zettelkasten/_system/docs/ENGINE_MAP.md` | This map: engine paths, and the docs that move with engine behaviour |
+| `zettelkasten/_system/docs/ENGINE_MAP.md` | This map: engine paths, and what moves with an engine change |
+| `.claude/CLAUDE.md`, `AGENTS.md` | The engine-development contract, one per runtime (Claude Code, Codex); reconciled in the same change |
 | `zettelkasten/_system/docs/SYSTEM_CONFIG.md` | System contract: schemas, hard rules, cross-skill lock matrix |
 | `zettelkasten/_system/docs/CONVENTIONS.md` | Documentation style; binding on every edit listed in this table |
-| `zettelkasten/_system/docs/ENGINE_DOCTRINE.md` | Operating philosophy; imported by `.claude/CLAUDE.md` — loads in this repo only |
+| `zettelkasten/_system/docs/ENGINE_DOCTRINE.md` | Operating philosophy; Claude Code imports it through `.claude/CLAUDE.md`, Codex reads it at this path (per `AGENTS.md`) |
 | `zettelkasten/_system/docs/ARCHITECTURE.md` | System design as built: git-centric layers, rejected alternatives, the system files the engine maintains |
 | `zettelkasten/_system/docs/manifest-schema/v{N}.json` | Canonical JSON Schema for Minder Memory engine manifest (consumer-agnostic). New major = new file alongside; old majors retained for validating old batches |
 | `zettelkasten/_system/docs/manifest-schema/README.md` | Reference doc for manifest contract: SemVer evolution rules, per-skill semantics, "what is NOT in the manifest", consumer integration patterns |
 | `zettelkasten/_system/docs/manifest-schema/fixtures/` | Per-skill sanitized example manifests; regression test for schema evolution — schema changes MUST keep these validating |
 | `zettelkasten/_system/docs/batch-format.md` | Markdown batch-summary format (`{ts}-{skill}.md` next to each JSON manifest); narrative side only — JSON contract canonical lives in `manifest-schema/` |
 | `zettelkasten/_system/docs/constitution-capture.md` | In-the-moment capture trigger spec |
-| `zettelkasten/_system/docs/communication-baseline.md` | Universal presentation spine — how a result is DELIVERED; hot-loaded into every session (via the managed block) |
-| `zettelkasten/_system/docs/advisory-baseline.md` | Universal reasoning spine — how a result is REACHED: objective function, advocate-with-unbiased-instrument, interested-party ledger, criteria provenance + regime test, sweep gate, variance and irreversibility. Hot-loaded beside its sibling. Owner deltas layer on top in their `ai-interaction` principles; the heavy protocol is the owner's on-demand `_system/decision-advisory-playbook.md` |
-| `zettelkasten/_system/docs/harness-setup.md` | Harness setup |
+| `zettelkasten/_system/docs/communication-baseline.md` | Universal presentation spine — how a result is DELIVERED; a global file |
+| `zettelkasten/_system/docs/advisory-baseline.md` | Universal reasoning spine — how a result is REACHED: objective function, advocate-with-unbiased-instrument, interested-party ledger, criteria provenance + regime test, sweep gate, variance and irreversibility. A global file beside its sibling. Owner deltas layer on top in their `ai-interaction` principles; the heavy protocol is the owner's on-demand `_system/decision-advisory-playbook.md` |
+| `zettelkasten/_system/docs/harness-setup.md` | What the installer wires into `~/.claude/`; how to add a global file |
 | `zettelkasten/5_meta/CONCEPT.md` | Three-layer model; long-form philosophy |
 | `zettelkasten/5_meta/PROCESSING_PRINCIPLES.md` | The 8 processing principles |
 | `zettelkasten/0_constitution/CONSTITUTION.md` | Constitution protocol spec (axiom / principle / rule schema, scope, evolution ladder) |
@@ -61,9 +65,9 @@ Drift between them is the engine's largest entropy risk.
 | `.engine-manifest.yml` | Engine boundary; what ships to skeleton. Header comment above `template:` is the **SoT for the seed contract** (strip-seed / skill-seed / layered) |
 | `scripts/lib/` | Shared engine primitives: `portable` (LF/UTF-8 stdout + file I/O), `manifest` (the single reader of `.engine-manifest.yml`), `migrations` (the ledger + declared kinds), `git.sh` (branch identity, quotepath-safe path listing, MSYS-safe ref access), `tick_identity` (the base and run a scheduler delivery declares in its message — the one home for its keys, writer and reader). A concern that lands here has more than one call site — that is the bar |
 | `scripts/scheduler/record_tick_telemetry.py` | The tick odometer: reads the run's own session transcript (plus every sub-agent's) and appends one line of token consumption to `_system/state/tick-telemetry.jsonl`. It exists because a model cannot see its own usage — the only figure in its context is a remaining-budget counter that ignores cache reads and sub-agents entirely, so any self-reported number would be invention. Always exits 0: instrumentation that can abort a tick is worse than no instrumentation, which is why `/minder:mem:lint` A.13 has to watch for it going quiet |
-| `zettelkasten/_system/scripts/pipeline_health.py` | The single answer to «when did this pipeline last run», for every pipeline and every role. Takes the MAXIMUM timestamp, never the last line: logs are newest-first but carry an older ascending tail, so a last-line read reported `log_process.md` 68 days stale while it had run that week. Reports `last_in_file_order` alongside so a discrepancy is visible. `global-navigator` calls it instead of parsing prose |
+| `zettelkasten/_system/scripts/pipeline_health.py` | The single answer to «when did this pipeline last run», for every pipeline and every role. Takes the MAXIMUM timestamp, never the last line: logs are newest-first but carry an older ascending tail. Reports `last_in_file_order` alongside so a discrepancy is visible. `global-navigator` calls it instead of parsing prose |
 | `scripts/check_portability.py` | Portability gate — makes `ENGINE_DOCTRINE §3.9` executable. Runs in CI and inside `release_engine.py`; a release cannot ship a §3.9 violation. Escapes: inline `portability-ok: <reason>` or a row in `scripts/portability-allowlist.txt` |
-| `scripts/manifest_paths.py` | Emits one manifest section as LF-separated lines for a shell caller. Exists so `sync_engine.sh` has no inline `python3 - <<'PY'` heredoc on the boundary — that heredoc printed with a bare `print()`, and python's text-mode stdout writes CRLF on Git Bash, which is what made `/minder:mem:update` silently apply nothing there |
+| `scripts/manifest_paths.py` | Emits one manifest section as LF-separated lines for a shell caller. Exists so `sync_engine.sh` has no inline `python3 - <<'PY'` heredoc on the boundary: python's text-mode stdout writes CRLF on Git Bash, and a path read with a trailing `\r` resolves to nothing |
 | `scripts/run_migrations.py` | The migration runner. Honours each migration's declared `# migration-kind:` — `structural` failure aborts, `heal` failure is recorded and the update continues. Called by `sync_engine.sh` and by `/minder:mem:update` |
 | `scripts/check_migration_coverage.py` | Migration-coverage gate — a migration ships with a suite that EXECUTES it, or a dated row in `scripts/migration-coverage-allowlist.txt`. Coverage is read from the test's syntax tree (class naming the migration, a real `test_*`, a runner that itself shells out), because a `NAME` line beside no test is trivial to write and grep cannot tell them apart. The allowlist's ceiling is a constant in the gate, not a line in the list — a limit a file declares about itself is raised by editing that file. Runs in CI and inside `release_engine.py`. Exists because an untested `heal` that SUCCEEDS at the wrong thing is marked applied and never runs again, on any clone |
 | `scripts/check_seed_contract.py` | Seed-contract gate — enforces the contract at release + CI; add a new seed's invariant here if you introduce a new seeding kind |

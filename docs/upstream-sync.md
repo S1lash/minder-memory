@@ -128,8 +128,10 @@ and leaves four hundred paths changed with nothing telling you to commit them.
 
 ## After a sync
 
-- Re-install the Claude Code symlinks (some skills may have been
-  renamed): `bash integrations/claude-code/install.sh`. This step also
+- Run `python3 scripts/check_update.py`. Migrations that re-wire Claude
+  Code run the installer themselves; re-run
+  `bash integrations/claude-code/install.sh` only if a harness probe
+  fails. The installer also
   invokes `integrations/obsidian/seed.sh` to seed `<vault>/.obsidian/`
   and `<vault>/minder-memory.md` if missing — engine improvements to the
   Obsidian config never overwrite your live `.obsidian/` (run
@@ -144,12 +146,13 @@ If you want to override an engine prompt or script for your instance,
 **don't edit the engine path directly** — the next sync will overwrite
 your change. Instead:
 
-- For the always-on files (`~/.claude/minder-memory/`), commands and
+- For the global files (`~/.claude/minder-memory/`), commands and
   skills: don't edit what the installer links — every run re-links it and
   moves a file you put in its place into `~/.claude/.minder-memory-backup-*`.
   Write your own file instead and `@`-import it from `~/.claude/CLAUDE.md`
   outside the managed `MINDER-MEMORY` block, which the installer never
-  touches.
+  touches. It loads beside the engine's file, not instead of it — write it
+  as an addendum, not a substitute.
 - For system prompts that the engine reads from `_system/`: copy the
   engine file to a sibling path under `2_areas/personal/`, edit there,
   and update your `~/.claude/CLAUDE.md` to @-reference your version.

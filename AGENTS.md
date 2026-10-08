@@ -9,13 +9,13 @@ Different rules apply to each. This file is the project-local contract.
 
 **This repo ships exactly one agent integration, `integrations/claude-code/`, and its project-local config lives at `.claude/`.** Those are the real paths whatever agent is reading this; there is no second tree to look for.
 
-The operating philosophy, `zettelkasten/_system/docs/ENGINE_DOCTRINE.md`, reaches a Claude Code session in this repository through an import in `.claude/CLAUDE.md`. Codex does not load imports, and **nothing is installed into a Codex home**, so a Codex session does not get it automatically — read it at its repo path before working here. **This file covers what it does not: how to WORK ON THIS REPO.**
+The operating philosophy, `zettelkasten/_system/docs/ENGINE_DOCTRINE.md`, reaches a Claude Code session started at the repository root or under `zettelkasten/` through an import in `.claude/CLAUDE.md`. Codex does not load imports, and **nothing is installed into a Codex home**, so a Codex session does not get it automatically — read it at its repo path before working here. **This file covers what it does not: how to WORK ON THIS REPO.**
 
 ## Authority order (top wins on conflict)
 
 1. `zettelkasten/_system/docs/SYSTEM_CONFIG.md` — system contract; hard rules, schemas, lock matrix
 2. `zettelkasten/_system/docs/CONVENTIONS.md` — documentation conventions; binding on every edit to engine docs and SKILLs
-3. `zettelkasten/_system/docs/ENGINE_DOCTRINE.md` — operating philosophy; cross-skill principles (loaded in this repo)
+3. `zettelkasten/_system/docs/ENGINE_DOCTRINE.md` — operating philosophy; cross-skill principles (Claude Code loads it in this repo; Codex reads it at this path)
 4. This file — project-local engine-development rules
 5. Skill `SKILL.md` under `integrations/claude-code/skills/<name>/` — pipeline-specific spec
 6. `zettelkasten/_system/SOUL.md` — owner identity calibration
@@ -28,9 +28,9 @@ When you find these in conflict, the higher one wins. When a rule is absent ever
 
 ### Engine paths
 
-One line per engine path, and what it is for: `zettelkasten/_system/docs/ENGINE_MAP.md → Engine paths`.
+What the main engine paths are for: `zettelkasten/_system/docs/ENGINE_MAP.md → Engine paths`; the complete set is `.engine-manifest.yml`.
 
-**This file is in the manifest** and ships to the skeleton beside `.claude/CLAUDE.md`, so a friend's Codex reads the same contract. Keep the two reconciled: they are the same contract for two runtimes, and a rule that reaches one and not the other is worse than no rule. `.github/workflows/` and the repo-root `README.md` are likewise excluded (owner-only CI; the public README ships from `README.template.md`).
+**This file is in the manifest** and ships to the skeleton beside `.claude/CLAUDE.md`, so a friend's Codex reads the same contract. Keep the two reconciled: they are the same contract for two runtimes, and a rule that reaches one and not the other is worse than no rule. Notably **not** engine, though they sit beside engine paths: `.github/workflows/` (owner-only CI; a friend's clone stays CI-free by design) and the repo-root `README.md` (the maintainer's own; the public one ships from `README.template.md`).
 
 ### Owner-data paths (NEVER edit by hand — route through Minder Memory skills)
 
@@ -77,7 +77,7 @@ Every engine artifact runs identically on Windows (Git Bash + `python3`), macOS 
 
 ## Where skills are authored
 
-Skills live at `integrations/claude-code/skills/<name>/SKILL.md`. **That is the source of truth.** The full set lives under that path.
+Skills live at `integrations/claude-code/skills/<name>/SKILL.md`. **That is the source of truth.**
 
 The `minder-mem-role*` family shares one subagent definition at `.claude/agents/minder-mem-role.md` — the agent `/minder:mem:roles` spawns per due role. It is the only agent definition the engine ships. The two engine files every role's prompt is assembled from live at `zettelkasten/_system/roles/{_run-frame.md,_minder.md}`; everything else under `_system/roles/` is owner data.
 
@@ -85,7 +85,7 @@ Skills are discovered through two paths:
 
 1. **Project-level (Routines + interactive in repo CWD)** — `.claude/skills/minder-mem-*` symlinks at the repo root point into `integrations/claude-code/skills/<name>/`. Auto-discovered by Claude Code (interactive + Routines) when CWD is inside the repo. SKILL.md sources use repo-relative `zettelkasten/...` paths and need no rendering.
 
-2. **User-level (interactive from any CWD)** — `bash integrations/claude-code/install.sh` renders rules / commands templates (which still use `{{MINDER_MEMORY_BASE}}`) into `integrations/claude-code/built/` (gitignored) and symlinks `~/.claude/{minder-memory,commands,skills}/` so the constitution-capture hook + ambient `/minder:mem:capture-candidate` / `/minder:mem:check-decision` are reachable from sessions opened outside this repo. The skills loop in install.sh is a no-op pass for skills (no placeholder to render); kept for user-level symlink coverage.
+2. **User-level (interactive from any CWD)** — `bash integrations/claude-code/install.sh` renders rules / commands templates (which still use `{{MINDER_MEMORY_BASE}}`) into `integrations/claude-code/built/` (gitignored) and symlinks `~/.claude/{minder-memory,commands,skills,agents}/` so the constitution-capture hook + ambient `/minder:mem:capture-candidate` / `/minder:mem:check-decision` are reachable from sessions opened outside this repo. The skills loop in install.sh is a no-op pass for skills (no placeholder to render); kept for user-level symlink coverage.
 
 **Never edit:**
 - `integrations/claude-code/built/**` — generated output of install.sh
@@ -93,9 +93,9 @@ Skills are discovered through two paths:
 
 After editing a SKILL source, no rebuild is required — both `.claude/skills/` and `~/.claude/skills/` resolve to the same source. After editing a rule or command source, re-run `bash integrations/claude-code/install.sh` (idempotent) to refresh `built/`.
 
-## Authoritative docs to keep current
+## What moves with an engine change
 
-When engine behaviour changes, the docs that must move with it are listed in `zettelkasten/_system/docs/ENGINE_MAP.md → Docs that move with the engine` — open it before closing any engine change, and move every doc it names in the same change. **Two-stage doc edits create drift; one-stage edits prevent it.**
+When engine behaviour changes, what must move with it is listed in `zettelkasten/_system/docs/ENGINE_MAP.md → What moves with an engine change` — open it before closing any engine change, and move every doc it names in the same change. **Two-stage doc edits create drift; one-stage edits prevent it.**
 
 ## Release and sync — the gotchas that bite
 

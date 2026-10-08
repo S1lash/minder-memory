@@ -13,6 +13,25 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CLAUDE_HOME="${CLAUDE_HOME:-$HOME/.claude}"
 
+# The installer's lock (scripts/lib/install_lock.sh), held for the whole run:
+# never uninstall underneath a running install, nor let one start mid-way.
+LOCK_HELPER="$REPO_ROOT/scripts/lib/install_lock.sh"
+if [ ! -f "$LOCK_HELPER" ]; then
+  echo "[uninstall] error: $LOCK_HELPER is missing — this clone is incomplete" >&2
+  exit 1
+fi
+# shellcheck source=../../scripts/lib/install_lock.sh
+. "$LOCK_HELPER"
+if [ ! -d "$CLAUDE_HOME" ]; then
+  echo "[uninstall] no $CLAUDE_HOME — nothing to remove"
+  exit 0
+fi
+if ! minder_lock_acquire "$CLAUDE_HOME/.minder-memory-install.lock"; then
+  echo "[uninstall] error: another install or uninstall is running (lock $CLAUDE_HOME/.minder-memory-install.lock) — try again when it finishes" >&2
+  exit 1
+fi
+trap 'minder_lock_release' EXIT
+
 remove_if_points_into_repo() {
   local p="$1"
   if [ -L "$p" ]; then
@@ -33,11 +52,20 @@ remove_if_points_into_repo() {
 CLAUDE_MD="$CLAUDE_HOME/CLAUDE.md"
 BEGIN_MARK="<!-- MINDER-MEMORY BEGIN — managed by install.sh, do not edit by hand -->"
 END_MARK="<!-- MINDER-MEMORY END -->"
-if [ -f "$CLAUDE_MD" ] && grep -qF "$BEGIN_MARK" "$CLAUDE_MD"; then
-  if ! tr -d '\r' < "$CLAUDE_MD" | grep -qxF "$END_MARK"; then
-    echo "[uninstall] error: $CLAUDE_MD has the block's BEGIN marker but not its END marker — nothing was removed" >&2
+# Only BEGIN … END pairs are stripped; any other layout — a stray END
+# included — would take or strand the owner's own text (install.sh checks the
+# same way).
+if [ -f "$CLAUDE_MD" ] && grep -qF -e "$BEGIN_MARK" -e "$END_MARK" "$CLAUDE_MD"; then
+  if ! tr -d '\r' < "$CLAUDE_MD" | awk -v begin="$BEGIN_MARK" -v end="$END_MARK" '
+    $0 == begin { if (open) bad = 1; open = 1; next }
+    $0 == end   { if (!open) bad = 1; open = 0; next }
+    END         { exit (bad || open) ? 1 : 0 }
+  '; then
+    echo "[uninstall] error: the managed block markers in $CLAUDE_MD are not in BEGIN … END pairs — nothing was removed" >&2
     exit 1
   fi
+fi
+if [ -f "$CLAUDE_MD" ] && grep -qF "$BEGIN_MARK" "$CLAUDE_MD"; then
   TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
   BACKUP_DIR="$CLAUDE_HOME/.minder-memory-backup-$TIMESTAMP"
   mkdir -p "$BACKUP_DIR"

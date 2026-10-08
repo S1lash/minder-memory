@@ -70,12 +70,10 @@ SRC_COMMANDS="$INTEGR_ROOT/commands"
 SRC_SKILLS="$INTEGR_ROOT/skills"
 
 BUILT="$INTEGR_ROOT/built"
-BUILT_STAGE="$INTEGR_ROOT/built.new"
-BUILT_PREVIOUS="$INTEGR_ROOT/built.old"
 
 CLAUDE_HOME="${CLAUDE_HOME:-$HOME/.claude}"
 # `rules/` is loaded by Claude Code on its own. Nothing of the engine's belongs
-# there; the installer only removes the links an earlier version put in it.
+# there; the installer only removes the engine's retired links from it.
 TARGET_RULES="$CLAUDE_HOME/rules"
 TARGET_HOT="$CLAUDE_HOME/minder-memory"
 TARGET_COMMANDS="$CLAUDE_HOME/commands"
@@ -154,6 +152,29 @@ link() {
   log "linked: $dst -> $src"
 }
 
+# --- One installer at a time ---
+# Shared with uninstall.sh (scripts/lib/install_lock.sh): a manual install while
+# an update runs migration 036, or two clones sharing one home, would otherwise
+# interleave the swap of built/ and the rewrite of the managed block.
+LOCK_HELPER="$REPO_ROOT/scripts/lib/install_lock.sh"
+if [ ! -f "$LOCK_HELPER" ]; then
+  log "error: $LOCK_HELPER is missing — this clone is incomplete; run 'bash scripts/sync_engine.sh --self-heal'" >&2
+  exit 1
+fi
+# shellcheck source=../../scripts/lib/install_lock.sh
+. "$LOCK_HELPER"
+mkdir -p "$CLAUDE_HOME"
+if ! minder_lock_acquire "$CLAUDE_HOME/.minder-memory-install.lock"; then
+  log "error: another install or uninstall is running (lock $CLAUDE_HOME/.minder-memory-install.lock) — try again when it finishes" >&2
+  log "  If none is running, remove that directory and re-run." >&2
+  exit 1
+fi
+# Staging carries this run's lock token, not just its pid: a pid can be reused,
+# and an orphan stage left by a killed run must never be rendered into.
+BUILT_STAGE="$INTEGR_ROOT/built.new.$MINDER_LOCK_TOKEN"
+BUILT_PREVIOUS="$INTEGR_ROOT/built.old.$MINDER_LOCK_TOKEN"
+trap 'minder_lock_release; rm -rf "$BUILT_STAGE" "$BUILT_PREVIOUS"' EXIT
+
 log "repo root: $REPO_ROOT"
 log "MINDER_MEMORY_BASE: $MINDER_MEMORY_BASE"
 
@@ -167,7 +188,16 @@ log "MINDER_MEMORY_BASE: $MINDER_MEMORY_BASE"
 # render finished would leave every session importing a missing rule until
 # the next run.
 log "rendering templates into $BUILT"
-rm -rf "$BUILT_STAGE" "$BUILT_PREVIOUS"
+# Leftovers of a run that died mid-swap are cleaned on a best-effort basis (a
+# stage whose pid is alive is left alone — it may be another home's install of
+# this clone). Correctness does not depend on it: this run's stage is created
+# fresh, and `mkdir` without -p fails rather than reuse one.
+for stale in "$INTEGR_ROOT"/built.new.* "$INTEGR_ROOT"/built.old.*; do
+  [ -d "$stale" ] || continue
+  stale_token="${stale##*/built.???.}"
+  minder_lock_alive "${stale_token%%-*}" || rm -rf "$stale"
+done
+mkdir "$BUILT_STAGE"
 mkdir -p "$BUILT_STAGE/rules" "$BUILT_STAGE/commands"
 
 for f in "$SRC_RULES"/*.md; do
@@ -295,20 +325,29 @@ EOF
   printf '%s\n' "$END_MARK"
 }
 
+# The splice drops everything from a BEGIN line to the END line that closes
+# it. Any other layout — an END with no BEGIN, an END before its BEGIN, a BEGIN
+# inside an open block, a block never closed — would drop or strand the owner's
+# own text, so it is refused and the file left as it is. (uninstall.sh checks
+# the same way.)
+if [ -f "$CLAUDE_MD" ] && grep -qF -e "$BEGIN_MARK" -e "$END_MARK" "$CLAUDE_MD"; then
+  if ! tr -d '\r' < "$CLAUDE_MD" | awk -v begin="$BEGIN_MARK" -v end="$END_MARK" '
+    $0 == begin { if (open) bad = 1; open = 1; next }
+    $0 == end   { if (!open) bad = 1; open = 0; next }
+    END         { exit (bad || open) ? 1 : 0 }
+  '; then
+    log "error: the managed block markers in $CLAUDE_MD are not in BEGIN … END pairs — the file is unchanged" >&2
+    log "  Fix them by hand (each '$BEGIN_MARK' closed by one '$END_MARK'), then re-run: bash integrations/claude-code/install.sh" >&2
+    exit 1
+  fi
+fi
+
 if [ ! -f "$CLAUDE_MD" ]; then
   log "creating $CLAUDE_MD"
   mkdir -p "$CLAUDE_HOME"
   managed_block > "$CLAUDE_MD"
 elif grep -qF "$BEGIN_MARK" "$CLAUDE_MD"; then
   log "refreshing managed block in $CLAUDE_MD"
-  # The splice drops everything from BEGIN up to the matching END line. With no
-  # END line it would drop the rest of the file — the owner's own instructions
-  # included — so the refresh is refused instead.
-  if ! tr -d '\r' < "$CLAUDE_MD" | grep -qxF "$END_MARK"; then
-    log "error: $CLAUDE_MD has the managed block's BEGIN marker but not its END marker — it is unchanged" >&2
-    log "  Restore the line '$END_MARK' after the block, then re-run: bash integrations/claude-code/install.sh" >&2
-    exit 1
-  fi
   mkdir -p "$BACKUP_DIR"
   cp "$CLAUDE_MD" "$BACKUP_DIR/CLAUDE.md.before-refresh"
   # Splice the new block in via awk getline from a file. A multi-line
@@ -382,7 +421,7 @@ if [ "$BLOCK_STATUS" -ne 0 ]; then
   exit 1
 fi
 
-# --- Retire the links an earlier installer put in rules/ ---
+# --- Retire the engine's links in rules/ ---
 # Last, after the new links and the block are in place: a run that stops before
 # this point leaves sessions loading what they loaded before, never a block of
 # dead imports. Which entries are ours is decided by `lib.ownership` (asked
@@ -446,7 +485,7 @@ Obsidian vault config:
   - Start at minder-memory.md (Cmd+O → "minder-memory").
   - Reset to engine defaults later: bash integrations/obsidian/seed.sh --force
 
-Restart Claude Code (open a new session) to pick up the rules.
+Restart Claude Code (open a new session) to pick up the global files.
 Re-run this installer any time after a 'git pull' on minder-memory — it is
 idempotent and refreshes the managed block in place.
 
