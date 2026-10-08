@@ -105,6 +105,7 @@ zettelkasten/
 │   │   ├── log_agent_lens.md     # append-only лог /minder:mem:agent-lens runs
 │   │   ├── agent-lens-runs.jsonl # машинный индекс agent-lens runs (one JSON per line)
 │   │   ├── agent-lens-rejected/  # raw Stage 2 outputs (validator rejected)
+│   │   ├── agent-lens-raw/       # verbatim thinker text, before formatting
 │   │   ├── resolve-sessions/     # per-session логи /minder:mem:resolve-clarifications
 │   │   ├── biometric/            # σ-baselines по устройствам
 │   │   ├── activity/             # σ-baselines по источникам computer-usage

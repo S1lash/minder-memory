@@ -5,8 +5,9 @@
 The frame is the contract every lens runs inside. Two stages, deliberately
 decoupled:
 
-- **Stage 1 — Thinker.** The primary LLM (Opus or equivalent) reads the
-  lens prompt and decides what to read in the Minder Memory base. It writes its
+- **Stage 1 — Thinker.** The latest Opus, in a clean call of its own
+  (`_system/scripts/lens_think.py`), reads the lens prompt and decides what
+  to read in the Minder Memory base. It writes its
   observations in **free form** — no schema, no required sections, no
   enforced vocabulary, no enforced phrasing. The thinker is NOT told that
   it must cite sources, provide an alternative reading, or state
@@ -14,17 +15,17 @@ decoupled:
   is honest. The point: thinking should not be biased by formatting
   pressure.
 
-- **Stage 2 — Structurer.** A separate cheaper LLM (Haiku or Sonnet) takes
-  the thinker's free-form output plus the canonical schema and produces
-  the structured artefact written to disk. The structurer EXTRACTS what
+- **Stage 2 — Structurer.** The runner takes the thinker's free-form
+  output plus the canonical schema and produces the structured artefact
+  written to disk, reading nothing but that output while it does. The structurer EXTRACTS what
   the thinker provided. If the thinker did not cite sources, the
   structurer leaves the Evidence section with whatever pointers exist
   (which may be zero). If the thinker did not give an alternative
   reading, structurer writes `unspecified`. The structurer never invents
   content the thinker did not state.
 
-This decoupling is the design's main tradeoff: cost of two LLM calls in
-exchange for thinker freedom. Worth it for this use case.
+This decoupling is the design's main tradeoff: a second pass over every
+standard lens in exchange for thinker freedom. Worth it for this use case.
 
 **Output schema modes** — controlled by `output_schema` lens-frontmatter
 field:
@@ -122,9 +123,13 @@ no forbidden language. Write what you observe, in whatever shape is
 honest. If you have nothing this run, say so plainly — that is signal,
 not failure.
 
-A separate, cheap LLM will read what you wrote and reformat it to the
-canonical schema. You do not need to know the schema. Write for the
-owner, not for the structurer.
+Another pass will lay what you wrote out in the canonical schema
+without adding to it. You do not need to know the schema. Write for the
+owner, not for the formatter.
+
+Do not read `_system/state/agent-lens-raw/` or
+`_system/state/agent-lens-rejected/` — unvalidated drafts, not
+observations.
 
 Suggestions, not constraints — to make your output USEFUL (these are
 strong recommendations because the owner will read what you wrote):
@@ -258,7 +263,10 @@ which has none):
   Forbidden: paraphrasing a principle-candidate body or a
              clarification quote
 
-You may write in free form. The structurer will reformat.
+You may write in free form. Another pass will lay it out in the schema.
+Do not read `_system/state/agent-lens-raw/` or
+`_system/state/agent-lens-rejected/` — unvalidated drafts, not
+observations.
 
 Reader alignment — output only. The owner (a human) reads this digest.
 Decide the status you owe them FIRST — which items, counts, and states
@@ -349,6 +357,10 @@ the final output. Respect the schema and the guards exactly. The
 schema is the analytical work — choosing which section a finding
 belongs in is part of the thinking.
 
+Do not read `_system/state/agent-lens-raw/` or
+`_system/state/agent-lens-rejected/` — unvalidated drafts, not
+observations.
+
 Default-silence is load-bearing. If a section has nothing non-obvious
 and cited, write the section header and leave the body empty (or with
 a one-line `(no signal this week)` marker). Filling sections with
@@ -412,11 +424,12 @@ stage entirely; the thinker writes the final output directly per the
 schema in the lens prompt.
 
 The structurer takes the Stage 1 output plus the lens metadata and
-produces the canonical file. Runs as a separate LLM call.
+produces the canonical file. Performed by the runner itself, reading
+only this lens's thinker text.
 
 ```
 You are a strict formatter. You receive:
-  1. A free-form analysis from a thinker LLM.
+  1. A free-form analysis from a thinker.
   2. The canonical output schema (below).
   3. Lens metadata (id, run timestamp).
 

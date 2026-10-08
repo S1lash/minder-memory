@@ -36,13 +36,14 @@ Pointer card. The full pipeline lives in the installed skill, not here.
 
 Reads the lens registry, filters lenses that are due per their
 per-lens cadence, runs each through a two-stage pipeline (free-form
-thinker LLM → structurer LLM → structural validator), writes
+thinker in a clean call of its own → the runner formats → structural validator), writes
 — a lens declaring `output_schema: synthesis-custom` skips the
 structurer and writes its final shape itself, validator still enforcing
 the frontmatter trio and a non-empty body. It writes
 observation snapshots to `_system/agent-lens/{id}/{date}.md`. Each
-lens runs in isolation: fresh API context per Stage, no cross-lens
-carry-over, no subagent dispatch. Meta lenses (input_type=lens-outputs)
+lens's thinker runs in its own clean `claude -p` call
+(`lens_think.py`, latest Opus): no cross-lens carry-over, no subagent;
+the runner only formats what the thinker wrote. Meta lenses (input_type=lens-outputs)
 read other lenses' outputs and produce a navigator digest of pointers,
 never content. Each observation entity carries the privacy trio per
 SKILL Step 5.9 (`origin: personal`, `audience_tags: []`,

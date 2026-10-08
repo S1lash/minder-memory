@@ -11,8 +11,8 @@ the next action and it executes. Step 0 verifies this layout resolved in
 the clone before any slash invocation.
 
 `/minder:mem:agent-lens --all-due` iterates all lenses whose cadence has elapsed
-and runs each through its two-stage thinker→structurer pipeline as the
-skill's own architecture. Outputs land in `_system/agent-lens/{id}/{date}.md`
+and runs each through its two-stage pipeline: a clean thinker call per
+lens, then the runner's own formatting. Outputs land in `_system/agent-lens/{id}/{date}.md`
 plus the runs index `_system/state/agent-lens-runs.jsonl`.
 
 **Single-commit guarantee.** This tick produces **exactly one git commit
@@ -35,8 +35,10 @@ contract violation.
   re-implement its steps with Bash / Read / Edit. Skills are loaded by
   the runtime — invoke via slash, never re-execute.
 - Do NOT use the Agent / Task tool as a substitute for slash invocation.
-  The skill's own internal sub-agent dispatch (per-lens thinker /
-  structurer) is preserved; the scheduler contract does not govern it.
+  No subagent anywhere in this run: each lens's thinker runs through
+  `_system/scripts/lens_think.py` (the skill's Step 5.2), a clean call that
+  returns inside the step, and the formatting is yours (Step 5.3). Never
+  write a thinker's text yourself.
 - Do NOT run any history-rewriting or work-discarding git command directly:
   `git commit --amend`, `--reset-author`, `git reset` (any mode), `git checkout
   --force`, `git rebase`. The helper scripts do their own internal recovery

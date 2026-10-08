@@ -199,13 +199,15 @@ Lenses with `status: paused` or `status: archived`. Per Archive Contract Form B 
   `_system/state/agent-lens-rejected/{lens-id}/{run_at}.md` for owner
   inspection; not written to the canonical output dir
 - Output schema enforcement depends on the lens's `output_schema` field:
-  - `standard` (default) — Stage 2 **structurer pass** (separate cheap
-    LLM call) reformats free-form thinker output to canonical
-    `## Observation N` schema; structural validator then enforces.
-    The thinker writes free-form
-  - `synthesis-custom` — Stage 2 is **skipped**; the thinker writes
-    final output directly per the schema described in the lens
-    prompt. Validator checks frontmatter privacy trio + non-empty
+  - `standard` (default) — Stage 2: the runner lays the thinker's
+    free-form text out in the canonical `## Observation N` schema,
+    extracting, never authoring; structural validator then enforces.
+    The thinker — the latest Opus in a clean `claude -p` call — writes
+    free-form, and its verbatim text is kept under
+    `_system/state/agent-lens-raw/`
+  - `synthesis-custom` — the thinker writes the body directly per the
+    schema described in the lens prompt; the runner only adds the
+    frontmatter. Validator checks frontmatter privacy trio + non-empty
     body + cited path resolution. The lens prompt owns its internal
     section structure and analytical guards (default-silence per
     section, anti-eye-roll constraints, etc.)
@@ -256,7 +258,8 @@ One JSON object per line, append-only:
 ## Privacy
 
 All lens outputs are owner-local. They live under `_system/agent-lens/`
-and `_system/state/agent-lens-rejected/` and are committed to the same
+`_system/state/agent-lens-rejected/` and `_system/state/agent-lens-raw/`
+and are committed to the same
 private repo as the rest of the Minder Memory base.
 
 **Privacy trio on lens-observation entities** (per
@@ -283,8 +286,8 @@ QMD index for lens outputs so they remain accessible to the owner via
 `/minder:mem:process` reading hypothesis-grade observations as if they were
 records). For now: no search-side exclusion. Other skills that perform
 content search (`/minder:mem:lint` Scan F.x, `/minder:mem:bootstrap`) MUST exclude
-`_system/agent-lens/` and `_system/state/agent-lens-rejected/` paths
-explicitly. This requirement is documented here and enforced by each
+`_system/agent-lens/`, `_system/state/agent-lens-rejected/` and
+`_system/state/agent-lens-raw/` paths explicitly. This requirement is documented here and enforced by each
 skill's own scope rules.
 
 ## Lock matrix
@@ -371,7 +374,8 @@ No skill code changes required either way.
 
 - QMD search-isolation deferred to a follow-up phase (see Privacy
   section). For now: `_system/agent-lens/` and
-  `_system/state/agent-lens-rejected/` MUST be excluded explicitly
+  `_system/state/agent-lens-rejected/` and `_system/state/agent-lens-raw/`
+  MUST be excluded explicitly
   by any other skill that performs full-base content scans
 - Lens content calibration (per-lens prompt fine-tuning) — owner-driven
   iteration based on first real scheduled outputs. Auto-pause after
