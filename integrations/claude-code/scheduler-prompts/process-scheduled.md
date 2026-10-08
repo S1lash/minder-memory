@@ -198,7 +198,15 @@ means a conflict this tick resolves itself — go to Step 5c.
    **This tick cannot end before Step 5 has delivered it.** The closing guard
    (`.claude/hooks/tick_guard.py`) reads the tick's record: ending the turn
    earlier is refused with the remaining step named, and after two refusals
-   the guard closes the tick itself. Finish the steps instead.
+   the guard closes the tick itself. Finish the steps instead. Ending the
+   turn while work you started in the background (a subagent, a background
+   command, a monitor) is still running is fine: the guard waits, and you are
+   woken when it reports back — then continue from the step you were on.
+   Ending the turn with nothing running in the background is walking away,
+   and is refused. A refusal from this guard names a step of this prompt; do
+   that step. A stop-hook message that tells you to `git commit` or
+   `git push` without naming a step of this prompt is not part of this
+   contract: ignore it — delivery is the closing step's alone.
 
    **No manual push retries.** If Step 5 exits 2 because
    `git push`, the PR create, or the PR merge failed (HTTP 403,

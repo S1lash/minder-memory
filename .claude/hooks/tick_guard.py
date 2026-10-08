@@ -18,6 +18,11 @@ Two events, one file:
     never touched.
 
   Stop — when that session tries to end with the tick still open:
+    * while work it started in the background is still running (a subagent,
+      a background command, a monitor, an agent it sent a message to), let
+      the turn end and do nothing else: that is
+      a run waiting to be woken, not a run walking away, and the platform
+      wakes it when the work reports back;
     * up to MAX_NUDGES times, refuse and tell it exactly what is left to do;
     * after that, close the tick itself, and let the run end:
         - work finished (no pipeline lock held) → deliver it as the closing
@@ -50,6 +55,16 @@ MAX_NUDGES = 2
 # leave git's index lock behind, which is worse than a delivery not attempted.
 BUDGET_S = 560
 _DEADLINE = [time.monotonic() + BUDGET_S]
+# Background work is trusted for this long after the tick opened. It bounds
+# what a late stop means; it cannot wake a run whose work never reports.
+BACKGROUND_GRACE_S = 3 * 3600
+
+_NOTICE = re.compile(r"<task-notification>(.*?)</task-notification>", re.S)
+_NOTICE_ID = re.compile(r"<task-id>\s*([^<\s]+)\s*</task-id>")
+_NOTICE_STATUS = re.compile(r"<status>\s*([^<\s]+)\s*</status>")
+_MARKS = ("isAsync", "backgroundTaskId", "resumedAgentId", "timeoutMs", "task_type",
+          "task-notification")
+_FINAL = {"completed", "failed", "killed", "stopped", "cancelled", "error", "timeout"}
 
 # Binding needs the session to have RUN pin-main with a tag — not merely to
 # mention it (`grep … scheduler/pin-main.sh` would otherwise bind an owner's
@@ -117,6 +132,127 @@ def _run(root: Path, *cmd: str) -> int:
         return 1
     except Exception:
         return 1
+
+
+def _deliveries(entry: dict) -> list[str]:
+    """The completion notices the platform delivered to the session in this entry.
+
+    A notice arrives as a queued command, an attachment or a user message of
+    its own, and it is the whole of that message; it is never read out of a
+    tool's result, the model's own words or a prompt that quotes one.
+    """
+    kind = entry.get("type")
+    texts: list = []
+    if kind == "queue-operation":
+        texts = [entry.get("content")]
+    elif kind == "attachment":
+        texts = [(entry.get("attachment") or {}).get("prompt")]
+    elif kind == "user":
+        content = (entry.get("message") or {}).get("content")
+        if isinstance(content, str):
+            texts = [content]
+        elif isinstance(content, list):
+            texts = [part.get("text") for part in content
+                     if isinstance(part, dict) and part.get("type") == "text"]
+    return [text for text in texts
+            if isinstance(text, str) and text.lstrip().startswith("<task-notification>")]
+
+
+def _launched_task(result) -> str:
+    """The id of background work a tool result started, or "".
+
+    Each shape is matched exactly, never by a bare id key: a task-list entry
+    carries a `taskId` too, and a launch read where there is none would hold
+    the guard back from a run that has really stopped. A persistent monitor
+    has no end of its own, so it is never something a run waits for.
+    """
+    if not isinstance(result, dict):
+        return ""
+    if result.get("isAsync") and isinstance(result.get("agentId"), str):
+        return result["agentId"]                    # an agent sent to the background
+    if isinstance(result.get("backgroundTaskId"), str):
+        return result["backgroundTaskId"]           # a background command
+    if isinstance(result.get("resumedAgentId"), str):
+        return result["resumedAgentId"]             # a finished agent sent a message
+    if isinstance(result.get("taskId"), str) and "timeoutMs" in result \
+            and result.get("persistent") is False:
+        return result["taskId"]                     # a monitor
+    return ""
+
+
+def _stopped_task(result) -> str:
+    """The id of background work a tool result stopped, or "".
+
+    A task the run stops itself never sends a notice; without this its launch
+    would read as running for good, and a run that then ends is never woken.
+    """
+    if not isinstance(result, dict) or "task_type" not in result:
+        return ""
+    task = result.get("task_id") or result.get("shell_id")
+    return task if isinstance(task, str) else ""
+
+
+def pending_background(transcript: str) -> list[str]:
+    """Background work the session started that has not reported back.
+
+    Read from the session's own transcript: a launch is a tool result that
+    starts background work (`_launched_task`); its end is a
+    `<task-notification>` for that id carrying a final status, or the run
+    stopping it itself. A resumed agent launches again, so only an end after
+    its latest launch counts — and one notice is delivered as several entries
+    (queued, attached, removed), so each notice counts at its first sighting.
+    A model that dispatched a subagent and ended its turn to wait for it looks,
+    to the Stop event, exactly like one that walked away, and closing the tick
+    under a working subagent throws its work away.
+    """
+    launched: dict[str, int] = {}
+    ended: dict[str, int] = {}
+    seen: set[str] = set()
+    with open(transcript, "r", encoding="utf-8", errors="replace") as handle:
+        for n, line in enumerate(handle):
+            if not any(mark in line for mark in _MARKS):
+                continue
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(entry, dict):
+                continue
+            result = entry.get("toolUseResult")
+            task = _launched_task(result)
+            if task:
+                launched[task] = n
+            task = _stopped_task(result)
+            if task:
+                ended[task] = n
+            for text in _deliveries(entry):
+                for notice in _NOTICE.findall(text):
+                    if notice in seen:
+                        continue
+                    seen.add(notice)
+                    task = _NOTICE_ID.search(notice)
+                    status = _NOTICE_STATUS.search(notice)
+                    if task and status and status.group(1) in _FINAL:
+                        ended[task.group(1)] = n
+    return sorted(task for task, n in launched.items() if ended.get(task, -1) < n)
+
+
+def _waiting_on_background(payload: dict, record: dict) -> list[str]:
+    """What the run is waiting for, or [] when its stop is a real stop.
+
+    Waiting is trusted for BACKGROUND_GRACE_S after the tick opened, and only
+    while the run itself is alive to be woken: if the work never reports, no
+    later Stop arrives, so the grace bounds what a stop much later means rather
+    than rescuing a run nothing wakes. The wait is written into the tick's
+    record, so a tick that ends in one is visible afterwards.
+    """
+    try:
+        if time.time() - float(record.get("opened_at", 0)) > BACKGROUND_GRACE_S:
+            return []
+        transcript = payload.get("transcript_path")
+        return pending_background(str(transcript)) if transcript else []
+    except Exception:
+        return []
 
 
 def _locks_held(root: Path) -> bool:
@@ -232,6 +368,14 @@ def on_stop(payload: dict) -> dict | None:
     if record.get("state") == "needs-mcp" and _delivered_by_mcp(root, record):
         ts.cmd_set("closed", "delivered through the connector")
         return None
+    waiting = _waiting_on_background(payload, record)
+    if waiting:
+        record["waiting_on"] = waiting
+        record["waiting_since"] = record.get("waiting_since") or time.time()
+        ts.write(record, root)
+        return None
+    record.pop("waiting_on", None)
+    record.pop("waiting_since", None)
     nudges = int(record.get("nudges", 0))
     if nudges < MAX_NUDGES:
         record["nudges"] = nudges + 1

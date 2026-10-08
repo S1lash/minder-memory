@@ -412,7 +412,18 @@ to do silently:
   set aside in a git stash named in the note, so a clone that persists between
   runs does not deliver them with its next tick either. (A skill that reports
   its own error still goes through ordinary failure handling, which delivers
-  what is in the tree.)
+  what is in the tree.) A turn that ends while work the run started in the
+  background is still running — a subagent, a background command, a monitor,
+  an agent it sent a message to — is the run waiting to be woken, not walking
+  away: the guard lets it end, counts nothing, and acts only once that work has
+  reported back (or once the tick is three hours old, so a subagent that never
+  reports cannot keep the tick open for good). It reads this from the session's own
+  transcript. This is the ordinary case, not an edge: the cloud runs a tick's
+  subagents in the background even when the skill asks for them in the
+  foreground, so a processing tick ends its turn to wait as a matter of course.
+  A wait is written into the tick's record (`waiting_on`), so a run that ended
+  inside one — its work never reported back, and nothing woke it — is visible
+  afterwards.
 - **Conflicts are settled, not fatal.** A run that delivered first and touched
   the same files used to cost the later run everything. Now, where both sides
   only added lines, both are kept mechanically

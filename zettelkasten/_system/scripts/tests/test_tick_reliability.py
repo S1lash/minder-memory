@@ -79,10 +79,57 @@ def _guard(work: Path, payload: dict) -> str:
     return res.stdout
 
 
-def _stop(work: Path, session: str = "S1") -> dict | None:
-    out = _guard(work, {"hook_event_name": "Stop", "session_id": session,
-                        "stop_hook_active": False})
+def _stop(work: Path, session: str = "S1", transcript: Path | None = None) -> dict | None:
+    payload = {"hook_event_name": "Stop", "session_id": session, "stop_hook_active": False}
+    if transcript is not None:
+        payload["transcript_path"] = str(transcript)
+    out = _guard(work, payload)
     return json.loads(out) if out.strip() else None
+
+
+def _transcript(path: Path, *entries: dict) -> Path:
+    with open(path, "a", encoding="utf-8") as handle:
+        for entry in entries:
+            handle.write(json.dumps(entry) + "\n")
+    return path
+
+
+_LAUNCHES = {
+    "agent": lambda task: {"isAsync": True, "status": "async_launched", "agentId": task},
+    "command": lambda task: {"backgroundTaskId": task, "stdout": ""},
+    "monitor": lambda task: {"taskId": task, "timeoutMs": 300000, "persistent": False},
+    "resume": lambda task: {"success": True, "resumedAgentId": task},
+}
+
+
+def _launch(task: str, kind: str = "agent") -> dict:
+    result = _LAUNCHES[kind](task)
+    return {"type": "user", "toolUseResult": result,
+            "message": {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": "toolu_x",
+                 "content": [{"type": "text", "text": "launched"}]}]}}
+
+
+def _notice(task: str, status: str = "completed", shape: str = "queued",
+            call: str = "toolu_1") -> dict:
+    # A notice names the call that started its run: a resumed agent's second
+    # notice differs from its first, while one notice delivered twice does not.
+    text = (f"<task-notification>\n<task-id>{task}</task-id>\n"
+            f"<tool-use-id>{call}</tool-use-id>\n"
+            f"<status>{status}</status>\n</task-notification>")
+    if shape == "attached":
+        return {"type": "attachment", "attachment": {"type": "queued_command", "prompt": text}}
+    if shape == "message":
+        return {"type": "user", "message": {"role": "user", "content": text}}
+    return {"type": "queue-operation", "operation": "enqueue", "content": text}
+
+
+def _stopped(task: str) -> dict:
+    return {"type": "user", "toolUseResult": {
+        "message": f"Successfully stopped task: {task}", "task_id": task,
+        "task_type": "local_bash", "command": "sleep 900"},
+        "message": {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": "toolu_s", "content": "stopped"}]}}
 
 
 SHARED = "zettelkasten/_records/shared.md"
@@ -196,6 +243,134 @@ def test_the_guard_nudges_twice_then_delivers_the_tick_itself(tmp_path: Path) ->
     assert _stop(work) is None, "the third time it lets go — after closing the tick"
     assert _show(origin, "zettelkasten/_system/state/log_lint.md") == "ran\n"
     assert _state(work)["state"] == "closed"
+
+
+def test_a_run_waiting_on_its_subagent_is_not_held_or_closed(tmp_path: Path) -> None:
+    work, origin = _seed(tmp_path)
+    _open_tick(work, tag="scheduler/process")
+    lock = work / "zettelkasten/_sources/.processing.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text("running\n", encoding="utf-8")
+    transcript = _transcript(tmp_path / "session.jsonl", _launch("agent-1"))
+
+    for _ in range(4):
+        assert _stop(work, transcript=transcript) is None, "waiting, not walking away"
+    record = _state(work)
+    assert record["state"] == "open" and record["nudges"] == 0
+    assert "failure" not in tsf._git(origin, "log", "-1", "--format=%s", "main").stdout
+
+    # The subagent reports back; the run is woken and ends without closing.
+    _transcript(transcript, _notice("agent-1"))
+    assert _stop(work, transcript=transcript)["decision"] == "block"
+
+
+def test_a_background_command_holds_the_guard_back_too(tmp_path: Path) -> None:
+    work, _ = _seed(tmp_path)
+    _open_tick(work)
+    transcript = _transcript(tmp_path / "session.jsonl", _launch("bash-1", kind="command"))
+    assert _stop(work, transcript=transcript) is None
+    _transcript(transcript, _notice("bash-1", status="failed"))
+    assert _stop(work, transcript=transcript)["decision"] == "block"
+
+
+def test_a_monitor_holds_the_guard_back_until_it_ends(tmp_path: Path) -> None:
+    work, _ = _seed(tmp_path)
+    _open_tick(work)
+    transcript = _transcript(tmp_path / "session.jsonl", _launch("mon-1", kind="monitor"))
+    assert _stop(work, transcript=transcript) is None
+    _transcript(transcript, _notice("mon-1"))
+    assert _stop(work, transcript=transcript)["decision"] == "block"
+
+
+def test_a_resumed_agent_is_running_again(tmp_path: Path) -> None:
+    work, _ = _seed(tmp_path)
+    _open_tick(work)
+    transcript = _transcript(tmp_path / "session.jsonl", _launch("agent-1"),
+                             _notice("agent-1"), _launch("agent-1", kind="resume"))
+    assert _stop(work, transcript=transcript) is None, "its first notice is history"
+    _transcript(transcript, _notice("agent-1", call="toolu_2"))
+    assert _stop(work, transcript=transcript)["decision"] == "block"
+
+
+def test_a_task_list_entry_is_not_background_work(tmp_path: Path) -> None:
+    work, _ = _seed(tmp_path)
+    _open_tick(work)
+    todo = {"type": "user", "toolUseResult": {"taskId": "7", "subject": "close the tick"},
+            "message": {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": "toolu_z", "content": "created"}]}}
+    transcript = _transcript(tmp_path / "session.jsonl", todo)
+    assert _stop(work, transcript=transcript)["decision"] == "block"
+
+
+@pytest.mark.parametrize("shape", ["queued", "attached", "message"])
+def test_every_delivered_shape_of_a_notice_ends_the_wait(tmp_path: Path, shape: str) -> None:
+    work, _ = _seed(tmp_path)
+    _open_tick(work)
+    transcript = _transcript(tmp_path / "session.jsonl", _launch("agent-1"),
+                             _notice("agent-1", shape=shape))
+    assert _stop(work, transcript=transcript)["decision"] == "block"
+
+
+def test_work_the_run_stopped_itself_is_not_waited_for(tmp_path: Path) -> None:
+    work, _ = _seed(tmp_path)
+    _open_tick(work)
+    transcript = _transcript(tmp_path / "session.jsonl",
+                             _launch("bash-1", kind="command"), _stopped("bash-1"))
+    assert _stop(work, transcript=transcript)["decision"] == "block"
+
+
+def test_a_persistent_monitor_is_not_waited_for(tmp_path: Path) -> None:
+    work, _ = _seed(tmp_path)
+    _open_tick(work)
+    persistent = _launch("mon-1", kind="monitor")
+    persistent["toolUseResult"]["persistent"] = True
+    transcript = _transcript(tmp_path / "session.jsonl", persistent)
+    assert _stop(work, transcript=transcript)["decision"] == "block"
+
+
+def test_a_notice_redelivered_after_a_resume_does_not_end_it(tmp_path: Path) -> None:
+    work, _ = _seed(tmp_path)
+    _open_tick(work)
+    first = _notice("agent-1")
+    attached = _notice("agent-1", shape="attached")
+    transcript = _transcript(tmp_path / "session.jsonl", _launch("agent-1"), first,
+                             _launch("agent-1", kind="resume"), attached)
+    assert _stop(work, transcript=transcript) is None, "the same notice, seen again"
+
+
+def test_a_wait_is_written_into_the_record(tmp_path: Path) -> None:
+    work, _ = _seed(tmp_path)
+    _open_tick(work)
+    transcript = _transcript(tmp_path / "session.jsonl", _launch("agent-1"))
+    assert _stop(work, transcript=transcript) is None
+    assert _state(work)["waiting_on"] == ["agent-1"]
+
+
+def test_an_unreadable_transcript_falls_back_to_the_guard(tmp_path: Path) -> None:
+    work, _ = _seed(tmp_path)
+    _open_tick(work)
+    assert _stop(work, transcript=tmp_path / "missing.jsonl")["decision"] == "block"
+
+
+def test_a_notice_quoted_in_a_tool_result_does_not_count(tmp_path: Path) -> None:
+    work, _ = _seed(tmp_path)
+    _open_tick(work)
+    quoted = {"type": "user", "message": {"role": "user", "content": [
+        {"type": "tool_result", "tool_use_id": "toolu_y", "content":
+         "<task-notification><task-id>agent-1</task-id><status>completed</status>"
+         "</task-notification>"}]}}
+    transcript = _transcript(tmp_path / "session.jsonl", _launch("agent-1"), quoted)
+    assert _stop(work, transcript=transcript) is None
+
+
+def test_background_work_that_never_reports_stops_holding_back(tmp_path: Path) -> None:
+    work, _ = _seed(tmp_path)
+    _open_tick(work)
+    record = _state(work)
+    record["opened_at"] = time.time() - 4 * 3600
+    (work / ".scheduler-state/tick.json").write_text(json.dumps(record), encoding="utf-8")
+    transcript = _transcript(tmp_path / "session.jsonl", _launch("agent-1"))
+    assert _stop(work, transcript=transcript)["decision"] == "block"
 
 
 def test_a_closed_tick_lets_the_session_end(tmp_path: Path) -> None:
