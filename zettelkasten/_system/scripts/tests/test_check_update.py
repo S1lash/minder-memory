@@ -108,7 +108,13 @@ class CheckUpdateTests(unittest.TestCase):
     INSTALLER_AFTER = 'BACKUP="$CLAUDE_HOME/.minder-memory-backup-$(date +%Y%m%d)"\n'
     SECRETS_REL = "zettelkasten/_system/state/secrets.enc.json"
 
-    def _build_clone(self) -> None:
+    def _rebuild_clone(self, before_rename: dict[str, str]) -> None:
+        """The same clone, with `before_rename` files present when the rename ran."""
+        import shutil  # noqa: PLC0415
+        shutil.rmtree(self.clone)
+        self._build_clone(before_rename)
+
+    def _build_clone(self, before_rename: dict[str, str] | None = None) -> None:
         """Two commits, because the damage probe needs a BEFORE to read.
 
         The first is the clone as it stood before the rename migration ran; the
@@ -139,6 +145,8 @@ class CheckUpdateTests(unittest.TestCase):
                "Scripts in ~/scripts/ztn-process-"
                "\u0438\u0432\u0430\u043d\u043e\u0432/run.sh.\n")
         _write(self.clone, self.NOTE_REL_BEFORE, self.NOTE_BODY)
+        for rel, text in (before_rename or {}).items():
+            _write(self.clone, rel, text)
         # A note whose own file name is the OWNER's: today's map leaves it
         # alone, so a predecessor cannot be found by inverting the map, and
         # only similarity can pair the two sides.
@@ -214,6 +222,117 @@ class CheckUpdateTests(unittest.TestCase):
                       "conflict-markers", "clone-residue", "sources-untouched"):
             self.assertEqual(statuses[probe], "ok", f"{probe}: {statuses[probe]}")
 
+    def _upstream(self, version: str) -> Path:
+        bare = self.tmp / "upstream.git"
+        work = self.tmp / "upstream-work"
+        if not bare.exists():
+            _git(self.tmp, "init", "-q", "--bare", "-b", "main", str(bare))
+            _git(self.tmp, "clone", "-q", str(bare), str(work))
+        _write(work, "integrations/VERSION", version + "\n")
+        _git(work, "add", "-A")
+        _git(work, "commit", "-qm", f"engine {version}")
+        _git(work, "push", "-q", "origin", "HEAD:main")
+        return bare
+
+    def _version_probe(self) -> dict:
+        res = self._run("--json")
+        return next(p for p in json.loads(res.stdout)["probes"] if p["probe"] == "version")
+
+    def test_a_stale_upstream_ref_is_refreshed_before_comparing(self):
+        """The ref is whatever the last fetch left; the check asks the remote itself."""
+        bare = self._upstream("1.0.3")
+        _git(self.clone, "remote", "add", "upstream", str(bare))
+        _git(self.clone, "fetch", "-q", "upstream")
+        self._upstream("1.0.4")
+        probe = self._version_probe()
+        self.assertEqual(probe["status"], "ok", probe["evidence"])
+
+    def test_a_custom_fetch_mapping_cannot_leave_the_comparison_stale(self):
+        """The comparison reads what this fetch brought, not a ref the mapping never updates."""
+        bare = self._upstream("1.0.3")
+        _git(self.clone, "remote", "add", "upstream", str(bare))
+        _git(self.clone, "fetch", "-q", "upstream")
+        _git(self.clone, "config", "remote.upstream.fetch", "+refs/heads/nothing:refs/remotes/upstream/nothing")
+        self._upstream("1.0.5")
+        probe = self._version_probe()
+        self.assertEqual(probe["status"], "fail", probe["evidence"])
+        self.assertIn("1.0.5", probe["evidence"])
+
+    def test_a_concurrent_fetch_cannot_change_what_is_compared(self):
+        """Anything else fetching between the probe's fetch and its read rewrites FETCH_HEAD."""
+        import sys  # noqa: PLC0415
+        sys.path.insert(0, str(CHECK.parent))
+        import check_update  # noqa: PLC0415
+        from unittest import mock  # noqa: PLC0415
+        decoy = self.tmp / "decoy.git"
+        _git(self.tmp, "init", "-q", "--bare", "-b", "main", str(decoy))
+        _git(self.clone, "push", "-q", str(decoy), "HEAD:main")       # carries the clone's 1.0.4
+        _git(self.clone, "remote", "add", "upstream", str(self._upstream("1.0.5")))
+        real = check_update._git
+
+        def racing(repo, *args):
+            if args and args[0] == "show":
+                real(repo, "fetch", "-q", str(decoy), "main")      # someone else fetches now
+            return real(repo, *args)
+        with mock.patch.object(check_update, "_git", side_effect=racing):
+            probe = check_update.probe_version(self.clone, "upstream", "main")
+        self.assertEqual(probe["status"], check_update.FAIL, probe)
+        self.assertIn("1.0.5", probe["evidence"])
+        leftovers = real(self.clone, "for-each-ref", "refs/minder-check/").stdout.strip()
+        self.assertEqual(leftovers, "", "the probe's own ref is removed")
+
+    def test_a_clone_behind_upstream_fails(self):
+        _git(self.clone, "remote", "add", "upstream", str(self._upstream("1.1.0")))
+        probe = self._version_probe()
+        self.assertEqual(probe["status"], "fail", probe["evidence"])
+        self.assertIn("behind", probe["evidence"])
+
+    def test_a_clone_ahead_of_upstream_is_not_a_failed_update(self):
+        """The authoring clone carries the next version before it is released."""
+        _git(self.clone, "remote", "add", "upstream", str(self._upstream("1.0.2")))
+        probe = self._version_probe()
+        self.assertEqual(probe["status"], "ok", probe["evidence"])
+        self.assertIn("ahead", probe["evidence"])
+
+    def test_an_unreachable_upstream_is_a_skip_even_when_the_old_ref_matches(self):
+        """A ref nobody refreshed proves nothing about what upstream ships now."""
+        bare = self._upstream("1.0.4")
+        _git(self.clone, "remote", "add", "upstream", str(bare))
+        _git(self.clone, "fetch", "-q", "upstream")
+        import shutil  # noqa: PLC0415
+        shutil.rmtree(bare)
+        probe = self._version_probe()
+        self.assertEqual(probe["status"], "skip", probe["evidence"])
+        self.assertIn("could not reach", probe["evidence"])
+
+    def test_a_fetch_that_times_out_is_a_skip_not_a_crash(self):
+        import sys  # noqa: PLC0415
+        sys.path.insert(0, str(CHECK.parent))
+        import check_update  # noqa: PLC0415
+        from unittest import mock  # noqa: PLC0415
+        real = subprocess.run
+
+        def slow(cmd, *a, **k):
+            if "fetch" in cmd:
+                raise subprocess.TimeoutExpired(cmd, 60)
+            return real(cmd, *a, **k)
+        with mock.patch.object(check_update.subprocess, "run", side_effect=slow):
+            probe = check_update.probe_version(self.clone, "upstream", "main")
+        self.assertEqual(probe["status"], check_update.SKIP, probe)
+
+    def test_a_shallow_history_cannot_excuse_a_line(self):
+        """Lines that cannot be dated are counted, and the check says why."""
+        self._rebuild_clone({"zettelkasten/_records/observations/note.md": "I run /ztn:process.\n"})
+        shallow = self.tmp / "shallow"
+        _git(self.tmp, "clone", "-q", "--depth", "1", "file://" + str(self.clone), str(shallow))
+        res = subprocess.run(["python3", str(CHECK), "--repo-root", str(shallow), "--json"],
+                             capture_output=True, text=True, encoding="utf-8",
+                             env={**os.environ, "CLAUDE_HOME": str(self.home)})
+        residue = next(p for p in json.loads(res.stdout)["probes"] if p["probe"] == "clone-residue")
+        self.assertEqual(residue["status"], "fail", residue["evidence"])
+        self.assertIn("note.md", residue["evidence"])
+        self.assertIn("shallow", residue["evidence"])
+
     def test_a_probe_that_cannot_be_asked_says_so_rather_than_passing(self):
         """No remote is fetched in the fixture, so the version probe skips."""
         res = self._run("--json")
@@ -254,26 +373,28 @@ class CheckUpdateTests(unittest.TestCase):
         probe = next(p for p in json.loads(res.stdout)["probes"] if p["probe"] == "rules-dir-clean")
         self.assertIn("my-playbook.md", probe["evidence"])
 
-    def test_a_retired_link_into_another_clone_fails_and_names_it(self):
-        """Not removed by this clone's installer — so it must not be silent either."""
+    def test_an_engine_link_into_another_clone_fails_until_this_installer_removes_it(self):
+        """Any clone's installer removes the engine's retired links, wherever they point."""
         other = self.home.parent / "other-clone"
         doctrine = _write(other, "zettelkasten/_system/docs/ENGINE_DOCTRINE.md", "x\n")
+        _write(other, ".engine-manifest.yml", "engine: []\n")
+        _write(other, "integrations/claude-code/install.sh", "#!/bin/bash\n")
         (self.home / "rules").mkdir(parents=True, exist_ok=True)
         os.symlink(doctrine, self.home / "rules" / "minder-memory-engine-doctrine.md")
         res = self._run("--json")
         self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
         self.assertEqual(self._failed(res), {"rules-dir-clean"})
         self.assertIn("other-clone", res.stdout)
+        self.assertIn("install.sh", res.stdout)
 
-    def test_a_dangling_retired_link_is_reported_not_failed(self):
-        """A moved clone's old link loads nothing; failing on it would teach the reader to ignore the probe."""
+    def test_a_dangling_engine_link_of_a_moved_clone_fails_until_removed(self):
+        """It loads nothing, but the installer removes it — so the check asks for that run."""
         (self.home / "rules").mkdir(parents=True, exist_ok=True)
         gone = self.home.parent / "moved-away/zettelkasten/_system/docs/ENGINE_DOCTRINE.md"
         os.symlink(gone, self.home / "rules" / "minder-memory-engine-doctrine.md")
         res = self._run("--json")
-        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
-        probe = next(p for p in json.loads(res.stdout)["probes"] if p["probe"] == "rules-dir-clean")
-        self.assertIn("minder-memory-engine-doctrine.md", probe["evidence"])
+        self.assertEqual(self._failed(res), {"rules-dir-clean"})
+        self.assertIn("minder-memory-engine-doctrine.md", res.stdout)
 
     def test_a_block_that_imports_nothing_fails(self):
         """Every file present and nothing loading it is the quietest way to lose all five."""
@@ -361,40 +482,62 @@ class CheckUpdateTests(unittest.TestCase):
         self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
         self.assertEqual(self._failed(res), {"skill-count"})
 
-    def test_a_file_still_carrying_the_former_name_fails_the_residue_probe(self):
-        _write(self.clone, "zettelkasten/_records/observations/note.md",
-               "I still run /ztn:process every night.\n")
-        _git(self.clone, "commit", "-qam", "a file the rename missed")
+    def test_a_file_the_rename_missed_fails_the_residue_probe(self):
+        """Present when the rename ran and still carrying the former name: the rename missed it."""
+        self._rebuild_clone({"zettelkasten/_records/observations/note.md":
+                             "I still run /ztn:process every night.\n"})
         res = self._run("--json")
         self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
         self.assertEqual(self._failed(res), {"clone-residue"})
+        self.assertIn("note.md", res.stdout)
 
-    def test_a_line_that_opts_out_of_the_rename_is_not_residue(self):
-        """The two opt-outs are what make a former-name line legitimate.
-
-        Without discounting them the probe fails forever on the engine's own
-        files — and a probe that always fails is a probe nobody reads.
-        """
-        marked = ("A beat that must keep the aliases: `ztn` / `\u0417\u0422\u041d`. "
-                  "<!-- rebrand:keep -->\n")
-        _write(self.clone, "zettelkasten/_records/observations/beat.md", marked)
+    def test_a_line_written_after_the_rename_is_not_residue(self):
+        """A note about the rename names the former product on purpose — nothing missed it."""
+        _write(self.clone, "zettelkasten/1_projects/rebrand-decision.md",
+               "We renamed ztn to Minder Memory; /ztn:process still works as an alias.\n")
         _git(self.clone, "add", "-A")
-        _git(self.clone, "commit", "-qm", "a line that opts out on purpose")
+        _git(self.clone, "commit", "-qm", "a note written after the rename")
         res = self._run("--json")
-        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
-        residue = next(p for p in json.loads(res.stdout)["probes"]
-                       if p["probe"] == "clone-residue")
+        residue = next(p for p in json.loads(res.stdout)["probes"] if p["probe"] == "clone-residue")
+        self.assertEqual(residue["status"], "ok", residue["evidence"])
+        self.assertIn("written after the rename", residue["evidence"])
+
+    def test_an_uncommitted_line_is_judged_as_written_now(self):
+        note = self.clone / "zettelkasten/_records/observations/note.md"
+        note.write_text(note.read_text(encoding="utf-8") + "Talked about ztn today.\n", encoding="utf-8")
+        res = self._run("--json")
+        residue = next(p for p in json.loads(res.stdout)["probes"] if p["probe"] == "clone-residue")
         self.assertEqual(residue["status"], "ok", residue["evidence"])
 
-        # The same line WITHOUT the marker is residue — otherwise the test above
-        # would pass just as well against a probe that had stopped looking.
-        _write(self.clone, "zettelkasten/_records/observations/beat.md",
-               marked.replace(" <!-- rebrand:keep -->", ""))
-        _git(self.clone, "commit", "-qam", "the marker removed")
+    def test_a_pre_rename_line_that_opts_out_is_not_residue(self):
+        """The two opt-outs are what make a pre-rename former-name line legitimate."""
+        marked = ("A beat that must keep the aliases: `ztn` / `\u0417\u0422\u041d`. "
+                  "<!-- rebrand:keep -->\n")
+        self._rebuild_clone({"zettelkasten/_records/observations/beat.md": marked})
         res = self._run("--json")
-        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        residue = next(p for p in json.loads(res.stdout)["probes"] if p["probe"] == "clone-residue")
+        self.assertEqual(residue["status"], "ok", residue["evidence"])
+        # Without the marker the same pre-rename line is residue — otherwise the
+        # assertion above would pass against a probe that had stopped looking.
+        self._rebuild_clone({"zettelkasten/_records/observations/beat.md":
+                             marked.replace(" <!-- rebrand:keep -->", "")})
+        res = self._run("--json")
         self.assertEqual(self._failed(res), {"clone-residue"})
         self.assertIn("beat.md", res.stdout)
+
+    def test_without_a_rename_point_every_former_name_line_counts(self):
+        """No ledger and no dashboard history: nothing tells before from after, so nothing is excused."""
+        import shutil  # noqa: PLC0415
+        shutil.rmtree(self.clone / ".git")
+        (self.clone / ".engine-migrations.jsonl").unlink()
+        (self.clone / "zettelkasten/minder-memory.md").unlink()
+        _git(self.clone, "init", "-q", "-b", "main")
+        _write(self.clone, "zettelkasten/_records/observations/note.md", "I run /ztn:process.\n")
+        _git(self.clone, "add", "-A")
+        _git(self.clone, "commit", "-qm", "one commit, no history")
+        res = self._run("--json")
+        residue = next(p for p in json.loads(res.stdout)["probes"] if p["probe"] == "clone-residue")
+        self.assertEqual(residue["status"], "fail", residue["evidence"])
 
     def test_a_file_that_opts_out_whole_is_not_residue(self):
         _write(self.clone, "zettelkasten/_records/observations/inventory.md",

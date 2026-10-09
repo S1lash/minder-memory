@@ -428,7 +428,7 @@ python3 scripts/check_update.py            # add --json for the machine-readable
 The probes live in that script, not here, for two reasons: a probe described in
 a prompt drifts from the one that ran last time, and the literals a rename check
 needs cannot live in a file the rename rewrites. It checks the version against
-the remote, the managed block (and that it imports every global file), the
+the remote (fetched first; only a clone BEHIND upstream fails), the managed block (and that it imports every global file), the
 global-file / command / agent links, that nothing of the engine's remains in
 `~/.claude/rules/`, the skill count, leftovers and foreign dangling links
 under the harness home, the residue

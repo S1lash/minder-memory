@@ -38,6 +38,7 @@ import json
 import os
 import re
 import subprocess
+import time
 import sys
 from pathlib import Path
 
@@ -197,18 +198,63 @@ def _result(probe: str, status: str, evidence: str) -> dict:
 # probes — the clone
 # --------------------------------------------------------------------------- #
 
+def _semver(text: str) -> tuple[int, ...] | None:
+    try:
+        return tuple(int(part) for part in text.strip().split("."))
+    except ValueError:
+        return None
+
+
 def probe_version(repo: Path, remote: str, branch: str) -> dict:
+    """Did the update land what upstream ships?
+
+    Asked of the remote itself: the remote-tracking ref is whatever the last
+    fetch left, and a clone that has not fetched for weeks would compare against
+    a release long gone. Only BEHIND is a failed update. AHEAD is the authoring
+    clone carrying the next version before it is released — what the check
+    cannot tell apart from a hand-edited VERSION, so it says which it saw.
+    """
     local = _read(repo / VERSION_FILE).strip()
-    shown = _git(repo, "show", f"{remote}/{branch}:{VERSION_FILE}")
+    # The fetch lands in a ref only this run uses, so neither a custom fetch
+    # mapping nor anything else fetching meanwhile (which rewrites FETCH_HEAD)
+    # can change what is compared. The ref is removed whatever happens.
+    probe_ref = f"refs/minder-check/{os.getpid()}-{time.time_ns()}"
+    reached = False
+    try:
+        if remote:
+            try:
+                reached = subprocess.run(
+                    ["git", "-C", str(repo), "fetch", "--quiet", remote,
+                     f"+refs/heads/{branch}:{probe_ref}"],
+                    capture_output=True, text=True, encoding="utf-8", errors="replace",
+                    env={**os.environ, "GIT_TERMINAL_PROMPT": "0"}, timeout=60,
+                ).returncode == 0
+            except (OSError, subprocess.SubprocessError):
+                reached = False
+        shown = _git(repo, "show", f"{probe_ref}:{VERSION_FILE}") if reached else \
+            _git(repo, "show", f"{remote}/{branch}:{VERSION_FILE}")
+    finally:
+        _git(repo, "update-ref", "-d", probe_ref)
+    if not reached:
+        last = (f"; the last fetched ref says {shown.stdout.strip()}, which proves nothing about now"
+                if shown.returncode == 0 else "")
+        return _result("version", SKIP,
+                       f"could not reach {remote or 'upstream'} — cannot compare (local {local}){last}")
     if shown.returncode != 0:
         return _result("version", SKIP,
-                       f"{remote}/{branch} is not fetched here — cannot compare (local {local})")
+                       f"{remote}/{branch} cannot be read here — cannot compare (local {local})")
     upstream = shown.stdout.strip()
+    stale = ""
     if local == upstream:
-        return _result("version", OK, f"{VERSION_FILE} is {local}, matching {remote}/{branch}")
+        return _result("version", OK, f"{VERSION_FILE} is {local}, matching {remote}/{branch}{stale}")
+    mine, theirs = _semver(local), _semver(upstream)
+    if mine is not None and theirs is not None and mine > theirs:
+        return _result("version", OK,
+                       f"{VERSION_FILE} is {local}, ahead of {remote}/{branch} ({upstream}) — "
+                       f"an authoring clone or a change not yet released{stale}")
     return _result("version", FAIL,
-                   f"{VERSION_FILE} is {local} but {remote}/{branch} ships {upstream} — "
-                   "the checkout did not land what it reported")
+                   f"{VERSION_FILE} is {local}, behind {remote}/{branch} ({upstream}) — "
+                   f"the update did not land what upstream ships{stale}")
 
 
 def probe_conflict_markers(repo: Path) -> dict:
@@ -238,13 +284,13 @@ def probe_clone_residue(repo: Path) -> dict:
                        "no file outside the allowed set still carries the former name")
     if found.returncode != 0:
         return _result("clone-residue", SKIP, "git grep could not run")
-    counts: dict[str, int] = {}
+    hits: list[tuple[str, int]] = []
     own = 0
     for line in found.stdout.splitlines():
         parts = line.split(":", 2)
         if len(parts) < 3:
             continue
-        path, _lineno, text = parts
+        path, lineno, text = parts
         if LINE_KEEP in text:
             continue
         # The owner's own names — a repository, a folder, a credential — are
@@ -257,16 +303,79 @@ def probe_clone_residue(repo: Path) -> dict:
         own += len(found)
         if not re.search(r"ztn|ЗТН", stripped, re.IGNORECASE):
             continue
-        counts[path] = counts.get(path, 0) + 1
-    files = sorted(p for p in counts if FILE_KEEP not in _read(repo / p))
+        hits.append((path, int(lineno)))
+    # A line written AFTER the rename names the former product on purpose — a
+    # note about the rename, an alias explained — so nothing missed it. Only a
+    # line already in the tree when the rename ran is residue.
+    point = rename_point(repo)
+    shallow = _git(repo, "rev-parse", "--is-shallow-repository").stdout.strip() == "true"
+    later = undated = 0
+    if point is not None and not shallow:
+        kept_hits = []
+        for hit in hits:
+            dated = _line_predates(repo, hit, point)
+            if dated is False:
+                later += 1
+                continue
+            undated += dated is None
+            kept_hits.append(hit)
+        hits = kept_hits
+    files = sorted({p for p, _ in hits if FILE_KEEP not in _read(repo / p)})
     kept = (f"; {own} line{'' if own == 1 else 's'} name your own repository, folder or "
             "credential — kept" if own else "")
+    if later:
+        kept += (f"; {later} line{'' if later == 1 else 's'} written after the rename name the "
+                 "former product on purpose — not residue")
+    if shallow:
+        kept += "; shallow history — lines cannot be dated, so every one counts"
+    elif undated:
+        kept += f"; {undated} line(s) could not be dated against the rename — counted"
     if not files:
         return _result("clone-residue", OK,
                        "nothing outside the allowed set still carries the former name" + kept)
     return _result("clone-residue", FAIL,
                    f"{len(files)} file(s) still carry the former name: "
                    + ", ".join(files[:8]) + kept)
+
+
+def rename_point(repo: Path) -> str | None:
+    """The commit at which the rename landed in this clone, or None when nothing dates it.
+
+    A friend's clone dates it by the ledger: the first commit carrying 032. The
+    authoring clone ran the rename itself and has no ledger; there the commit
+    that introduced the renamed dashboard dates it.
+    """
+    log = _git(repo, "log", "--reverse", "--format=%H", "-S", _LEDGER_MARK, "--", LEDGER)
+    shas = [ln.strip() for ln in log.stdout.splitlines() if ln.strip()] if log.returncode == 0 else []
+    if shas:
+        return shas[0]
+    added = _git(repo, "log", "--diff-filter=A", "--format=%H", "--", DASHBOARD)
+    shas = [ln.strip() for ln in added.stdout.splitlines() if ln.strip()] if added.returncode == 0 else []
+    return shas[-1] if shas else None
+
+
+_BLAME_CACHE: dict[tuple[str, str], bool | None] = {}
+
+
+def _line_predates(repo: Path, hit: tuple[str, int], point: str) -> bool | None:
+    """Was this line already in the tree when the rename landed? None when history cannot tell.
+
+    Uncommitted lines are being written now. A line whose last change is the
+    rename commit or one of its ancestors was there for the rename to rewrite
+    — the rename commit included, because what it left unrewritten it missed.
+    """
+    path, lineno = hit
+    blame = _git(repo, "blame", "--porcelain", "-L", f"{lineno},{lineno}", "--", path)
+    if blame.returncode != 0 or not blame.stdout:
+        return None
+    sha = blame.stdout.split(" ", 1)[0]
+    if set(sha) == {"0"}:
+        return False
+    key = (sha, point)
+    if key not in _BLAME_CACHE:
+        rc = _git(repo, "merge-base", "--is-ancestor", sha, point).returncode
+        _BLAME_CACHE[key] = True if rc == 0 else False if rc == 1 else None
+    return _BLAME_CACHE[key]
 
 
 def pre_032_commit(repo: Path) -> str | None:
@@ -784,13 +893,12 @@ def probe_rules_dir_clean(home: Path, repo: Path) -> dict:
 
     Claude Code loads `rules/` by itself, so a link of ours left there loads in
     every session beside the managed block — the doctrine included, which
-    belongs to this repository only. What this clone's installer removes is
-    decided by the same function the installer asks (`lib.ownership`), so a
-    failure here always names something a re-run changes. A retired name
-    pointing into ANOTHER clone is the engine's too; that clone's installer
-    removes it, and the check names the clone. A dangling one loads nothing and
-    is reported; an owner's own file under a retired name is reported with the
-    file it now loads beside; anything else is somebody's.
+    belongs to this repository only. What the installer removes is decided by
+    the same function the installer asks (`lib.ownership`) — the engine's
+    retired links into any clone, live or dangling — so a failure here always
+    names something one re-run changes. An owner's own file under a retired
+    name is reported with the file it now loads beside; anything else is
+    somebody's.
     """
     if not home.is_dir():
         return _result("rules-dir-clean", SKIP, f"no harness home at {home}")
@@ -824,18 +932,13 @@ def probe_rules_dir_clean(home: Path, repo: Path) -> dict:
         if target is None:
             continue
         if entry in ours:
-            problems.append(f"{entry} -> {target} (this clone's — re-run its install.sh)")
-        elif retired is None:
-            if ownership.path_within(target, repo):
-                notes.append(f"{entry.name} links into this clone under a name of your own "
-                             "and is yours, left alone")
-        elif target.as_posix().endswith("/" + retired):
-            if entry.exists():
-                clone = Path(target.as_posix()[: -len(retired) - 1])
-                problems.append(f"{entry} -> {target} (another clone's — run "
-                                f"bash integrations/claude-code/install.sh in {clone})")
-            else:
-                notes.append(f"{entry} dangles into a clone that is gone and loads nothing")
+            state = "" if entry.exists() else ", dangling"
+            problems.append(f"{entry} -> {target} (the engine's{state} — re-run "
+                            "bash integrations/claude-code/install.sh; it removes these "
+                            "wherever they point)")
+        elif retired is None and ownership.path_within(target, repo):
+            notes.append(f"{entry.name} links into this clone under a name of your own "
+                         "and is yours, left alone")
     note = ("; " + "; ".join(notes)) if notes else ""
     if problems:
         return _result("rules-dir-clean", FAIL, "; ".join(problems) + note)

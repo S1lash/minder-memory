@@ -269,15 +269,36 @@ def path_within(target: Path, root: Path) -> bool:
     return False
 
 
-def removable_retired_rule_links(home: Path, repo: Path) -> list[Path]:
-    """The `rules/` entries the installer of THIS clone removes.
+def _engine_file_of_a_clone(entry: Path, target: Path) -> bool:
+    """Is `target` the file the engine linked under this name, in some clone?
 
-    A retired name, a symlink, and a target inside this repository — all three.
-    An owner's own file under a retired name, a link into another clone, and a
-    link the owner made under a name of their own are not this clone's to remove.
-    The installer (through `harness_entries.py`) and the post-update check both
-    decide by this function, so the check never asks for a re-run that cannot
-    change anything.
+    The path alone proves nothing — an unrelated tree can hold the same relative
+    path. A live target counts only when the tree around it is a clone of the
+    engine (its manifest and installer are there). A dangling target can no
+    longer be checked and holds nothing, so the name and the path are enough.
+    """
+    suffix = ENGINE_RETIRED_RULE_TARGETS[entry.name]
+    posix = target.as_posix()
+    if not posix.endswith("/" + suffix):
+        return False
+    if not entry.exists():
+        return True
+    root = Path(posix[: -len(suffix) - 1])
+    return (root / ".engine-manifest.yml").is_file() and (root / _INSTALLER_REL).is_file()
+
+
+def removable_retired_rule_links(home: Path, repo: Path) -> list[Path]:
+    """The `rules/` entries the engine's installer removes, whichever clone runs it.
+
+    A retired name and a symlink — and a target that is the engine's: inside
+    the running clone however its path is spelled, or the very file the engine
+    linked under that name in another clone (a live one verified as a clone, a
+    deleted one by its name and path). Two clones on
+    one machine therefore converge on whichever installed last, and a clone
+    that is gone leaves nothing behind. An owner's own file under a retired
+    name, or a link of that name to anything else, is not the engine's. The
+    installer (through `harness_entries.py`) and the post-update check decide
+    by this one function.
     """
     rules = home / "rules"
     if not rules.is_dir():
@@ -287,7 +308,9 @@ def removable_retired_rule_links(home: Path, repo: Path) -> list[Path]:
         if not entry.is_symlink() or not is_engine_retired_harness_entry(entry.name, "rules"):
             continue
         target = link_target(entry)
-        if target is not None and path_within(target, repo):
+        if target is None:
+            continue
+        if path_within(target, repo) or _engine_file_of_a_clone(entry, target):
             found.append(entry)
     return found
 
