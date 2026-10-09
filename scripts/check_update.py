@@ -57,14 +57,28 @@ CURRENT_MARKER = "MINDER-MEMORY BEGIN"
 SKILL_PREFIX = "minder-mem-"
 SKILL_COUNT = 20
 
-REQUIRED_HARNESS_PATHS: tuple[str, ...] = (
-    "rules/minder-memory.md",
-    "rules/minder-memory-engine-doctrine.md",
+# The harness paths an update must leave resolving: the global files the managed
+# block imports — read from the installer's own table, the one list
+# (`ownership.engine_global_files`), of the engine this check ships with — plus
+# the agent and the commands. The engine doctrine is not among them: it loads
+# inside the repository only, through `.claude/CLAUDE.md`, and nothing of the
+# engine's belongs in `rules/` (see `probe_rules_dir_clean`).
+HOT_DIR = "minder-memory"
+_ENGINE_ROOT = Path(__file__).resolve().parents[1]
+OTHER_HARNESS_PATHS: tuple[str, ...] = (
     "agents/minder-mem-role.md",
     "commands/minder/mem/recap.md",
     "commands/minder/mem/search.md",
 )
-HARNESS_SUBDIRS: tuple[str, ...] = ("skills", "rules", "commands", "agents")
+
+
+def required_harness_paths(engine_root: Path = _ENGINE_ROOT) -> list[str]:
+    """Raises `ownership.GlobalFilesUnreadable` — a probe must fail, not pass, on it."""
+    return ([f"{HOT_DIR}/{name}" for name, _ in ownership.engine_global_files(engine_root)]
+            + list(OTHER_HARNESS_PATHS))
+
+
+HARNESS_SUBDIRS: tuple[str, ...] = ("skills", "rules", HOT_DIR, "commands", "agents")
 
 VERSION_FILE = "integrations/VERSION"
 DASHBOARD = "zettelkasten/minder-memory.md"
@@ -716,7 +730,7 @@ def probe_credential_store(repo: Path, before: str | None) -> dict:
 # probes — the harness home
 # --------------------------------------------------------------------------- #
 
-def probe_managed_block(home: Path) -> dict:
+def probe_managed_block(home: Path, engine_root: Path = _ENGINE_ROOT) -> dict:
     claude_md = home / "CLAUDE.md"
     if not claude_md.is_file():
         return _result("managed-block", SKIP, f"no {claude_md}")
@@ -724,20 +738,109 @@ def probe_managed_block(home: Path) -> dict:
     current = text.count(CURRENT_MARKER)
     legacy = text.count(LEGACY_MARKER)
     if current == 1 and legacy == 0:
-        return _result("managed-block", OK, "exactly one current block, no former marker")
+        block = _managed_block(text) or ""
+        try:
+            wanted = [rel for rel in required_harness_paths(engine_root) if rel.startswith(HOT_DIR + "/")]
+        except ownership.GlobalFilesUnreadable as exc:
+            return _result("managed-block", FAIL,
+                           f"cannot tell which global files the block must import — {exc}")
+        missing = [rel for rel in wanted if f"@~/.claude/{rel}" not in block]
+        if missing:
+            return _result("managed-block", FAIL,
+                           "the block does not import " + ", ".join(missing)
+                           + " — nothing loads them; re-run bash integrations/claude-code/install.sh")
+        return _result("managed-block", OK,
+                       f"exactly one current block, importing all {len(wanted)} global files")
     return _result("managed-block", FAIL,
                    f"{current} current block marker(s) and {legacy} former marker(s) "
                    f"in {claude_md}")
 
 
-def probe_harness_paths(home: Path) -> dict:
+def probe_harness_paths(home: Path, engine_root: Path = _ENGINE_ROOT) -> dict:
     if not home.is_dir():
         return _result("harness-paths", SKIP, f"no harness home at {home}")
-    missing = [rel for rel in REQUIRED_HARNESS_PATHS if not (home / rel).exists()]
+    try:
+        required = required_harness_paths(engine_root)
+    except ownership.GlobalFilesUnreadable as exc:
+        return _result("harness-paths", FAIL, f"cannot tell which global files must resolve — {exc}")
+    missing = [rel for rel in required if not (home / rel).exists()]
     if not missing:
         return _result("harness-paths", OK,
-                       f"all {len(REQUIRED_HARNESS_PATHS)} rule / command / agent paths resolve")
+                       f"all {len(required)} global-file / command / agent paths resolve")
     return _result("harness-paths", FAIL, "does not resolve: " + ", ".join(missing))
+
+
+def _managed_block(text: str) -> str | None:
+    lines = text.replace("\r", "").splitlines()
+    begin = next((n for n, ln in enumerate(lines) if CURRENT_MARKER in ln), None)
+    if begin is None:
+        return None
+    end = next((n for n in range(begin + 1, len(lines)) if "MINDER-MEMORY END" in lines[n]), len(lines))
+    return "\n".join(lines[begin + 1:end])
+
+
+def probe_rules_dir_clean(home: Path, repo: Path) -> dict:
+    """Nothing of the engine's may sit in `rules/`, and the block may not import from it.
+
+    Claude Code loads `rules/` by itself, so a link of ours left there loads in
+    every session beside the managed block — the doctrine included, which
+    belongs to this repository only. What this clone's installer removes is
+    decided by the same function the installer asks (`lib.ownership`), so a
+    failure here always names something a re-run changes. A retired name
+    pointing into ANOTHER clone is the engine's too; that clone's installer
+    removes it, and the check names the clone. A dangling one loads nothing and
+    is reported; an owner's own file under a retired name is reported with the
+    file it now loads beside; anything else is somebody's.
+    """
+    if not home.is_dir():
+        return _result("rules-dir-clean", SKIP, f"no harness home at {home}")
+    problems: list[str] = []
+    notes: list[str] = []
+    claude_md = home / "CLAUDE.md"
+    if claude_md.is_file():
+        text = _read(claude_md)
+        block = _managed_block(text)
+        if block is not None and "~/.claude/rules/" in block:
+            problems.append(f"the managed block in {claude_md} still imports from ~/.claude/rules/")
+        # Older setup docs had friends add some of these imports by hand,
+        # outside the block. Nothing of theirs is rewritten; the check names
+        # the line, which now imports a link that no longer exists.
+        # A former-name block is the managed-block probe's finding, not this one's.
+        outside = "" if LEGACY_MARKER in text else text.replace(block or "", "")
+        for name in ownership.ENGINE_RETIRED_RULE_TARGETS:
+            if f"@~/.claude/rules/{name}" in outside:
+                problems.append(f"{claude_md} imports ~/.claude/rules/{name} outside the managed block — "
+                                f"delete that line; the block imports the file from ~/.claude/{HOT_DIR}/")
+    ours = set(ownership.removable_retired_rule_links(home, repo))
+    rules = home / "rules"
+    for entry in sorted(rules.iterdir()) if rules.is_dir() else []:
+        retired = ownership.ENGINE_RETIRED_RULE_TARGETS.get(entry.name)
+        if not entry.is_symlink():
+            if retired is not None:
+                notes.append(f"{entry} is a file of your own under a name the engine once used there; "
+                             f"it loads beside {HOT_DIR}/{entry.name} if that exists — keep one")
+            continue
+        target = ownership.link_target(entry)
+        if target is None:
+            continue
+        if entry in ours:
+            problems.append(f"{entry} -> {target} (this clone's — re-run its install.sh)")
+        elif retired is None:
+            if ownership.path_within(target, repo):
+                notes.append(f"{entry.name} links into this clone under a name of your own "
+                             "and is yours, left alone")
+        elif target.as_posix().endswith("/" + retired):
+            if entry.exists():
+                clone = Path(target.as_posix()[: -len(retired) - 1])
+                problems.append(f"{entry} -> {target} (another clone's — run "
+                                f"bash integrations/claude-code/install.sh in {clone})")
+            else:
+                notes.append(f"{entry} dangles into a clone that is gone and loads nothing")
+    note = ("; " + "; ".join(notes)) if notes else ""
+    if problems:
+        return _result("rules-dir-clean", FAIL, "; ".join(problems) + note)
+    return _result("rules-dir-clean", OK,
+                   "no engine link in ~/.claude/rules/ and the block imports none from it" + note)
 
 
 def probe_skill_count(home: Path) -> dict:
@@ -835,6 +938,7 @@ def run(repo: Path, home: Path, *, remote: str, branch: str, before: str | None)
         probe_credential_store(repo, before),
         probe_managed_block(home),
         probe_harness_paths(home),
+        probe_rules_dir_clean(home, repo),
         probe_skill_count(home),
         probe_legacy_harness_entries(home),
         probe_foreign_dangling(home, repo),

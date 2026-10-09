@@ -47,8 +47,9 @@ Runs five generators in order, fail-fast:
    table + stats for human browse)
 2. `gen_constitution_core.py` → `_system/views/constitution-core.md` (harness
    view; all scopes visible, filtered by `applies_to: claude-code` and
-   `status != placeholder`). Users symlink
-   `~/.claude/rules/constitution-core.md` to this file once per machine.
+   `status != placeholder`). `install.sh` links
+   `~/.claude/minder-memory/constitution-core.md` to this file and imports it
+   from the managed block, so every session carries the regenerated view.
 3. `render_index.py` → `_system/views/INDEX.md` (surface catalog of the
    knowledge, archive, constitution and hub layers)
 4. `render_tags.py` → the `AUTO-GENERATED: tag-registry` managed zone of

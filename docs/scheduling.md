@@ -492,7 +492,9 @@ must be visible in the session's skill registry.
   `.claude/skills/` tree loads when the runner has the repo as CWD. If
   the runner invokes `claude` from a different CWD, also run
   `bash integrations/claude-code/install.sh` once on the runner so
-  user-level `~/.claude/skills/` symlinks cover the case.
+  user-level `~/.claude/skills/` symlinks cover the case. The engine
+  doctrine loads only in a session started at the repo root, so prefer
+  `cd <repo> && claude …`; the skills that bind on it read it themselves.
 
 The bash helpers under `scripts/scheduler/` (`ensure-skills.sh`,
 `pin-main.sh`, `lock-check.sh`, `stage.sh`, `finalize-tick.sh`,

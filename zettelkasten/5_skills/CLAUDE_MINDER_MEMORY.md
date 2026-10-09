@@ -84,7 +84,7 @@ modified: '2026-08-15'
 8. **Self-review** (3.7) — обязателен для КАЖДОГО транскрипта; целостность источника проверяется отдельно в 3.10
 9. **Идеи** — living documents (поиск существующих перед созданием)
 10. **Люди** — обязательное обогащение профиля при новом контексте
-11. **CLARIFICATIONS HARD RULE** — при `confidence < threshold` не принимать решение молча; писать вопрос в `_system/state/CLARIFICATIONS.md`, использовать conservative default, продолжать работу. **Layer-specific exception:** несколько детерминированных слоёв разрешаются автономно и никогда не поднимают CLARIFICATION — квалифицированный список и три критерия допуска живут в ENGINE_DOCTRINE §3.1, здесь не дублируются
+11. **CLARIFICATIONS HARD RULE** — при `confidence < threshold` не принимать решение молча; писать вопрос в `_system/state/CLARIFICATIONS.md`, использовать conservative default, продолжать работу. **Layer-specific exception:** несколько детерминированных слоёв разрешаются автономно и никогда не поднимают CLARIFICATION. Три критерия допуска — ENGINE_DOCTRINE §3.1; квалифицированный список — `SYSTEM_CONFIG.md → Autonomous resolution layers`; здесь не дублируются
 12. **Privacy trio per entity** — каждый record / knowledge note / hub / person profile / project profile несёт `origin` (personal/work/external) + `audience_tags[]` (canonical 5 + AUDIENCES.md extensions, default `[]`) + `is_sensitive` (bool). Hub trio auto-derived через `recompute_hub_trio` (preserve owner edits)
 
 ---

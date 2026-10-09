@@ -16,6 +16,7 @@
 
 - `integrations/claude-code/skills/**/*.md` — SKILL.md + adjacent reference docs (the authoring home; `.claude/skills/` and `~/.claude/skills/` are symlinks into it)
 - `zettelkasten/_system/docs/SYSTEM_CONFIG.md`
+- `zettelkasten/_system/docs/ENGINE_DOCTRINE.md`, `zettelkasten/_system/docs/ENGINE_MAP.md`
 - `zettelkasten/_system/docs/batch-format.md`
 - Frontmatter (`description`, `owned_by`, `read_by` fields) of `_system/state/log_*.md`
 - `zettelkasten/5_skills/CLAUDE_MINDER_MEMORY.md`
@@ -138,7 +139,7 @@ territory.
   `processor` / `captured_by` вида `minder:mem:<pipeline>`;
 - инструменты MCP-коннектора `minder-memory` — `memory_<verb>`;
 - прежнее имя продукта не пишется нигде, кроме мест, где оно — сам предмет
-  строки: список разговорных алиасов в горячем правиле
+  строки: список разговорных алиасов в глобальном правиле
   `integrations/claude-code/rules/minder-memory.md`; `docs/CHANGELOG.md` (и его производная копия `5_meta/help/CHANGELOG.md`) и
   `5_meta/DECISION_LOG.md` (история); миграции 031/032 и их тесты, чьи входы —
   старая форма по определению; пост-апдейтная проверка `scripts/check_update.py`,

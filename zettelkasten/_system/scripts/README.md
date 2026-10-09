@@ -18,9 +18,10 @@ Works on any Python ≥ 3.9 with PyYAML ≥ 6.0.
 All scripts support `--dry-run` and print to stderr on failure with a non-zero
 exit code. Paths are resolved relative to the zettelkasten repo root; override
 via the `MINDER_MEMORY_BASE` env var if running from outside the repo. All outputs live
-inside the repo — scripts never write to `$HOME`. Consumers (Claude Code
-harness) set up a symlink once per machine:
-`ln -s $MINDER_MEMORY_BASE/_system/views/constitution-core.md ~/.claude/rules/constitution-core.md`.
+inside the repo — scripts never write to `$HOME`. The Claude Code harness
+reaches `_system/views/constitution-core.md` through the link
+`integrations/claude-code/install.sh` makes at
+`~/.claude/minder-memory/constitution-core.md`, imported by its managed block.
 
 | Script | Purpose | Writes |
 |---|---|---|

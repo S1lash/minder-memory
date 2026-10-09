@@ -420,12 +420,15 @@ fi
 # for the owner; a friend running the script directly was never told, which is
 # why the caveat is here rather than in a doc they may not read.
 #
-# The installer already ran inside migration 031, so this does not ask for it
-# again: a step suggested twice is a step somebody performs twice and then
-# wonders which one counted.
+# A migration that re-wires the harness runs the installer itself (031, 036),
+# so this does not ask for it again: a step suggested twice is a step somebody
+# performs twice and then wonders which one counted. The check below is what
+# says whether the harness needs it.
 cat <<EOF
 
-[sync] done. The Claude Code installer ran as part of migration 031 — nothing to re-run.
+[sync] done. Migrations that re-wire Claude Code run its installer themselves —
+re-run bash integrations/claude-code/install.sh only if the check below fails
+a harness probe.
 
 Review the diff:    git status
 Run tests:          (your test suite — engine ships pytest under zettelkasten/_system/scripts/tests/)
