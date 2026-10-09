@@ -10,8 +10,8 @@ runtime loads them automatically — write the slash command literally as
 the next action and it executes. Step 0 verifies this layout resolved in
 the clone before any slash invocation.
 
-`/minder:mem:agent-lens --all-due` iterates all lenses whose cadence has elapsed
-and runs each through its two-stage pipeline: a clean thinker call per
+`/minder:mem:agent-lens --all-due` iterates the lenses `lens_due.py` names as due — on their cadence,
+or retried the night after a failed thinker — and runs each through its two-stage pipeline: a clean thinker call per
 lens, then the runner's own formatting. Outputs land in `_system/agent-lens/{id}/{date}.md`
 plus the runs index `_system/state/agent-lens-runs.jsonl`.
 

@@ -47,20 +47,43 @@ access to the Minder Memory base is given.
 
 ## Cadence semantics
 
+Implemented by `_system/scripts/lens_due.py` — the runner asks it, never
+works the due set out itself. Dates are UTC days; a lens's last run is
+its latest `ok` or `empty` entry in `agent-lens-runs.jsonl`.
+
+- **Once a day at most.** A lens with any run today other than `error`
+  (`ok`, `empty`, `rejected`, `skipped`) is not due again today.
 - `cadence: daily` → due every calendar day. `cadence_anchor` ignored
   (or set to `daily`).
 - `cadence: weekly` → due on the day of week given by `cadence_anchor`
-  (`monday`, `tuesday`, ...). If today matches anchor and last run was
-  ≥6 days ago, run.
-- `cadence: biweekly` → due every 14 calendar days, anchored to
-  `cadence_anchor` day of week. First run defines the cycle.
+  (`monday`, `tuesday`, ...), unless the lens ran within the last 3
+  days. With no run ever, the anchor day alone decides.
+- `cadence: biweekly` → as weekly, unless the lens ran within the last
+  10 days — which is what makes it skip alternate anchors; its cycle
+  follows its last run, so a missed or rejected turn shifts it a week.
 - `cadence: monthly` → due on day-of-month given by `cadence_anchor`
-  (`1`-`28`; values >28 clamp to 28).
+  (`1`-`28`; values >28 clamp to 28), unless the lens ran within the
+  last 3 days.
+- The 3-day window is longer than the retry window below: a run made by
+  hand just before the anchor is not repeated on it, and a retry that
+  succeeds on its last night is never taken for the next turn.
+- **Retry after a failed thinker.** A weekly, biweekly or monthly lens
+  that ended `error` on an anchor day in the last two days (the thinker
+  never answered — a transient failure), with only `error` runs since,
+  is due again tonight; then it waits for its next anchor. Every failed
+  anchor gets its own retry. A `rejected` run is a verdict on the
+  output, not a transient failure, and is never retried early — so a
+  retry can never run up the auto-pause count. A daily lens needs no
+  retry.
+- A lens whose frontmatter cannot be read, or two folders declaring
+  the same `id`, are left out and named on stderr; the runner's
+  registry validation (Step 2) raises the CLARIFICATION.
 
-**Catch-up policy:** if scheduler missed runs (laptop offline), the
+**Catch-up policy:** if the scheduler missed runs (laptop offline), the
 runner does NOT replay missed days. It runs once for the current day
-if due, and updates `last_run` to today. Missed days are gone — they
-will be visible in `global-navigator` as gaps.
+if due. Missed days are gone — they will be visible in
+`global-navigator` as gaps. The retry above is not a replay: it re-runs
+a lens that did run on its day and failed.
 
 ## Active Lenses
 

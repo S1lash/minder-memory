@@ -2,6 +2,17 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.5.1 — A lens that fails on its day tries again the next night
+
+A weekly lens whose thinker failed on its day — a timeout, a passing service
+error — used to wait a whole week for its next turn. It now tries again on the
+next two nights. A lens that already ran today is not run again that day,
+unless its thinker failed. Which lenses run on a given night is now decided by
+a small script instead of being worked out anew each night, so the rule holds
+the same everywhere.
+
+The lenses' original texts and rejected reports are kept for good.
+
 ## 1.5.0 — Lenses look at your base with their own eyes
 
 A lens is meant to be an outside view: it should see its own instructions
