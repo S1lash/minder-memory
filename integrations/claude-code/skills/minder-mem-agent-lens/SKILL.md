@@ -2,8 +2,8 @@
 name: minder:mem:agent-lens
 description: >
   Outside-view observation runner for the Minder Memory base. Reads
-  _system/registries/AGENT_LENSES.md, filters lenses that are due per
-  cadence, runs each through a two-stage pipeline (free-form thinker in
+  _system/registries/AGENT_LENSES.md, runs the lenses lens_due.py names
+  as due — on their cadence, or retried after a failed thinker — and runs each through a two-stage pipeline (free-form thinker in
   a clean call of its own + runner-side structurer + structural
   validator), writes outputs to
   _system/agent-lens/{id}/{date}.md and machine index to
@@ -37,7 +37,9 @@ owner reviews on their own schedule.
   errors surface to log + CLARIFICATIONS as designed. Run continues
   with remaining lenses.
 - Cadence-honest — scheduler fires daily; per-lens cadence is enforced
-  inside the skill via `is_due()` filter. Daily tick ≠ daily lens runs.
+  by `lens_due.py`, not judged by the runner. Daily tick ≠ daily lens
+  runs; a lens whose thinker failed on its day is retried on the next
+  nights rather than a week later.
 - Isolation by construction — every thinker runs in a clean model call
   of its own (`_system/scripts/lens_think.py`) with an empty history: no
   cross-lens carry-over, no inheritance of the runner's context. Never
@@ -218,8 +220,8 @@ Never write a CLARIFICATION without all five fields. Doctrine §3.1.
 
 ### 0.1 Early exit check
 
-If `--all-due`: load registry briefly (just the table, not lens
-prompts). Compute due set via `is_due()` (Step 4). If empty → report
+If `--all-due`: note the UTC date now — the tick's date — and run
+`lens_due.py due` with it (Step 3). If it prints nothing → report
 «no lenses due today» and **exit immediately**. No lock, no further
 context loading.
 
@@ -335,21 +337,27 @@ CLARIFICATION, release lock, exit.
 
 Apply mode flags:
 
-- `--all-due`: keep lenses where `status == active` AND
-  `is_due(lens, today)`.
+- `--all-due`: keep exactly the lenses the due script names — never
+  work the due set out by hand:
+
+  ```
+  python3 _system/scripts/lens_due.py due --base . --today {tick's UTC date from Step 0.1}
+  ```
+
+  One line per due lens, `{lens-id} scheduled` or `{lens-id} retry`
+  (a lens whose thinker ended `status: error` on its day — its in-run
+  retries of §4.5.4 exhausted — tried again on the next two nights);
+  nothing printed means nothing is due. Step 0.1 and this step use the
+  same date and the same set; Step 3 does not recompute it.
 - `--lens <id>`: keep only the matching lens. Status check:
   - `active` → run
   - `draft` → require `--include-draft`, else abort with message
   - `paused` → abort with message «lens {id} is paused; un-pause in
     registry to run»
 
-`is_due(lens, today)` semantics + catch-up policy: canonical in
-`AGENT_LENSES.md` Cadence semantics section.
-
-Runner specifics: `last_run` is the most recent entry for this `lens_id`
-in `_system/state/agent-lens-runs.jsonl` with `status` ∈ {ok, empty}.
-Rejected/error runs do NOT count as last_run, so a run that produced
-nothing valid will be retried on next due-day.
+The rule the script applies — once a day at most, the cadence, and the
+retry of a lens whose thinker failed — is canonical in `AGENT_LENSES.md`
+Cadence semantics section; the script is its only implementation.
 
 ---
 
@@ -832,7 +840,7 @@ Per-run write surface:
 - `_system/state/agent-lens-runs.jsonl` — append-only
 - `_system/state/log_agent_lens.md` — append-only
 - `_system/state/agent-lens-rejected/{lens-id}/{run_at-fs}.md` — append
-- `_system/state/agent-lens-raw/{lens-id}/{run_at-fs}.md` — the thinker's verbatim text, one per thinker that answered
+- `_system/state/agent-lens-raw/{lens-id}/{run_at-fs}.md` — the thinker's verbatim text, one per thinker that answered; kept for good
 - `_sources/.agent-lens.lock` — create + delete (concurrency lock)
 - `_system/registries/lenses/{lens-id}/prompt.md` — frontmatter `status`
   only, only on auto-pause
@@ -863,8 +871,7 @@ from the step text:
 | Case | Behaviour |
 |---|---|
 | Thinker output but no specific paths | Structurer emits observations with `(no specific paths cited)` evidence; validator passes — diffuse patterns are valid signal, not a bug |
-| First-ever run of a lens (no prior `last_run`) | Treat as due if today's date matches `cadence_anchor` |
-| Tick spans midnight | `run_at` captured once per tick, when the first cohort's Step 5.2 starts, and shared by every lens of the tick; ALL cadence checks for the run use `today = run_at.date()` (consistency across lenses within one tick) |
+| Tick spans midnight | `run_at` captured once per tick, when the first cohort's Step 5.2 starts, and shared by every lens of the tick; the due set is computed once, for the UTC date noted at Step 0.1, and kept for the whole tick (consistency across lenses within one tick) |
 | Owner edits a lens prompt mid-tick | Lens already loaded into memory at Step 2; mid-tick edits not picked up. Next tick sees them |
 | Two lenses with same id | Both skipped (not first-wins); raises CLARIFICATION «id collision»; remaining lenses run normally |
 | `--dry-run` on Active lens | Allowed — useful when iterating prompt of an already-deployed lens |

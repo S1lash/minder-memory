@@ -59,7 +59,7 @@ From SRE Four Golden Signals (Google) + USE method (Brendan Gregg) + Tufte / Few
    - **Lenses overdue** against their cadence (formula below)
    - **Active lens never ran** (`last_run` absent in runs.jsonl) — render as «active but never ran»
    - **Lenses at 2 consecutive rejections** (one position from auto-pause)
-   - **Lenses with error-streak ≥2** (two consecutive `status: error`)
+   - **Lenses with error-streak ≥3** (three consecutive `status: error` — a lens that failed its day and both retry nights)
    - **Lint stale** — last `/minder:mem:lint` run >14 days ago (lint cadence is weekly-to-biweekly; surface only when clearly stale)
    - **Process backlog** — `_sources/inbox/` non-empty AND last `/minder:mem:process` run >7 days ago (count files, do not list)
 
@@ -150,7 +150,7 @@ For active lenses with **zero prior runs** (`last_run` absent): do NOT compute o
 
 Per `_frame.md` Stage 3 validator: 3 consecutive rejections → runner flips status to `paused`. **Surface lenses at 2 consecutive rejections** — leading indicator (one position from auto-pause). Computed from runs.jsonl: the last 2 runs in a row with `status: rejected`, with no `status: ok` between them.
 
-The same applies to `status: error` — surface a lens with an error-streak of ≥2 as «runs requiring attention».
+The same applies to `status: error`, with a streak of ≥3 — a lens whose thinker failed is retried on the next two nights, so two errors in a row are a retry still pending, not yet a problem. Surface it as «runs requiring attention».
 
 Single rejection / single error: suppressed. Streaks only.
 

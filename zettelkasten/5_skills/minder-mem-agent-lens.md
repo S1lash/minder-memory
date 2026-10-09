@@ -34,8 +34,8 @@ Pointer card. The full pipeline lives in the installed skill, not here.
 
 ## What it does (one paragraph)
 
-Reads the lens registry, filters lenses that are due per their
-per-lens cadence, runs each through a two-stage pipeline (free-form
+Reads the lens registry, takes the lenses `lens_due.py` names as due
+— on their cadence, or retried the night after a failed thinker — runs each through a two-stage pipeline (free-form
 thinker in a clean call of its own → the runner formats → structural validator), writes
 — a lens declaring `output_schema: synthesis-custom` skips the
 structurer and writes its final shape itself, validator still enforcing

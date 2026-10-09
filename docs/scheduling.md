@@ -34,8 +34,9 @@ prevents the agent that produces lens bodies from also voting on its
 own proposals (confirmation bias). Lint runs later (05:00), invokes
 its invariant scans, then Step 7.5 dispatches resolve --auto-mode
 inline so the same tick consumes fresh lens hints + CLARIFICATIONS
-that lint just emitted. The agent-lens skill filters lenses by per-
-lens cadence — nightly fire ≠ nightly lens runs.
+that lint just emitted. The agent-lens skill runs only the lenses that
+are due — on their cadence, or retried the night after a failed thinker —
+so nightly fire ≠ nightly lens runs.
 
 The roles tick closes the overnight sequence at 07:00. Three reasons for that
 slot, in order of weight:
