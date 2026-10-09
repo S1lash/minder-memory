@@ -53,9 +53,21 @@ Nothing of the engine's goes into `~/.claude/rules/`, which Claude Code loads
 on its own: a file there would load in every session on the machine beside
 the block, whether the block lists it or not. The installer removes the
 engine's retired links there — by the exact names `lib/ownership.py` declares
-(`ENGINE_RETIRED_HARNESS`), and only when the link points into this
-repository; a link into another clone is that clone's installer's to remove. The post-update check (`scripts/check_update.py`, probe
+(`ENGINE_RETIRED_HARNESS`), and only when the link points at the engine's own
+file: into this clone, or at the file the engine linked under that name in any
+other clone, live, moved or deleted. A link of the owner's own is never
+touched. The post-update check (`scripts/check_update.py`, probe
 `rules-dir-clean`) fails while one remains.
+
+Two clones on one machine share `~/.claude/minder-memory/`: every session loads
+the clone that installed last, and the installer says so when the global files
+move from one clone to another. Run the installer of the clone you want
+sessions to read.
+
+The installer backs up `~/.claude/CLAUDE.md` only when it changes the file, and
+keeps the newest such backup (`~/.claude/.minder-memory-backup-<time>/`). A
+backup holding anything else — a file the installer moved aside — is never
+removed; the installer names it until you delete it.
 
 The engine doctrine (`_system/docs/ENGINE_DOCTRINE.md`) is not global. The
 repository's `.claude/CLAUDE.md` imports it, so it loads in every session

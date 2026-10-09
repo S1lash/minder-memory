@@ -227,13 +227,27 @@ log "creating symlinks under $CLAUDE_HOME"
 mkdir -p "$TARGET_HOT" "$TARGET_COMMANDS" "$TARGET_SKILLS" "$TARGET_AGENTS"
 
 # Global files — linked beside rules/, never into it; the managed block below
-# imports each one.
+# imports each one. Two clones on one machine share these links: the last to
+# install is the one every session loads, so moving them is said out loud.
+REPO_PHYSICAL="$(cd "$REPO_ROOT" && pwd -P)"
+PREVIOUS_CLONE=""
 while IFS='|' read -r name source heading; do
   [ -n "$name" ] || continue
+  if [ -z "$PREVIOUS_CLONE" ] && [ -L "$TARGET_HOT/$name" ]; then
+    current="$(readlink "$TARGET_HOT/$name")"
+    case "$current" in
+      "$REPO_ROOT"/* | "$REPO_PHYSICAL"/*) ;;
+      */"$source") PREVIOUS_CLONE="${current%/$source}" ;;
+      *) PREVIOUS_CLONE="${current%/*}" ;;
+    esac
+  fi
   link "$REPO_ROOT/$source" "$TARGET_HOT/$name"
 done <<EOF
 $HOT_FILES
 EOF
+if [ -n "$PREVIOUS_CLONE" ]; then
+  log "global files now come from this clone: $REPO_ROOT (were: $PREVIOUS_CLONE)"
+fi
 
 # Commands — one link for the product's namespace directory. `~/.claude/
 # commands/minder/` stays a REAL directory: it is the ecosystem's namespace,
@@ -348,8 +362,6 @@ if [ ! -f "$CLAUDE_MD" ]; then
   managed_block > "$CLAUDE_MD"
 elif grep -qF "$BEGIN_MARK" "$CLAUDE_MD"; then
   log "refreshing managed block in $CLAUDE_MD"
-  mkdir -p "$BACKUP_DIR"
-  cp "$CLAUDE_MD" "$BACKUP_DIR/CLAUDE.md.before-refresh"
   # Splice the new block in via awk getline from a file. A multi-line
   # `-v block="$(managed_block)"` value is rejected by some awk builds
   # (macOS bwk awk: «awk: newline in string»), which silently no-ops the
@@ -366,13 +378,21 @@ elif grep -qF "$BEGIN_MARK" "$CLAUDE_MD"; then
     line0 == end   { skip = 0; next }
     !skip          { print }
   ' "$CLAUDE_MD" > "$CLAUDE_MD.tmp"; then
-    # A CLAUDE.md kept in a dotfiles repo is a symlink: write through it, never
-    # replace it — `mv` would swap the link for a file and cut it off from that repo.
-    if [ -L "$CLAUDE_MD" ]; then
-      cat "$CLAUDE_MD.tmp" > "$CLAUDE_MD"
+    if cmp -s "$CLAUDE_MD.tmp" "$CLAUDE_MD"; then
+      # Nothing changes, so nothing is written and nothing is backed up.
       rm -f "$CLAUDE_MD.tmp"
+      log "managed block already current"
     else
-      mv "$CLAUDE_MD.tmp" "$CLAUDE_MD"
+      mkdir -p "$BACKUP_DIR"
+      cp "$CLAUDE_MD" "$BACKUP_DIR/CLAUDE.md.before-refresh"
+      # A CLAUDE.md kept in a dotfiles repo is a symlink: write through it, never
+      # replace it — `mv` would swap the link for a file and cut it off from that repo.
+      if [ -L "$CLAUDE_MD" ]; then
+        cat "$CLAUDE_MD.tmp" > "$CLAUDE_MD"
+        rm -f "$CLAUDE_MD.tmp"
+      else
+        mv "$CLAUDE_MD.tmp" "$CLAUDE_MD"
+      fi
     fi
   else
     # A command in an `if` condition does not trip `set -e`, so the failure is
@@ -459,6 +479,27 @@ retire_rule_links || RETIRE_STATUS=$?
 if [ -d "$BACKUP_DIR" ]; then
   log "previous entries backed up to: $BACKUP_DIR"
 fi
+
+# --- Keep one backup of CLAUDE.md ---
+# A backup that holds nothing but CLAUDE.md copies is superseded by the next
+# one, so only the newest is kept. A backup holding anything else — a file the
+# installer moved aside — is never removed: that file exists nowhere else.
+newest_claude_only=""
+for backup in "$CLAUDE_HOME"/.minder-memory-backup-*; do
+  [ -d "$backup" ] || continue
+  if [ -z "$(find "$backup" -mindepth 1 ! -name 'CLAUDE.md.before-*' | head -n 1)" ]; then
+    newest_claude_only="$backup"
+  fi
+done
+for backup in "$CLAUDE_HOME"/.minder-memory-backup-*; do
+  [ -d "$backup" ] || continue
+  [ "$backup" != "$newest_claude_only" ] || continue
+  if [ -z "$(find "$backup" -mindepth 1 ! -name 'CLAUDE.md.before-*' | head -n 1)" ]; then
+    rm -rf "$backup"
+  else
+    log "kept $backup — it holds a file the installer moved aside; review it and delete it when done"
+  fi
+done
 
 # --- Obsidian vault seed (idempotent; skipped if .obsidian/ already exists) ---
 OBSIDIAN_SEED="$REPO_ROOT/integrations/obsidian/seed.sh"
