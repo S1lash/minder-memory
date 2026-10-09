@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Regenerate `_system/views/constitution-core.md` — harness core view.
 
-Output lives inside the repo. Consumers (Claude Code harness) symlink
-`~/.claude/rules/constitution-core.md` to this file once per machine.
+Output lives inside the repo. The Claude Code harness reaches it through
+`~/.claude/minder-memory/constitution-core.md`, which `install.sh` links here.
 
 Deterministic, no LLM. Filters by `core: true`, `status != placeholder`,
 and `applies_to` contains `claude-code`. All scopes (shared / personal /
@@ -40,9 +40,7 @@ CORE_VIEW_ADVISORY_LINES = 80
 
 
 def default_output_path() -> Path:
-    """Single harness view file. Consumers symlink
-    `~/.claude/rules/constitution-core.md` to this path once per machine.
-    """
+    """Single harness view file, linked from `~/.claude/minder-memory/` by `install.sh`."""
     return views_dir() / "constitution-core.md"
 
 

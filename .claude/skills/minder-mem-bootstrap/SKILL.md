@@ -206,8 +206,9 @@ For `fresh-onboarding` and `mixed` modes:
 > on promotion** (cheap to add, expensive to canonise); **idempotency**
 > (re-runs add or surface, never overwrite your edits).
 >
-> Long-form: `_system/docs/ENGINE_DOCTRINE.md` (auto-loaded in every
-> session via `~/.claude/rules/minder-memory-engine-doctrine.md`). The frame
+> Long-form: `_system/docs/ENGINE_DOCTRINE.md` (loaded, through
+> `.claude/CLAUDE.md`, in every session started at the repo root or under
+> `zettelkasten/`). The frame
 > persists from this point — every future `/minder:mem:process`, `/minder:mem:lint`,
 > `/minder:mem:maintain` operates against it.
 >
@@ -388,7 +389,7 @@ For each transcript in the raw globs above:
 
 4. **Principle candidates (signal 4).**
    - Detect explicit principle moments per
-     `~/.claude/rules/constitution-capture.md` triggers (a–d): explicit
+     `_system/docs/constitution-capture.md` triggers (a–d): explicit
      behavioural principle stated with reason; conscious trade-off; non-obvious
      ethical / interpersonal judgement; clear implicit pattern with
      hypothesis. Conservative — better to miss 30% than ingest 300% noise.
@@ -976,9 +977,9 @@ Next steps (in order — do not skip):
 philosophy is now anchored in three independent paths so it survives
 any single point of failure:
 
-- `~/.claude/rules/minder-memory-engine-doctrine.md` → `_system/docs/ENGINE_DOCTRINE.md`
-  (auto-loaded in every Claude Code session in this repo via the
-  `install.sh` symlink chain)
+- `_system/docs/ENGINE_DOCTRINE.md`, imported by the repository's
+  `.claude/CLAUDE.md` (loaded in every Claude Code session started at the
+  repo root or under `zettelkasten/`, cloud routines included)
 - `_system/views/CURRENT_CONTEXT.md` frontmatter `engine_doctrine`,
   `processing_principles`, `constitution_core` keys (any skill
   loading just CURRENT_CONTEXT inherits the pointers)

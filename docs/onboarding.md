@@ -55,15 +55,9 @@ See `docs/upstream-sync.md` for the full engine-update flow.
 bash integrations/claude-code/install.sh
 ```
 
-Then add to `~/.claude/CLAUDE.md` if not already present:
-
-```
-## Constitution Capture — Global Hook
-- @~/.claude/rules/constitution-capture.md
-
-## Zettelkasten (Minder Memory) — Personal Knowledge Base
-- @~/.claude/rules/minder-memory.md
-```
+The installer writes a managed block into `~/.claude/CLAUDE.md` that imports
+the engine's global files from `~/.claude/minder-memory/` — nothing to add by
+hand. Open a new Claude Code session to pick them up.
 
 ## 3. (Optional but high-leverage) Drop your backlog and write a profile
 

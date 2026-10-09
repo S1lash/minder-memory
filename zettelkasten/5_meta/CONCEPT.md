@@ -231,7 +231,7 @@ constitution — 4 узких trigger + 5 anti-trigger.
        │ regen (детерминистичный Python)
        ▼
        ├── _system/views/CONSTITUTION_INDEX.md     (registry для человека)
-       ├── _system/views/constitution-core.md      (~/.claude/rules симлинк — harness)
+       ├── _system/views/constitution-core.md      (~/.claude/minder-memory симлинк — harness)
        └── _system/SOUL.md Values zone       (между markers)
                  │
                  │ SOUL загружается во ВСЕ три пайплайна
@@ -354,7 +354,8 @@ owner-set values. Owner может вручную поставить `audience_t
 Surfacing per-decision drowned бы owner queue без actual decision'ов,
 которые owner мог бы принять. Все остальные layers (threading,
 dedup, principle promotion, people identity, и т.д.) сохраняют
-surface-don't-decide правило.
+surface-don't-decide правило. Полный список автономных слоёв —
+`_system/docs/SYSTEM_CONFIG.md → Autonomous resolution layers`.
 
 ### Где искать подробности
 

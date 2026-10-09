@@ -4,7 +4,7 @@
 `minder-memory`. CC выполнит установку одной командой и отчитается.
 
 Установка полностью автоматизирована: `install.sh` рендерит шаблоны,
-делает симлинки в `~/.claude/{rules,commands,skills}/` и сам подключает
+делает симлинки в `~/.claude/{minder-memory,commands,skills,agents}/` и сам подключает
 нужные `@`-импорты в `~/.claude/CLAUDE.md` через managed block (с
 бэкапом). Идемпотентно — повторный запуск после `git pull` обновляет
 блок на месте.
@@ -34,7 +34,7 @@
    вслепую.
 
 3. **Smoke test** — кратко выполнить и сообщить:
-   - `ls -la ~/.claude/rules/minder-memory.md ~/.claude/skills/minder-mem-process` — проверить, что симлинки живые.
+   - `ls -la ~/.claude/minder-memory/ ~/.claude/skills/minder-mem-process` — проверить, что симлинки живые.
    - `git -C <MINDER_MEMORY_PATH> pull --rebase --autostash` — убедиться, что pull работает (если remote настроен).
    - Проверить, что в `~/.claude/CLAUDE.md` появился managed block с `<!-- MINDER-MEMORY BEGIN ... -->`.
 
@@ -57,13 +57,18 @@
 
 `install.sh` создаёт в `~/.claude/`:
 
-**Rules** (auto-loaded через managed block в `~/.claude/CLAUDE.md`):
+**Глобальные файлы** — симлинки в `~/.claude/minder-memory/`, каждый подключён
+`@`-импортом из managed block в `~/.claude/CLAUDE.md` (сама папка не
+автозагружается; в `~/.claude/rules/` движок ничего не кладёт):
 - `minder-memory.md` — search triggers (reactive + narrow proactive) + `/minder:mem:check-decision` discovery
 - `constitution-capture.md` — глобальный capture-hook (4 узких триггера)
+- `communication-baseline.md` — как подавать результат
+- `advisory-baseline.md` — как к результату приходить
 - `constitution-core.md` — derived view конституции (аксиомы / принципы / правила)
 
-**Rules** (симлинки, on-demand, не auto-loaded):
-- `minder-memory-engine-doctrine.md` — operating philosophy движка; читается скиллами
+**Доктрина движка** (`zettelkasten/_system/docs/ENGINE_DOCTRINE.md`) — не
+глобальная: её импортирует `.claude/CLAUDE.md` репозитория, она грузится только
+в сессиях, открытых в репо.
 
 **Commands:** `minder:mem:search`, `minder:mem:recap`
 

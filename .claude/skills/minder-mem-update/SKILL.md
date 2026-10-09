@@ -332,7 +332,7 @@ Inspect what changed:
 | Pattern in changed files | Recommendation |
 |---|---|
 | `integrations/claude-code/{rules,commands,skills}/**` changed | «Re-run `bash integrations/claude-code/install.sh` to refresh `~/.claude/` symlinks.» |
-| A NEW file added under `_system/docs/**` that install.sh symlinks as a hot rule (git status `A`; today `communication-baseline.md`, `advisory-baseline.md`, `ENGINE_DOCTRINE.md`, `constitution-capture.md`) | «Re-run `bash integrations/claude-code/install.sh` — a new always-on rule shipped and needs its `~/.claude/rules/` symlink plus its `@`-import in the managed block.» A migration may already have done it; say so rather than repeating the ask when `~/.claude/rules/<name>.md` resolves |
+| `HOT_FILES` in `integrations/claude-code/install.sh` gained a row (a new global file) | «Re-run `bash integrations/claude-code/install.sh` — a new global file shipped and needs its `~/.claude/minder-memory/` link plus its `@`-import in the managed block.» A migration may already have done it; say so rather than repeating the ask when `~/.claude/minder-memory/<name>` resolves |
 | Any file under `0_constitution/` engine paths or constitution tooling changed | «Run `/minder:mem:regen-constitution` to refresh views.» |
 | `_system/scripts/**` changed | «Run tests: `pytest zettelkasten/_system/scripts/tests/`.» |
 | A NEW file added under `integrations/claude-code/scheduler-prompts/**` (git status `A`) | «A new scheduled job shipped — set up a new `/schedule` routine for it (see `docs/scheduling.md` for the cron slot + its loader prompt).» |
@@ -428,8 +428,10 @@ python3 scripts/check_update.py            # add --json for the machine-readable
 The probes live in that script, not here, for two reasons: a probe described in
 a prompt drifts from the one that ran last time, and the literals a rename check
 needs cannot live in a file the rename rewrites. It checks the version against
-the remote, the managed block, the rule / command / agent links, the skill
-count, leftovers and foreign dangling links under the harness home, the residue
+the remote, the managed block (and that it imports every global file), the
+global-file / command / agent links, that nothing of the engine's remains in
+`~/.claude/rules/`, the skill count, leftovers and foreign dangling links
+under the harness home, the residue
 grep of `docs/upgrade-1.0.0.md` row 7, conflict markers, the dashboard,
 `_sources/`, the roles list and credential store, and the migration ledger.
 Each probe answers `ok` / `fail` / `skip`; the exit code is 0 when nothing
@@ -618,7 +620,7 @@ each one is a thing the owner would otherwise discover by something failing.
    about the release whose whole subject is that everything did. Listing a
    command that does not exist is still worse than listing none.
 3. **`ztn` / `зтн` / `ЗТН` still work when they speak to the assistant.** <!-- rebrand:keep -->
-   They are aliases in the hot rule and stay so permanently; only the slash
+   They are aliases in the global rule and stay so permanently; only the slash
    commands changed. (The line above keeps the former spellings on purpose —
    naming the alias is the whole point of the beat.)
 4. **Their GitHub repository name is theirs and needs no change.** The redirect
@@ -683,12 +685,13 @@ Ask for more detail on any point?
   owner decides per file.
 - **Push.** Hands off to `/minder:mem:save`.
 - **Run regen-constitution or the tests automatically.** Suggests; owner runs
-  explicitly. `install.sh` is the exception and is NOT in this list: migration
-  031 runs it, because a harness left half-wired imports a rule that no longer
-  exists in every session that follows. Do not ask the owner to run it again
-  after a migration has — a step suggested twice is a step somebody performs
-  twice and then wonders which one counted. Check whether it already ran (031's
-  report says so) before adding it to the follow-ups.
+  explicitly. `install.sh` is the exception and is NOT in this list: migrations
+  031 and 036 run it, because a harness left half-wired imports a rule that no
+  longer exists, or loads one that no longer belongs, in every session that
+  follows. Do not ask the owner to run it again after a migration has — a step
+  suggested twice is a step somebody performs twice and then wonders which one
+  counted. Check whether it already ran (the 031 / 036 report says so) before
+  adding it to the follow-ups.
 - **Rewrite the migration ledger.** If the owner needs to re-run a migration
   that already succeeded, they remove its line from
   `.engine-migrations.jsonl` themselves — guarded territory. A `heal` that

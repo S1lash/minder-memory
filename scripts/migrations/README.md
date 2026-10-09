@@ -83,6 +83,7 @@ fetch + checkout. One file per breaking engine change.
   | `031` harness wiring | structural | after the sync the old skills are gone and the old hot rule dangles; a session that continues imports a dead rule and finds no skill under either name |
   | `032` product rename over the clone | heal | un-run means the old name in files the engine still reads correctly — stale words, not a wrong place |
   | `033` names an earlier rename damaged | heal | it only RAISES a question with the owner; a clone where it never ran is unwarned, not broken, and a notice must never be able to block an update. It also NEEDS the retry `heal` gives it: on a first update the state it reads has not been committed yet, so it exits non-zero, is recorded `partial`, and looks for real on the next one — a `structural` migration here would abort the update, and a migration that exited 0 would be retired before it ever looked |
+  | `036` hot-context wiring | heal | it runs the same installer `031` runs, and is a `heal` where `031` is `structural`, because the installer writes the new wiring before removing the old: a failed run never leaves sessions loading less than before (if only the removal failed, they load the new imports and the old links side by side). The installer exits non-zero whenever it cannot remove one of this clone's old links, so the migration is retried rather than retired |
 
   The distinction is not stylistic. A repair of historical data used to abort
   the whole update and stay unrecorded, so every future update re-ran it and
