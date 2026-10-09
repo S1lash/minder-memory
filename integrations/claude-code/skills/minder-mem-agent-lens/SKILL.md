@@ -3,8 +3,9 @@ name: minder:mem:agent-lens
 description: >
   Outside-view observation runner for the Minder Memory base. Reads
   _system/registries/AGENT_LENSES.md, filters lenses that are due per
-  cadence, runs each through a two-stage pipeline (free-form thinker +
-  cheap structurer + structural validator), writes outputs to
+  cadence, runs each through a two-stage pipeline (free-form thinker in
+  a clean call of its own + runner-side structurer + structural
+  validator), writes outputs to
   _system/agent-lens/{id}/{date}.md and machine index to
   _system/state/agent-lens-runs.jsonl. Each lens is independent — no
   cross-lens synthesis at runner level. Meta-lens (input_type=lens-outputs)
@@ -21,10 +22,10 @@ that runs on its own cadence and produces structured observations the
 owner reviews on their own schedule.
 
 **Philosophy:**
-- Thinker-free, structurer-strict — primary LLM (Opus or equivalent)
-  writes free-form analysis; separate cheap LLM (Haiku/Sonnet) reformats
-  to canonical schema. Decoupling so thinking is not biased by
-  formatting pressure.
+- Thinker-free, structurer-strict — the thinker (the latest Opus, in a
+  clean call of its own) writes free-form analysis; the runner reformats
+  it to the canonical schema without adding to it. Decoupling so
+  thinking is not biased by formatting pressure.
 - Hypothesis-grade, not fact — outputs are the agent's hypotheses about
   patterns. Owner judges on review. Skill never auto-promotes a lens
   observation to constitution / knowledge / hub / clarification.
@@ -37,17 +38,17 @@ owner reviews on their own schedule.
   with remaining lenses.
 - Cadence-honest — scheduler fires daily; per-lens cadence is enforced
   inside the skill via `is_due()` filter. Daily tick ≠ daily lens runs.
-- Isolation by construction — every Stage 1 / Stage 2 invocation is a
-  fresh LLM API call with empty conversation history. No cross-lens
-  carry-over, no cross-stage carry-over, no inheritance of skill
-  orchestrator system prompt. Direct API calls only — never subagent
-  dispatch. See Step 4.5 for the load-bearing contract.
+- Isolation by construction — every thinker runs in a clean model call
+  of its own (`_system/scripts/lens_think.py`) with an empty history: no
+  cross-lens carry-over, no inheritance of the runner's context. Never
+  a subagent, never the runner itself. See Step 4.5 for the load-bearing
+  contract.
 - Surface-everything to CLARIFICATIONS — any unexpected condition
   (registry error, malformed lens, LLM exhaustion after retries,
   IO failure, missing context, unhandled exception) becomes a row
   in `_system/state/CLARIFICATIONS.md` plus a log entry. Never silent
   failure, never owner pause, never auto-recovery beyond the explicit
-  retry policy in §4.5.5. Doctrine §3.1 — surface, don't decide
+  retry policy in §4.5.4. Doctrine §3.1 — surface, don't decide
   silently.
 
 **Language convention (load-bearing):**
@@ -61,9 +62,10 @@ Establish and lock the user-facing language at the very first turn:
   body text, (3) fall back to English if neither is decisive. The
   detection happens during Step 1 context load.
 - **Generated lens content** — observations written by the thinker,
-  formatted by the structurer — MUST be in the language the lens
-  prompt is written in. Each lens prompt's `## Намерение` /
-  `## Intent` line establishes per-lens language; thinker follows.
+  formatted by the runner — MUST be in the owner's language established
+  above. The runner passes it to every thinker (`lens_think.py
+  --language`), because the thinker sees nothing of this run and the
+  frame itself is in English.
 - **Internal artefacts** — `_system/state/log_agent_lens.md` block
   headers, `_system/state/agent-lens-runs.jsonl` field values,
   exit-status tokens, error codes, file paths — English only
@@ -113,10 +115,12 @@ version/phase/rename-history narratives.
 - `--include-draft` — only meaningful with `--lens`; allows running a
   lens with `status: draft`. Without this flag, draft lenses are
   skipped even when explicitly named.
-- `--dry-run` — execute the full pipeline including LLM calls, but do
-  NOT write outputs to `_system/agent-lens/`, do NOT append to
-  runs.jsonl, do NOT modify lens status. Print Stage 2 output to stdout
-  for inspection. Used during lens prompt iteration.
+- `--dry-run` — execute the full pipeline including the thinker calls,
+  but write nothing under `_system/` except the log entry: no output in
+  `_system/agent-lens/`, no runs.jsonl line, no raw or rejected copy, no
+  lens status change. Print the thinker's text and the formatted
+  artefact (or the validator's verdict) for inspection. Used during lens
+  prompt iteration.
 - `--force` — bypass the «another agent-lens run completed <30min ago»
   guard. Useful when the owner is iterating manually.
 - `--no-sync-check` — skip the data-freshness pre-flight (see below).
@@ -188,7 +192,7 @@ Severity → action map:
 |---|---|---|
 | **Catastrophic** (cannot proceed at all) | missing `_frame.md`, missing `AGENT_LENSES.md`, registry table unparseable, lock acquisition failed mid-tick, unhandled exception | Append CLARIFICATION «agent-lens: {cause}» under `## Open Items`, write log entry, release lock (finally), exit with non-success status. **Do NOT** continue to other lenses. |
 | **Lens-level** (one lens broken, others fine) | lens folder missing, frontmatter incomplete, `id` collision, `cadence_anchor`/`cadence` mismatch, `self_history` invalid, lens prompt unreadable | Append CLARIFICATION «agent-lens: lens {id} {cause}», log entry, **skip this lens, continue** with remaining due lenses. |
-| **Run-level recoverable** (transient) | LLM timeout, rate-limit, 5xx, partial network failure | Retry per §4.5.5 (2 attempts, fresh context). After exhaustion → log `status: error` only (no CLARIFICATION — transient, not actionable by owner). Continue to next lens. |
+| **Run-level recoverable** (transient) | LLM timeout, rate-limit, 5xx, partial network failure | Retry per §4.5.4 (2 retries, each a clean call). After exhaustion → log `status: error` only (no CLARIFICATION — transient, not actionable by owner). Continue to next lens. |
 | **Quality issue** (output produced but invalid) | structurer output fails validator, cited paths don't resolve, schema mismatch | Save raw to `_system/state/agent-lens-rejected/`, log `status: rejected`, continue. CLARIFICATION raised ONLY on auto-pause trigger (3 consecutive rejections per §5.5). |
 | **Owner-action-required** (system needs attention) | auto-pause after 3 rejections, registry collision, `cadence_anchor` impossible | Append CLARIFICATION explicitly naming what owner should do, log entry, continue. |
 
@@ -366,127 +370,90 @@ global-navigator), so they run last.
 
 ## Step 4.5 — Isolation contract (load-bearing)
 
-Every lens executes in full isolation. The runner enforces this at
-four levels. Violating any one breaks the design — observations from
-one lens MUST NOT influence another, and orchestration noise MUST NOT
-reach the thinker.
+A lens is an outside view, and the outside is the point: the thinker
+sees its frame, its own prompt and the owner's data — nothing of the
+tick that runs it, the project's rules, or the other lenses of the same
+run. The runner enforces that at four levels; violating any one breaks
+the design.
 
-### 4.5.1 Per-lens isolation
+### 4.5.1 The thinker is a clean call, never the runner
 
-Lens N's Stage 1 invocation has zero visibility into Lens N-1's input,
-output, intermediate state, or the orchestrator's loop variables. The
-ONLY shared structure across lenses is the orchestrator's per-tick
-loop, and the orchestrator is plain code (Python / runtime), not an
-LLM that could leak state into prompts.
+Every Stage 1 runs through `_system/scripts/lens_think.py`, which makes
+one headless Claude Code call per lens (`claude -p`, the owner's own
+login and subscription):
 
-Concretely:
-- The orchestrator does NOT keep a persistent LLM conversation
-  spanning lenses.
-- The orchestrator does NOT pass «what previous lenses found» as
-  context to the next lens.
-- Each lens gets its own pair of API calls (Stage 1 + Stage 2),
-  fully decoupled from the rest of the tick.
+- **System prompt** = exactly the `_frame.md` Stage 1 body for the
+  lens's `input_type`, extracted by the script. Nothing prepended or
+  appended by the runner.
+- **User message** = the lens folder (`prompt.md` first, other `*.md`
+  alphabetically), the self-history hint for its stance, and one line
+  of run context (lens id, today's date, the base as working
+  directory) — assembled by the script, not by the runner.
+- **Tools** = read-only over the base: Read, Glob, Grep. No settings,
+  no MCP servers, no hooks, no session history.
+- **Model** = the alias `opus`, so the latest Opus is used without a
+  version pinned anywhere. No other model is ever substituted: the
+  script checks that the model which wrote the answer (`thinker_model`)
+  is an Opus and otherwise fails the attempt with `wrong-model`. A
+  lighter model listed beside it in `models` is the CLI's own
+  housekeeping, not the thinker.
 
-### 4.5.2 Per-stage isolation
+Forbidden, because each one puts the runner's context or a foreign
+system prompt around the frame:
+- writing the thinker's text in the runner's own turn;
+- the Agent / Task tool, a «general-purpose» or any other subagent;
+- passing anything from another lens, or from this run's loop, into a
+  thinker's message.
 
-Stage 2 (structurer) is a SEPARATE API call from Stage 1 (thinker).
-The thinker output is passed to the structurer as user-message text
-input — NOT as a conversation continuation.
+The platform still adds its own reminders and an environment note to
+every call; they carry nothing of the tick and are accepted. No
+CLAUDE.md, rule or memory file reaches the thinker.
 
-Structurer has zero LLM-level awareness that Stage 1 ever happened.
-From its perspective, it received a string of free-form analysis and
-must reformat it. This is critical because:
-- Structurer in conversation mode would treat the thinker as an
-  «interlocutor» and could feel licensed to argue, expand, or push
-  back. We don't want that — we want strict reformatting.
-- Cross-stage caching of context can leak Stage 1 system prompt into
-  Stage 2 reasoning.
+### 4.5.2 The runner formats, and only formats
 
-### 4.5.3 No subagent dispatch
+For `output_schema: standard` the runner itself is the structurer
+(Step 5.3): it lays the thinker's text out in the canonical schema
+using the `_frame.md` Stage 2 body as its instructions. It extracts,
+never authors — no claim added, removed, sharpened or softened, and
+nothing from another lens or from the runner's own knowledge of the
+base. The thinker's raw text is kept beside the result, so the two can
+always be compared.
 
-Stage 1 and Stage 2 calls MUST be direct LLM API invocations. The
-following are forbidden:
-- Claude Code Task tool / Agent tool dispatch
-- «general-purpose agent» wrappers
-- Any pattern that injects its own system prompt around the frame
+### 4.5.3 One call per lens, in parallel within a cohort
 
-Two reasons:
+`lens_think.py` takes every lens of one cohort (Step 4 order: records →
+lens-outputs → multi-source) and runs their thinkers concurrently, at
+most three at a time. A cohort can take longer than a single command
+may run, so the work is never run inside one command: `start` launches
+it as a process of its own and returns at once, and `wait` blocks for
+at most nine minutes and returns; the runner calls `wait` again until
+the cohort is done. The runner stays in its turn throughout — it never
+uses the Agent tool, never backgrounds a command and never ends its
+turn to wait. A cohort completes before the next one starts, so a
+meta-lens always reads this run's finished outputs.
 
-(a) Subagents carry a foreign system prompt («You are a general-
-    purpose agent...») that biases the thinker — overriding or
-    diluting the frame's instructions. The whole point of the frame
-    is that thinker sees ONLY the frame, nothing else.
+### 4.5.4 Retry is a clean slate
 
-(b) The scheduler tick contract (`agent-lens-nightly.md`) bans
-    sub-agent spawn for lock-deadlock reasons: the parent holds
-    `_sources/.agent-lens.lock`, the child polls for it, deadlock.
-
-### 4.5.4 Fresh context per call
-
-Each LLM invocation, both Stage 1 and Stage 2, MUST have:
-
-- **System prompt** = exactly the frame body for that stage (from
-  `_frame.md`). NOTHING prepended or appended. No «you are running
-  inside /minder:mem:agent-lens» framing. No skill-description preamble.
-  No CLAUDE.md content, no auto-loaded rules, no environment block.
-  If the runtime auto-injects context, the runner MUST suppress it
-  for these calls.
-
-- **User message** = exactly the assembled lens prompt (Stage 1) or
-  the thinker output + lens metadata (Stage 2). No additional
-  instructions.
-
-- **Conversation history** = empty. New session every call.
-
-- **Prompt cache** = the frame body MAY be cached across lenses
-  (it is byte-identical). Lens-specific content (lens prompt body,
-  thinker output) MUST NOT be cached across lenses or stages.
-
-### 4.5.5 Retry behaviour
-
-On transient error (timeout, rate-limit, 5xx), retry is ALSO a fresh
-context — same isolation contract applies. The runner does NOT pass
-the failed attempt as «previous attempt» context. It makes a clean
-new call with the original assembled prompt.
-
-Retry budget: 2 attempts max per stage per lens. After 2 failures →
-log `status: error`, `rejection_reason: stage{N}-{cause}-retries-
-exhausted`, continue to next lens.
-
-### 4.5.6 Parallelism (optional, owner-driven)
-
-Lenses MAY run in parallel API calls — there is no shared context to
-corrupt by construction. Tradeoffs:
-
-- ✅ Faster total tick time (N lenses sequentially ≈ N × 30-60s; parallel
-  ≈ max single lens ≈ 30-60s regardless of N)
-- ❌ Bursty rate-limit usage; risk of provider throttling
-- ❌ Meta-lenses (`input_type: lens-outputs`) MUST still wait for all
-  non-meta lenses to complete (otherwise they read partial state)
-- ❌ Synthesis lenses (`input_type: multi-source`) MUST wait for both
-  non-meta and meta lenses to complete — they read both primary data
-  and other lenses' outputs (including meta-lens outputs from this
-  same tick)
-
-Default: **sequential, in registry order respecting Step 4 ordering
-(records → lens-outputs → multi-source)**. Parallelism is opt-in via
-a future runner flag (not implemented today). Spec it here so the
-isolation contract is unambiguous when the flag lands: parallel
-batching applies only within each `input_type` cohort, never crosses
-the cohort barrier (records cohort completes → lens-outputs cohort
-completes → multi-source cohort completes), and each call still
-satisfies §§4.5.1-4.5.5.
+A failed call (timeout, rate limit, API error, refusal, unparseable
+output) is retried by the script up to twice, after a pause, each time
+a new clean call with the original message — never with the failed
+attempt as context. A timeout is retried once: it is already the
+expensive case. After three failures the lens is `status: error` with
+`rejection_reason: stage1-{cause}-retries-exhausted`; the run goes on
+with the other lenses.
 
 ---
 
 ## Step 5 — Per-Lens Execution
 
-For each ordered due lens, execute Steps 5.1-5.5 sequentially. Errors
-in one lens do NOT abort the loop.
+For each cohort (Step 4 order), run Step 5.2 once for all its due
+lenses, then Steps 5.3-5.5 for each of them in registry order. Errors in
+one lens do NOT abort the loop.
 
-### 5.1 Assemble Stage 1 prompt
+### 5.1 What the thinker receives
 
-Concatenate, in order:
+`lens_think.py` assembles this; the runner never does. The list below is
+what the script builds, so a reader knows what a thinker sees:
 1. Stage 1 frame body for `input_type` (extracted from `_frame.md`):
    - `records` → base-input variant (lens prompt scopes which layer is primary)
    - `lens-outputs` → lens-outputs-input variant
@@ -515,70 +482,77 @@ disk; the longitudinal view should mirror what is actually persisted.
 The thinker is told the same in the self-history hint above so it
 does not double-count an iteration as two independent past surfaces.
 
-### 5.2 Stage 1 — Thinker call
+### 5.2 Stage 1 — Thinker calls (one cohort at a time)
 
-**Isolation contract: see Step 4.5.** Direct API call, fresh context,
-no subagent.
+**Isolation contract: see Step 4.5.** For each cohort of due lenses, from
+`zettelkasten/`:
 
-Invoke primary LLM (Opus or equivalent) with:
-- **System prompt** = `_frame.md` Stage 1 body for the lens's
-  `input_type` — base-input variant for `records`, lens-outputs
-  variant for `lens-outputs`, multi-source-input variant for
-  `multi-source`. Exact text, nothing prepended/appended.
-- **User message** = assembled lens prompt from Step 5.1 (lens folder
-  content + self-history hint).
-- **Tool access** = read-only filesystem tools across the Minder Memory base.
-  Thinker decides what to read.
-- **Conversation history** = empty.
+```bash
+python3 _system/scripts/lens_think.py start --base . --language "{owner language}" \
+  {lens-id} {lens-id} ...
+```
 
-Output: free-form text. Capture verbatim. Do NOT trim, summarise, or
-rewrite before passing to Stage 2.
+It prints `OUT <dir>` — a fresh temporary directory — and returns at
+once. Then, as its own command each time:
 
-LLM error (timeout, API failure, refusal):
-- Up to 2 retry attempts (each a fresh-context call per §4.5.5).
-- After exhaustion: log entry to `agent-lens-runs.jsonl` with
-  `status: error`, `rejection_reason: stage1-{cause}-retries-
-  exhausted`. Append entry to `log_agent_lens.md`. Continue to
-  next lens.
+```bash
+python3 _system/scripts/lens_think.py wait --out "<dir>"
+```
 
-### 5.3 Stage 2 — Structurer call
+Exit 0: every thinker of the cohort has answered or failed. Exit 3: still
+running — run the same `wait` again. Exit 4: the work died before
+finishing — every lens not yet `ok` in `results.json` is an error
+(`rejection_reason: stage1-runner-died`). Never run `wait` in the
+background, and never end the turn between two `wait` calls.
+
+`<dir>` then holds `{lens-id}.thinker.md` (the thinker's text, verbatim)
+and `results.json` (per lens: `status`, `cause` and `error` on failure,
+`attempts`, the model that answered, token usage, seconds). A lens with
+`status: error` is logged with `rejection_reason:
+stage1-{cause}-retries-exhausted` and goes no further. Do NOT trim,
+summarise, or rewrite a thinker's text.
+
+Keep the thinker's text: copy it to
+`_system/state/agent-lens-raw/{lens-id}/{run_at-fs}.md` before Step
+5.3, whatever happens after (`{run_at-fs}` is `run_at` with `:` turned
+into `-`, legal in a file name on every platform) — except in `--dry-run`, which writes
+nothing under `_system/` but its log entry and prints the thinker's
+text instead.
+
+### 5.3 Stage 2 — The runner formats
 
 **Branch on `output_schema`:**
 
-- `output_schema: standard` (default; existing lenses) — execute
-  Stage 2 structurer call as below.
-- `output_schema: synthesis-custom` — **SKIP this step entirely.**
-  Thinker output from Step 5.2 is the final artefact; it is treated
-  as if it had passed through structurer unchanged. Proceed directly
-  to Step 5.4 with the thinker output as the structured artefact.
-  Rationale: synthesis lenses carry their own output schema in the
-  lens prompt and the thinker writes directly to it — running a
-  structurer pass would either duplicate work or risk reformatting
-  away analytical structure the thinker chose deliberately.
+- `output_schema: synthesis-custom` — no reformatting. The thinker
+  wrote directly to the schema in its lens prompt; the artefact is its
+  text, verbatim, under a frontmatter the runner writes: `title: 🔭
+  {lens-id} — {YYYY-MM-DD}`, `lens_id`, `run_at`, `hits` (the number of
+  findings, as the lens prompt counts them — its `## ` sections when it
+  names no count) and the privacy trio of Step 5.9. The body is not
+  touched. Proceed to Step 5.4.
+- `output_schema: standard` (default) — the runner lays the thinker's
+  text out in the canonical schema, following the `_frame.md` Stage 2
+  body as its instructions, with `lens_id` and `run_at`. It extracts,
+  never authors (Step 4.5.2): where the thinker gave no evidence, no
+  alternative reading or no confidence, the field says so
+  (`unspecified`, `(no specific paths cited)`) rather than being filled
+  in. A confidence the thinker gave as a range takes its lower end.
+  Material the schema has no field for (a list of readings the thinker
+  considered and set aside) is left out of the artefact, not squeezed
+  into a field; it survives in `agent-lens-raw/`. Read only this lens's
+  thinker text while formatting it.
 
-For `output_schema: standard`:
-
-**Isolation contract: see Step 4.5.** Separate API call from Stage 1,
-NOT a continuation. Thinker output is INPUT TEXT, not conversation.
-
-Invoke cheaper LLM (Haiku or Sonnet) with:
-- **System prompt** = `_frame.md` Stage 2 body. Exact text.
-- **User message** = thinker output (verbatim) + lens metadata
-  (`lens_id`, `run_at` captured at start of 5.2).
-- **Tool access** = none required (pure formatting task).
-- **Conversation history** = empty.
-
-Output: structured markdown per canonical schema in `_frame.md`.
-
-LLM error:
-- Up to 2 retry attempts (fresh-context per §4.5.5).
-- After exhaustion: log `status: error`, `rejection_reason:
-  stage2-{cause}-retries-exhausted`, append run record, continue.
+If the runner cannot lay a thinker's text out in the schema without
+adding to it, it does not repair the text: the lens's thinker runs once
+more (a new clean call, Step 5.2 for that lens alone), and if that text
+cannot be laid out either, the lens is `status: rejected` with
+`rejection_reason: stage2-unformattable` and its raw text stays in
+`agent-lens-raw/`.
 
 ### 5.4 Validator (structural, deterministic)
 
 **Frontmatter fence integrity (universal, runs first for every `output_schema`).**
-A Stage 2 output is an LLM-composed file (frontmatter + `## Observation N` body) —
+A Stage 2 output is a model-composed file (frontmatter + `## Observation N` body) —
 structurally identical to a knowledge note, so it carries the same risk of a `## `
 body heading being captured inside the YAML fence (breaks `yaml.safe_load`). Before
 the schema branches, run `python3 _system/scripts/check_frontmatter_fence.py --repair <path>`
@@ -613,7 +587,7 @@ Then apply the branch matching the lens's `output_schema`:
 
 **Fail:**
 - Save Stage 2 raw output to
-  `_system/state/agent-lens-rejected/{lens-id}/{run_at-iso}.md`.
+  `_system/state/agent-lens-rejected/{lens-id}/{run_at-fs}.md`.
 - Append run record with `status: rejected`,
   `rejection_reason: {validator-failure-summary}`.
 - Do NOT write to `_system/agent-lens/`.
@@ -841,9 +815,9 @@ Total duration: {seconds}
   `3_resources/people/PEOPLE.md`, `1_projects/PROJECTS.md`,
   `_system/state/OPEN_THREADS.md`. The lens **reads** these (via the
   thinker); the runner never writes to them.
-- Never include lens outputs (`_system/agent-lens/`) or rejected
-  outputs (`_system/state/agent-lens-rejected/`) in default search
-  scope. Other skills that perform full-base search MUST exclude
+- Never include lens outputs (`_system/agent-lens/`), rejected
+  outputs (`_system/state/agent-lens-rejected/`) or raw thinker text
+  (`_system/state/agent-lens-raw/`) in default search scope. Other skills that perform full-base search MUST exclude
   these paths (until QMD-isolation phase lands).
 
 ---
@@ -857,7 +831,8 @@ Per-run write surface:
 - `_system/state/batches/{batch_id}-agent-lens.json` — once per tick (Step 5.95), only when ≥1 lens emitted with `status: ok`
 - `_system/state/agent-lens-runs.jsonl` — append-only
 - `_system/state/log_agent_lens.md` — append-only
-- `_system/state/agent-lens-rejected/{lens-id}/{run_at}.md` — append
+- `_system/state/agent-lens-rejected/{lens-id}/{run_at-fs}.md` — append
+- `_system/state/agent-lens-raw/{lens-id}/{run_at-fs}.md` — the thinker's verbatim text, one per thinker that answered
 - `_sources/.agent-lens.lock` — create + delete (concurrency lock)
 - `_system/registries/lenses/{lens-id}/prompt.md` — frontmatter `status`
   only, only on auto-pause
@@ -889,7 +864,7 @@ from the step text:
 |---|---|
 | Thinker output but no specific paths | Structurer emits observations with `(no specific paths cited)` evidence; validator passes — diffuse patterns are valid signal, not a bug |
 | First-ever run of a lens (no prior `last_run`) | Treat as due if today's date matches `cadence_anchor` |
-| Tick spans midnight | `run_at` captured at Step 5.2 start; ALL cadence checks for the run use `today = run_at.date()` (consistency across lenses within one tick) |
+| Tick spans midnight | `run_at` captured once per tick, when the first cohort's Step 5.2 starts, and shared by every lens of the tick; ALL cadence checks for the run use `today = run_at.date()` (consistency across lenses within one tick) |
 | Owner edits a lens prompt mid-tick | Lens already loaded into memory at Step 2; mid-tick edits not picked up. Next tick sees them |
 | Two lenses with same id | Both skipped (not first-wins); raises CLARIFICATION «id collision»; remaining lenses run normally |
 | `--dry-run` on Active lens | Allowed — useful when iterating prompt of an already-deployed lens |

@@ -1222,8 +1222,8 @@ When evolving the agent-lens system, watch these compatibility points:
   lens-outputs`) implicitly depend on other lenses existing. No
   formal dependency declaration. If lens chains become richer, consider
   a `depends_on: [lens-id, ...]` field.
-- **Per-lens model selection.** Currently `_frame.md` Stage 1 defaults
-  to «primary LLM (Opus or equivalent)». Future: per-lens
+- **Per-lens model selection.** Every thinker runs on the `opus` alias
+  (the latest Opus) through `lens_think.py`. Future: per-lens
   `model_tier: opus | sonnet | haiku` could let mechanical-simple lenses
   use cheaper models.
 - **Lens versioning.** Currently lens prompt is mutable in place; git

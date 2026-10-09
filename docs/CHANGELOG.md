@@ -2,6 +2,22 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.5.0 — Lenses look at your base with their own eyes
+
+A lens is meant to be an outside view: it should see its own instructions
+and your notes, and nothing else. In practice the nightly run usually wrote
+the lenses itself, with everything else it was doing still in mind, so every
+lens of a night spoke in one voice and could lean on the others.
+
+Each lens now thinks in a clean session of its own: the latest Opus, its
+instructions, read-only access to your base, and nothing of the run around
+it. Lenses of one kind run side by side, so the night is no slower. The run
+only lays their findings out in the report format, without adding to them,
+and keeps each lens's original text next to the report so you can compare.
+
+It runs on your own Claude login and subscription, like the rest of the
+nightly work. Nothing to set up.
+
 ## 1.4.1 — The safety net no longer stops a run that is still working
 
 The safety net added in 1.4.0 mistook a run waiting for its own helper for a

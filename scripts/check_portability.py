@@ -388,6 +388,27 @@ def _nonascii_to_stream(ctx: LineCtx) -> list[tuple[int, str]]:
     return hits
 
 
+def _write_text_newline(ctx: LineCtx) -> list[tuple[int, str]]:
+    # The keyword often sits on a continuation line of a wrapped call, where a
+    # one-line regex sees neither the method nor the keyword together.
+    hits: list[tuple[int, str]] = []
+    for i, (no, text, code) in enumerate(ctx.rows):
+        start = code.find(".write_text(")
+        if start < 0:
+            continue
+        call, depth = "", 0
+        for _, _, more in ctx.rows[i : i + 8]:
+            segment = more[start:] if not call else more
+            start = 0
+            call += segment + "\n"
+            depth += segment.count("(") - segment.count(")")
+            if depth <= 0:
+                break
+        if re.search(r"\bnewline\s*=", call):
+            hits.append((no, text))
+    return hits
+
+
 _OPEN_BINARY = re.compile(r"""["'][rwax]?\+?b\+?["']""")
 
 
@@ -619,7 +640,7 @@ RULES: tuple[Rule, ...] = (
         "runs on 3.9, where the call raises `TypeError` before writing anything",
         "`lib.portable.write_text_utf8(path, text)` under `scripts/`, or "
         "`open(path, \"w\", encoding=\"utf-8\", newline=\"\")` — the same LF bytes on every version",
-        regex_matcher(r"\.write_text\([^)]*\bnewline\s*=|^\s*newline\s*=\s*[\"']"),
+        _write_text_newline,
     ),
     Rule(
         "py-stdin-unconfigured", "py",
