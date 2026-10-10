@@ -480,6 +480,66 @@ class InstallHotWiringTests(unittest.TestCase):
         self.assertFalse(dead.exists())
         live.rmdir()
 
+    def test_engine_links_into_another_clone_are_removed_too(self):
+        """Two clones on one machine converge on whichever clone installed last."""
+        other = Path(self._tmp.name) / "other-clone"
+        for rel in SOURCES.values():
+            _write(other, rel, "other\n")
+        _write(other, "integrations/claude-code/built/rules/minder-memory.md", "other\n")
+        _write(other, ".engine-manifest.yml", "engine: []\n")
+        _write(other, "integrations/claude-code/install.sh", "#!/bin/bash\n")
+        self._legacy_home(target_root=other)
+        gone = Path(self._tmp.name) / "deleted-clone"
+        os.symlink(gone / SOURCES[DOCTRINE_LINK], self.home / "rules" / "dangling-placeholder")
+        (self.home / "rules" / "dangling-placeholder").rename(self.home / "rules" / "zz")
+        self._ok()
+        for name in RETIRED:
+            self.assertFalse(os.path.lexists(self.home / "rules" / name), name)
+        self.assertTrue((self.home / "rules" / "zz").is_symlink(), "a name of the owner's own is theirs")
+
+    def test_a_live_link_into_something_that_is_not_a_minder_clone_is_kept(self):
+        """The same path inside an unrelated tree proves nothing; only a real clone's file is the engine's."""
+        unrelated = Path(self._tmp.name) / "unrelated-product"
+        target = _write(unrelated, SOURCES[DOCTRINE_LINK], "theirs\n")
+        (self.home / "rules").mkdir(parents=True)
+        os.symlink(target, self.home / "rules" / DOCTRINE_LINK)
+        self._ok()
+        self.assertTrue((self.home / "rules" / DOCTRINE_LINK).is_symlink())
+
+    def test_global_files_moving_to_this_clone_is_announced(self):
+        other = Path(self._tmp.name) / "other-clone"
+        hot = self.home / "minder-memory"
+        hot.mkdir(parents=True)
+        for name in HOT:
+            _write(other, f"x/{name}", "other\n")
+            os.symlink(other / "x" / name, hot / name)
+        res = self._ok()
+        self.assertIn("now come from this clone", res.stdout)
+        self.assertIn(str(other), res.stdout)
+        for name in HOT:
+            self.assertTrue((hot / name).resolve().is_relative_to(self.repo.resolve()), name)
+
+    def test_a_run_that_changes_nothing_writes_no_backup(self):
+        self._legacy_home()
+        self._ok()
+        backups = lambda: sorted(p.name for p in self.home.iterdir() if p.name.startswith(".minder-memory-backup-"))  # noqa: E731
+        first = backups()
+        self.assertEqual(len(first), 1, first)
+        self._ok()
+        self.assertEqual(backups(), first, "an unchanged block is not copied again")
+
+    def test_at_most_one_backup_of_claude_md_is_kept(self):
+        for stamp in ("20200101-000000", "20200102-000000", "20200103-000000"):
+            _write(self.home, f".minder-memory-backup-{stamp}/CLAUDE.md.before-refresh", "old\n")
+        _write(self.home, ".minder-memory-backup-20200104-000000/rules/mine.md", "a file the installer moved\n")
+        self._legacy_home()
+        self._ok()
+        names = sorted(p.name for p in self.home.iterdir() if p.name.startswith(".minder-memory-backup-"))
+        claude_only = [n for n in names if (self.home / n / "CLAUDE.md.before-refresh").exists()
+                       and len(list((self.home / n).rglob("*"))) == 1]
+        self.assertEqual(len(claude_only), 1, names)
+        self.assertIn(".minder-memory-backup-20200104-000000", names, "a moved file is never pruned")
+
     def test_rendering_leaves_no_staging_directory_behind(self):
         self._ok()
         siblings = sorted(p.name for p in (self.repo / "integrations/claude-code").iterdir())

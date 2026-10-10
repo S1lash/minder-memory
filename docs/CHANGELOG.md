@@ -2,6 +2,23 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.6.1 — Two copies on one machine agree, and the update check stops crying wolf
+
+- **Two Minder Memory folders on one computer** now settle on one setup: the
+  installer of either clears the other's old links, says when the files every
+  session reads move from one folder to the other, and leaves nothing behind
+  for a folder you deleted or moved.
+- **The post-update check asks GitHub, not its memory.** It fetches before
+  comparing versions, and only a copy that is *behind* counts as an update
+  that did not land.
+- **Your notes about the old name are yours.** The check used to flag every
+  note that mentions the former product name, including ones you wrote after
+  the rename on purpose. Now it only flags lines that were already there when
+  the rename ran — the ones it actually missed.
+- **One backup, not a pile.** The installer copies `~/.claude/CLAUDE.md` only
+  when it changes it, and keeps the newest copy. A backup holding a file it
+  moved aside is kept until you delete it.
+
 ## 1.6.0 — Minder Memory stops weighing down your other sessions
 
 Every Claude Code session on your machine — including ones that have nothing
