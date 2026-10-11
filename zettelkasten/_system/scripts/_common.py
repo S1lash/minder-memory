@@ -2034,6 +2034,38 @@ def find_evidence_trail_bounds(body: str) -> tuple[int, int] | None:
 SOUL_MARKER_START = "<!-- AUTO-GENERATED FROM CONSTITUTION — DO NOT EDIT MANUALLY -->"
 SOUL_MARKER_END = "<!-- END AUTO-GENERATED -->"
 
+# The pair `SOUL.template.md` seeded before it carried the canonical markers.
+# Every SOUL.md seeded from that template holds it, and no generator ever ran
+# on such a base: the marker check failed, so the Values zone stayed empty.
+# Converted on read, so a clone needs no migration; removable only together
+# with one, since a clone that never runs a regen keeps the old pair.
+SOUL_LEGACY_MARKERS = ("<!-- soul-values:start -->", "<!-- soul-values:end -->")
+
+
+def normalise_legacy_soul_markers(text: str) -> str:
+    """Rewrite the legacy marker pair to the canonical one.
+
+    Only the unambiguous shape converts: no canonical marker present, exactly
+    one legacy start and one legacy end, start first. Anything else comes back
+    unchanged, so the caller reports it instead of guessing.
+    """
+    if SOUL_MARKER_START in text or SOUL_MARKER_END in text:
+        return text
+    legacy_start, legacy_end = SOUL_LEGACY_MARKERS
+    if text.count(legacy_start) != 1 or text.count(legacy_end) != 1:
+        return text
+    if text.find(legacy_start) > text.find(legacy_end):
+        return text
+    return text.replace(legacy_start, SOUL_MARKER_START).replace(
+        legacy_end, SOUL_MARKER_END
+    )
+
+
+def soul_has_auto_zone(text: str) -> bool:
+    """True when the SOUL auto-zone markers are present, legacy pair included."""
+    text = normalise_legacy_soul_markers(text)
+    return SOUL_MARKER_START in text and SOUL_MARKER_END in text
+
 
 def find_soul_auto_zone(text: str) -> tuple[int, int] | None:
     """Return (content_start, content_end) between SOUL auto-markers.

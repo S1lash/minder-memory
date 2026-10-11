@@ -39,6 +39,7 @@ from _common import (
     die,
     find_soul_auto_zone,
     iter_principles,
+    normalise_legacy_soul_markers,
     now_iso_utc,
     repo_root,
     state_dir,
@@ -232,7 +233,7 @@ def main(argv: list[str] | None = None) -> int:
     if not soul_path.exists():
         die(f"SOUL.md not found at {soul_path}")
 
-    soul_text = soul_path.read_text(encoding="utf-8")
+    soul_text = normalise_legacy_soul_markers(soul_path.read_text(encoding="utf-8"))
     selected = select_for_soul(principles)
     new_source_hash = compute_source_hash(selected)
     expected_body = render_values_body(selected, new_source_hash)

@@ -148,16 +148,15 @@ frontmatter. **Bold** fields are required.
 id: axiom-identity-001                      # REQUIRED. {type}-{domain}-{NNN}
                                             # NNN is 3-digit monotonic per-type
                                             # per-domain sequence.
-title: If it can be better, it should be    # REQUIRED. Short, behavioral form
+title: Leave the place clearer              # REQUIRED. Short, behavioral form
                                             # where possible.
 type: axiom                                 # REQUIRED. axiom | principle | rule
 domain: identity                            # REQUIRED. See §5 Domains.
 
 # Content
 statement: >                                # REQUIRED. One sentence, behavioral.
-  Choose the higher-quality path when
-  the system is likely to outlive this
-  decision.
+  Leave every shared surface at least
+  as clear as you found it.
 
 # Classification
 priority_tier: 1                            # REQUIRED. 1 | 2 | 3
@@ -251,7 +250,7 @@ run. Consumers silently drop unknown values in `applies_to` lists (no crash).
 ### File naming
 
 - Path: `0_constitution/{type}/{domain}/{slug}.md`
-- Slug: lowercase kebab-case, matches id tail (`axiom-identity-001` → `001-if-it-can-be-better.md`
+- Slug: lowercase kebab-case, matches id tail (`axiom-identity-001` → `001-leave-the-place-clearer.md`
   or similar). Slug is descriptive; id is the authoritative key.
 - One principle per file. No multi-principle files. No wildcards in imports.
 
@@ -662,15 +661,18 @@ approved by owner before any code is written.
 
 ## Appendix A — Minimal example
 
+An invented principle, shown in full so every field and body section has a
+worked value. It belongs to no one; write your own from what you actually do.
+
 ```markdown
 ---
 id: axiom-identity-001
-title: If it can be better, it should be better
+title: Leave the place clearer than you found it
 type: axiom
 domain: identity
 statement: >
-  Choose the higher-quality path when the system is likely to outlive
-  this decision.
+  Leave every shared surface — code, a document, a kitchen — at least as
+  clear as it was before you touched it.
 priority_tier: 1
 framing: positive
 binding: hard
@@ -689,35 +691,30 @@ source_weight:
   external_author: 0
 ---
 
-# If it can be better, it should be better
+# Leave the place clearer than you found it
 
 ## Statement
-When the system I am building is likely to outlive the current decision — same
-code, same relationship, same health routine running years from now — pay the
-extra cost to do it right the first time. Short-term clever loses to long-term
-clear.
+Whenever I touch something other people also use, the next person meets it
+in a state at least as clear as I did: the stray note filed, the confusing
+name fixed, the half-finished step either finished or labelled.
 
 ## Why I hold this
-Every shortcut becomes a tax later, paid by someone who didn't choose it —
-future me, my team, my family. The decisions that compound positively over
-time share one pattern: choose the harder path today because the cost of
-revisit is much higher than the cost of correct setup now.
+Shared things decay one small mess at a time, and each mess is cheap only for
+the person who leaves it. Paying the small cost on the spot is how a shared
+space stays usable without anyone having to schedule a clean-up.
 
 ## Edge cases — when not to apply
-- Prototypes explicitly scoped for throwaway use. (And: be honest about what
-  is truly throwaway.)
-- Decisions whose reversal cost is trivial and whose value-of-information
-  outweighs the quality gap — speed-to-learning wins.
+- Someone else's work in progress — tidying it moves their things.
+- An emergency where the clean-up would delay the fix that matters.
 
 ## Related
 - [[principle/work/name-the-tradeoff]]
-- [[rule/tech/no-silent-compromise]]
 
 ## Evidence Trail
-- **2026-04-20** | landing | — seeded during infrastructure bootstrap as placeholder smoke-test principle
+- **2026-04-20** | landing | — example written for this protocol
 
 ## Source
-extracted-from: hand-written (placeholder)
+extracted-from: hand-written (example)
 ```
 
 ---

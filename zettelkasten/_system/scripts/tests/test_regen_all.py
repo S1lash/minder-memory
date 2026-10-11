@@ -71,7 +71,25 @@ class RegenAllTests(unittest.TestCase):
             self.assertTrue((fx.system / "views" / "constitution-core.md").exists())
             # SOUL values zone written
             soul_text = soul_path.read_text(encoding="utf-8")
-            self.assertIn("If it can be better", soul_text)
+            self.assertIn("Leave the place clearer", soul_text)
+        clear_minder_memory_env()
+
+    def test_legacy_seed_markers_render_instead_of_skipping(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fx = make_fixture(Path(tmp))
+            fx.write_principle("axiom/identity/001.md", VALID_NOTE)
+            legacy = SOUL_TEMPLATE.replace(
+                "<!-- AUTO-GENERATED FROM CONSTITUTION — DO NOT EDIT MANUALLY -->",
+                "<!-- soul-values:start -->",
+            ).replace("<!-- END AUTO-GENERATED -->", "<!-- soul-values:end -->")
+            soul_path = fx.write_system_file("SOUL.md", legacy)
+            result = _run_regen(
+                ["--strict-soul"], env_extra={"MINDER_MEMORY_BASE": str(fx.base)}
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            soul_text = soul_path.read_text(encoding="utf-8")
+            self.assertIn("Leave the place clearer", soul_text)
+            self.assertNotIn("soul-values:", soul_text)
         clear_minder_memory_env()
 
     def test_idempotent_two_runs(self):

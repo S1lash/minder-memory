@@ -33,16 +33,14 @@ engine changes.
    canonical set, a format rule, an example value), never for the
    owner-mutable rows beside it; when a template has a live sibling in
    this repo, both move in the same change or neither does.
-4. Run the three gates before opening a PR. CI runs all three, and
-   `release_engine.py` runs all three again at release time — the first
-   two before it copies anything, the seed-contract gate against the
-   assembled skeleton afterwards:
-
-   ```bash
-   python3 scripts/check_portability.py      # ENGINE_DOCTRINE §3.9
-   python3 scripts/check_no_personal_data.py # no owner identity in engine code
-   python3 scripts/check_seed_contract.py    # template / seed declarations
-   ```
+4. Run every gate before opening a PR. Your fork has no CI — the
+   checks run on your machine, and the maintainer runs them again before
+   merging. The commands, with what each one guards,
+   are in `.claude/CLAUDE.md → Verification`: the portability, personal-data,
+   seed-contract, migration-coverage and retirement gates, plus the pytest
+   suite. `release_engine.py` repeats the personal-data, portability,
+   retirement and migration-coverage gates before it copies anything, and
+   the seed-contract gate against the assembled skeleton afterwards.
 
    The portability gate is the one most likely to stop you, and it is the
    one worth reading the output of: it names the construct, why it breaks,

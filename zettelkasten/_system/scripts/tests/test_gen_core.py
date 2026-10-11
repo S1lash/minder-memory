@@ -93,7 +93,7 @@ class GenCoreTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertTrue(out.exists())
             self.assertIn("NOTE: view exceeds advisory", _read(out))
-            self.assertIn("If it can be better", _read(out))
+            self.assertIn("Leave the place clearer", _read(out))
         clear_minder_memory_env()
 
     def test_default_output_is_single_file(self):

@@ -228,37 +228,6 @@ can launch a Claude Code session with this repository as its working
 directory works: Claude Code `/schedule`, GitHub Actions cron, a host crontab
 calling `claude` headless.
 
-## 10. (Optional) Tune how the assistant talks to you
-
-After install the assistant already answers you **conclusion-first, no fluff,
-and stays critical** by default — the shipped *communication baseline*. And it
-already works *for you* rather than refereeing between you and the world — the
-shipped *advisory baseline*: it treats a claim from someone with a stake in the
-outcome as a claim rather than a fact, builds the decision criteria from your
-situation before adopting anyone else's list, and checks your own criteria
-against how you actually live rather than one vivid week. You don't have to do
-anything for either.
-
-To make it yours: put how you like praise and criticism in
-`zettelkasten/_system/SOUL.md → ## Context for Agents`, your recipe for long
-pieces (reports, audiobooks, debriefs) in
-`zettelkasten/_system/long-form-playbook.md`, and how you want a decision with
-someone else's interest in it worked through in
-`zettelkasten/_system/decision-advisory-playbook.md`. Both playbooks load on
-demand — only for an actual long piece or an actual decision — so an ordinary
-answer never pays for them. All three ship with filled examples.
-
-The assistant also *learns* your style over time through the `cognitive-model`
-lens, which is **on by default**. Every other Monday it reads your own
-reflections and proposes "you seem to want X" for you to approve via `/minder:mem:lint`
-— it only appends to your review buffer and never changes your constitution on
-its own. It fills your cognitive-model hub
-(`5_meta/mocs/hub-cognitive-model.md`). To populate it now instead of waiting for
-the next cycle, run `/minder:mem:agent-lens --lens cognitive-model`. To turn it off, set
-its row to `draft` in `_system/registries/AGENT_LENSES.md` (note: a later
-`/minder:mem:update` re-applies the platform default of `active`). See `docs/privacy.md`
-for exactly what it reads and produces.
-
 ### Required GitHub repo setting — auto-delete head branches
 
 Before relying on Cloud Routines (Claude Code `/schedule`), enable:
@@ -311,6 +280,37 @@ once in the scheduler environment and confirm:
    tick — proves the auto-delete setting is on and working.
 
 Full design — `docs/scheduling.md`.
+
+## 10. (Optional) Tune how the assistant talks to you
+
+After install the assistant already answers you **conclusion-first, no fluff,
+and stays critical** by default — the shipped *communication baseline*. And it
+already works *for you* rather than refereeing between you and the world — the
+shipped *advisory baseline*: it treats a claim from someone with a stake in the
+outcome as a claim rather than a fact, builds the decision criteria from your
+situation before adopting anyone else's list, and checks your own criteria
+against how you actually live rather than one vivid week. You don't have to do
+anything for either.
+
+To make it yours: put how you like praise and criticism in
+`zettelkasten/_system/SOUL.md → ## Context for Agents`, your recipe for long
+pieces (reports, audiobooks, debriefs) in
+`zettelkasten/_system/long-form-playbook.md`, and how you want a decision with
+someone else's interest in it worked through in
+`zettelkasten/_system/decision-advisory-playbook.md`. Both playbooks load on
+demand — only for an actual long piece or an actual decision — so an ordinary
+answer never pays for them. All three ship with filled examples.
+
+The assistant also *learns* your style over time through the `cognitive-model`
+lens, which is **on by default**. Every other Monday it reads your own
+reflections and proposes "you seem to want X" for you to approve via `/minder:mem:lint`
+— it only appends to your review buffer and never changes your constitution on
+its own. It fills your cognitive-model hub
+(`5_meta/mocs/hub-cognitive-model.md`). To populate it now instead of waiting for
+the next cycle, run `/minder:mem:agent-lens --lens cognitive-model`. To turn it off, set
+its row to `draft` in `_system/registries/AGENT_LENSES.md` (note: a later
+`/minder:mem:update` re-applies the platform default of `active`). See `docs/privacy.md`
+for exactly what it reads and produces.
 
 ## 11. (Optional) Stand up a role
 

@@ -94,7 +94,7 @@ class QueryConstitutionTests(unittest.TestCase):
             fx = make_fixture(Path(tmp))
             fx.write_principle("axiom/identity/001.md", VALID_NOTE)
             out = _run([])
-            self.assertIn("Choose the higher-quality path.", out[0]["body"])
+            self.assertIn("Leave it clearer.", out[0]["body"])
         clear_minder_memory_env()
 
     def test_unknown_domain_raises(self):

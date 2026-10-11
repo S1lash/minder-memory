@@ -12,7 +12,7 @@ whether or what to compact; it applies a pre-approved summary.
 
 Usage:
     python3 compact_evidence_trail.py \
-        --file 0_constitution/axiom/identity/001-if-it-can-be-better.md \
+        --file 0_constitution/axiom/identity/001-leave-the-place-clearer.md \
         --cutoff 2025-04-20 \
         --summary "2024-04..2025-04 — cited 27 times across 18 decisions; pattern: aligned outcomes on code-review trade-offs" \
         [--dry-run]

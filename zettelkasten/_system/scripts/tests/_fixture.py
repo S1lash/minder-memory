@@ -14,14 +14,15 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 
+VALID_NOTE_TITLE = "Leave the place clearer than you found it"
+
 VALID_NOTE = """---
 id: axiom-identity-001
-title: If it can be better, it should be better
+title: Leave the place clearer than you found it
 type: axiom
 domain: identity
 statement: >
-  Choose the higher-quality path when the system is likely to outlive
-  this decision.
+  Leave every shared surface at least as clear as you found it.
 priority_tier: 1
 framing: positive
 binding: hard
@@ -40,10 +41,10 @@ source_weight:
   external_author: 0
 ---
 
-# If it can be better, it should be better
+# Leave the place clearer than you found it
 
 ## Statement
-Choose the higher-quality path.
+Leave it clearer.
 
 ## Evidence Trail
 - **2026-01-01** | landing | — seeded for test

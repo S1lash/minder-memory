@@ -64,10 +64,8 @@ def _soul_has_markers(soul_path: Path) -> bool:
         text = soul_path.read_text(encoding="utf-8")
     except OSError:
         return False
-    return (
-        "<!-- AUTO-GENERATED FROM CONSTITUTION" in text
-        and "<!-- END AUTO-GENERATED -->" in text
-    )
+    from _common import soul_has_auto_zone  # local import — avoids polluting module load
+    return soul_has_auto_zone(text)
 
 
 def main(argv: list[str] | None = None) -> int:
