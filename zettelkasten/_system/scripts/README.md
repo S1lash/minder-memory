@@ -78,7 +78,7 @@ python3 _system/scripts/render_soul_values.py --write-clarification
 
 # Compact old Evidence Trail entries (only after human approval in CLARIFICATIONS)
 python3 _system/scripts/compact_evidence_trail.py \
-    --file 0_constitution/axiom/identity/001-if-it-can-be-better.md \
+    --file 0_constitution/axiom/identity/001-leave-the-place-clearer.md \
     --cutoff 2025-04-20 \
     --summary "2024-04..2025-04 — cited 27 times; pattern: aligned on code-review trade-offs"
 ```

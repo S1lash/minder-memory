@@ -21,39 +21,15 @@ The skill exists so that observations do not get lost between sessions.
 `_system/docs/CONVENTIONS.md` — файл описывает current behavior без
 version/phase/rename-history narratives.
 
-## When to invoke (narrow triggers)
+## When to invoke — and when not
 
-Capture when you observe one of these, and **only** these:
-
-**(a) Explicit behavioural principle** — The owner says "I always ...", "my rule
-is ...", "I never ..." with a reason (not just a factual statement, but
-a principle).
-
-**(b) Conscious trade-off** — explicit choice of X over Y with reasoning
-why one priority outranks another in the specific situation. Example:
-"here speed matters more than quality because rollback is cheap".
-
-**(c) Non-obvious ethical / emotional / interpersonal judgment** — a
-decision most people would make differently, with explanation why the owner
-does not. Includes "по понятиям" moments.
-
-**(d) Implicit pattern** — The owner does NOT name the principle, but makes
-a choice that clearly follows from an internal logic. Capture the
-**observation** (what you watched) plus your **hypothesis** about the
-principle behind it. The owner decides on review whether it is real or noise.
-
-## Do NOT capture
-
-- Technical preferences (prefer postgres, use records not classes) —
-  those are conventions, not principles.
-- Stylistic preferences (commit-message phrasing, naming).
-- Task-execution decisions without philosophical content.
-- Facts about people — those go through `/minder:mem:process` → PEOPLE.md.
-- The entire session content — that is `/minder:mem:recap`.
-
-**Better to miss 30% of real candidates than ingest 300% noise** — the
-buffer should stay signal-heavy (`2_areas/...` CONSTITUTION.md §13
-invariant #15 + rationale in the research note §5.5).
+The triggers and the exclusions have one home: the constitution-capture rule,
+`_system/docs/constitution-capture.md`. Every Claude Code session on an
+installed machine already carries it — it is what sent you here. Apply it as
+written, including its two carve-outs: how the owner wants information
+presented, and how the owner decides when someone else has a stake in the
+outcome. Both are captured even as a bare instruction. If the rule is not in
+your context, read it before appending.
 
 ## Well-formed candidate — structural rules
 
@@ -68,8 +44,9 @@ from the owner's own corpus, not from this skill's prompt.
   `hypothesis`.
 - `hypothesis` — at most one short sentence naming the rule the owner
   appears to be following. **Required to contain a reason or trade-off**,
-  not just a preference. Empty/null only when (a) trigger fired and the
-  owner stated the rule explicitly.
+  not just a preference — for a carve-out instruction given without a
+  reason, name the reason it implies. Empty/null only when (a) trigger
+  fired and the owner stated the rule explicitly.
 - `suggested_type` and `suggested_domain` — pick `unknown` over a forced
   guess. The owner re-classifies on review.
 - `applies_in_concepts` — optional list of canonical concept names the

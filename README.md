@@ -19,10 +19,11 @@ Three things make it different from a notes app:
   follow them.
 - **It's yours.** A single git repo. Records, knowledge, and
   constitution stay where you keep them — on your machine, plus your
-  private remote if you push there. The engine itself never pushes
-  and makes no outbound calls beyond the Claude API (which it uses to
-  process the text you ask it to). See `docs/privacy.md` for the full
-  data flow.
+  private remote if you push there. The engine pushes only to that
+  remote, and only when you ask — `/minder:mem:save` after your
+  confirmation, or a scheduled routine you set up. It makes no outbound
+  calls beyond the Claude API (which it uses to process the text you
+  ask it to). See `docs/privacy.md` for the full data flow.
 
 ## What it looks like
 

@@ -2,6 +2,28 @@
 
 User-readable release notes. For the engineering log, see git history.
 
+## 1.6.2 — Your values show up in SOUL, and the docs say what really happens
+
+- **The values section of your `SOUL.md` fills in.** The starter `SOUL.md`
+  carried a marker pair the generator did not recognise, so it skipped the
+  section without a word and it stayed empty. The next regeneration
+  (`/minder:mem:regen-constitution`, or any scheduled tick) converts the old
+  markers and renders your core principles there. Nothing to do on your side.
+- **Capturing how you want to be told things works as the hook promises.** The
+  capture skill kept its own, shorter list of what not to capture, which
+  turned away the two kinds of signal the always-on hook asks for: how you
+  want information presented, and how you decide when someone else has a
+  stake. The skill now follows the hook's single list.
+- **The privacy notes match reality.** Scheduled routines push their own
+  commits to your private remote, and an update edits your notes in exactly
+  two mechanical cases (a product rename, and restoring content a stale
+  scheduled delivery erased). `README` and `docs/privacy.md` now say so.
+- **The constitution example is an invented principle** rather than a real
+  one, and the onboarding guide's scheduling notes sit under the scheduling
+  step where they belong.
+- **Contributing:** the gate list points at the one place that keeps it
+  current, and says plainly that a fork runs the checks locally.
+
 ## 1.6.1 — Two copies on one machine agree, and the update check stops crying wolf
 
 - **Two Minder Memory folders on one computer** now settle on one setup: the

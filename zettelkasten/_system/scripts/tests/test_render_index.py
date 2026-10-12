@@ -237,8 +237,8 @@ class RenderIndexTests(unittest.TestCase):
             self.assertIn("### Principles — 1", text)
             self.assertIn("### Rules — 1", text)
             self.assertIn(
-                "[[axiom-identity-001]] — If it can be better, it should be "
-                "better · `[identity]` · tier 1 ·",
+                "[[axiom-identity-001]] — Leave the place clearer than you found "
+                "it · `[identity]` · tier 1 ·",
                 text,
             )
 

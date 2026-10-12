@@ -194,7 +194,7 @@ MINDER_TEXT = "# How the base works\n\nRecords, knowledge, hubs.\n"
 CONSTITUTION_TEXT = (
     "# Constitution core\n"
     "\n"
-    "## `axiom-identity-001` — If it can be better, it should be better\n"
+    "## `axiom-identity-001` — Leave the place clearer than you found it\n"
 )
 
 

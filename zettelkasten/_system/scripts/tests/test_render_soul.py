@@ -10,6 +10,7 @@ from tests._fixture import (  # type: ignore
     CLARIFICATIONS_TEMPLATE,
     SOUL_TEMPLATE,
     VALID_NOTE,
+    VALID_NOTE_TITLE,
     VALID_PERSONAL_NOTE,
     VALID_PLACEHOLDER_CORE,
     VALID_SENSITIVE_NOTE,
@@ -32,7 +33,7 @@ class RenderSoulTests(unittest.TestCase):
             self.assertIn("Hand-written style area.", text)
             self.assertIn(r.SOUL_MARKER_START, text)
             self.assertIn(r.SOUL_MARKER_END, text)
-            self.assertIn("If it can be better", text)
+            self.assertIn("Leave the place clearer", text)
         clear_minder_memory_env()
 
     def test_sensitive_scope_is_included_in_dogfood(self):
@@ -104,7 +105,7 @@ class RenderSoulTests(unittest.TestCase):
             # and the auto-generated source-hash comment intact).
             rendered = soul_path.read_text(encoding="utf-8")
             tampered = rendered.replace(
-                "If it can be better, it should be better",
+                "Leave the place clearer than you found it",
                 "HAND EDITED BY USER, NOT GENERATED",
             )
             soul_path.write_text(tampered, encoding="utf-8")
@@ -134,8 +135,8 @@ class RenderSoulTests(unittest.TestCase):
             # Edit the source principle (legit change, not auto-zone hand-edit)
             principle_path.write_text(
                 principle_path.read_text(encoding="utf-8").replace(
-                    "If it can be better, it should be better",
-                    "If it can be better, it must be better",
+                    "Leave the place clearer than you found it",
+                    "Leave the place clearer than you found it, always",
                 ),
                 encoding="utf-8",
             )
@@ -193,6 +194,79 @@ class RenderSoulTests(unittest.TestCase):
                     if "Last regenerated:" not in line
                 )
             self.assertEqual(strip_ts(once), strip_ts(twice))
+        clear_minder_memory_env()
+
+
+LEGACY_SOUL = SOUL_TEMPLATE.replace(
+    r.SOUL_MARKER_START, "<!-- soul-values:start -->"
+).replace(r.SOUL_MARKER_END, "<!-- soul-values:end -->")
+
+SHIPPED_SOUL_TEMPLATE = Path(__file__).resolve().parents[2] / "SOUL.template.md"
+
+
+class LegacySoulMarkerTests(unittest.TestCase):
+    """A SOUL.md seeded from the template's earlier marker pair renders."""
+
+    def test_legacy_pair_is_converted_and_rendered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fx = make_fixture(Path(tmp))
+            fx.write_principle("axiom/identity/001.md", VALID_NOTE)
+            soul_path = fx.write_system_file("SOUL.md", LEGACY_SOUL)
+            clar_path = fx.write_system_file(
+                "state/CLARIFICATIONS.md", CLARIFICATIONS_TEMPLATE
+            )
+            rc = r.main([
+                "--soul", str(soul_path), "--write-clarification",
+                "--clarifications", str(clar_path),
+            ])
+            self.assertEqual(rc, 0)
+            text = soul_path.read_text(encoding="utf-8")
+            self.assertIn(r.SOUL_MARKER_START, text)
+            self.assertIn(r.SOUL_MARKER_END, text)
+            self.assertNotIn("soul-values:", text)
+            self.assertIn(VALID_NOTE_TITLE, text)
+            self.assertIn("Hand-written style area.", text)
+            # A first render over the seed placeholder is not a hand-edit.
+            self.assertEqual(
+                clar_path.read_text(encoding="utf-8"), CLARIFICATIONS_TEMPLATE
+            )
+        clear_minder_memory_env()
+
+    @unittest.skipUnless(
+        SHIPPED_SOUL_TEMPLATE.exists(),
+        "authoring repo only — a release renames the template to the clone's own SOUL.md",
+    )
+    def test_shipped_template_renders(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fx = make_fixture(Path(tmp))
+            fx.write_principle("axiom/identity/001.md", VALID_NOTE)
+            soul_path = fx.write_system_file(
+                "SOUL.md", SHIPPED_SOUL_TEMPLATE.read_text(encoding="utf-8")
+            )
+            rc = r.main(["--soul", str(soul_path)])
+            self.assertEqual(rc, 0)
+            self.assertIn(VALID_NOTE_TITLE, soul_path.read_text(encoding="utf-8"))
+        clear_minder_memory_env()
+
+    @unittest.skipUnless(
+        SHIPPED_SOUL_TEMPLATE.exists(),
+        "authoring repo only — a release renames the template to the clone's own SOUL.md",
+    )
+    def test_shipped_template_carries_canonical_markers(self):
+        text = SHIPPED_SOUL_TEMPLATE.read_text(encoding="utf-8")
+        self.assertEqual(text.count(r.SOUL_MARKER_START), 1)
+        self.assertEqual(text.count(r.SOUL_MARKER_END), 1)
+
+    def test_ambiguous_legacy_markers_are_left_alone(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fx = make_fixture(Path(tmp))
+            fx.write_principle("axiom/identity/001.md", VALID_NOTE)
+            doubled = LEGACY_SOUL + "\n<!-- soul-values:start -->\nx\n<!-- soul-values:end -->\n"
+            soul_path = fx.write_system_file("SOUL.md", doubled)
+            with self.assertRaises(SystemExit) as ctx_mgr:
+                r.main(["--soul", str(soul_path)])
+            self.assertNotEqual(ctx_mgr.exception.code, 0)
+            self.assertEqual(soul_path.read_text(encoding="utf-8"), doubled)
         clear_minder_memory_env()
 
 

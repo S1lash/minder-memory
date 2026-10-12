@@ -71,9 +71,9 @@ modified: REPLACE_WITH_DATE
 > `_system/scripts/render_soul_values.py`. Do NOT hand-edit between the
 > markers — drift is detected and reported as CLARIFICATION.
 
-<!-- soul-values:start -->
+<!-- AUTO-GENERATED FROM CONSTITUTION — DO NOT EDIT MANUALLY -->
 {populated by render_soul_values.py — empty until first principle lands}
-<!-- soul-values:end -->
+<!-- END AUTO-GENERATED -->
 
 ## Context for Agents
 

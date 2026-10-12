@@ -8,9 +8,10 @@ before deciding to put anything sensitive into Minder Memory.
 - **Your records, knowledge, constitution, registries** are text files
   in your git repo. They live on your machine (the working tree),
   plus the local `.git/` history, plus wherever you push the repo —
-  typically a private GitHub repo you control. The engine itself
-  never pushes; you do (via `/minder:mem:save` with your confirmation, or
-  manually). Nothing else exfiltrates them — with one exception you
+  typically a private GitHub repo you control. Pushes happen only
+  when you ask for them: `/minder:mem:save` with your confirmation, a
+  manual push, or a scheduled routine you set up (each tick pushes its
+  own commit to `origin`). Nothing else exfiltrates them — with one exception you
   create deliberately: a **role** you set up to reach an outside
   service will send it what its assignment says to send. See «Roles»
   below before you create one.
@@ -22,10 +23,10 @@ before deciding to put anything sensitive into Minder Memory.
   API per their terms. This is how the engine "thinks". You consent
   per-skill-invocation; nothing fires without your action or a
   scheduler you set up.
-- **Git pushes** — only when you (or `/minder:mem:save`, with your
-  confirmation) push to a remote. The default remote is `origin` (a
-  private repo you control). The engine never auto-pushes to
-  `upstream` (the public skeleton).
+- **Git pushes** — only when you push, `/minder:mem:save` pushes with
+  your confirmation, or a scheduled routine you set up delivers its
+  tick. All of them go to `origin` (a private repo you control). Nothing
+  ever pushes to `upstream` (the public skeleton).
 
 If you stop running skills and stop pushing, the system is fully
 quiescent — markdown files on disk, nothing else.
@@ -83,9 +84,11 @@ Your repo can have two remotes:
   Read-only direction: you pull engine updates *from* upstream, never
   push to it.
 
-`/minder:mem:save` and `/minder:mem:sync-data` push to `origin` only. They never
-touch `upstream`. If you have private records you don't want on a
-remote at all, simply don't push — the system works fully offline.
+`/minder:mem:save`, `/minder:mem:sync-data` and the scheduled routines push to
+`origin` only — a routine either to `main` or to its own result branch that
+it merges (`docs/scheduling.md`). Nothing touches `upstream`. If you have
+private records you don't want on a remote at all, don't push and don't
+schedule routines — the system works fully offline.
 
 ## Sensitivity flags — what they do today
 
@@ -304,6 +307,16 @@ every Claude Code session started at this repository's root or under
 - Never delete files from `_sources/`.
 
 These hold across all skills. If you observe a violation, that's a bug.
+
+An engine update edits your notes in exactly two cases, both mechanical,
+both undone by one `git revert`, and neither ever touches a file with
+uncommitted changes:
+
+- **A product rename** — the engine's own name is replaced throughout
+  your base by a fixed token map (`_sources/` is left as it was).
+- **Recovering content a scheduled delivery erased** — when a stale tick
+  overwrote what arrived while it ran, the update restores that content
+  from your own git history.
 
 ## Questions
 
